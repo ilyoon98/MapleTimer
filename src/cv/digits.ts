@@ -120,11 +120,22 @@ function normalize(c: Comp, W: number): Float32Array {
   return acc;
 }
 
-/** 마스크에서 숫자처럼 생긴 덩어리를 골라 왼쪽부터 정렬 */
-export function segment(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK): Segmented {
+/**
+ * 마스크에서 숫자처럼 생긴 덩어리를 골라 왼쪽부터 정렬.
+ * staticMask: 평소(사용 가능 상태)에도 밝은 픽셀. 여기에 절반 넘게 겹치는 덩어리는
+ * 쿨타임 숫자가 아니라 퀵슬롯 키 이름("A", "Shift")이나 아이콘 그림이므로 뺀다.
+ */
+export function segment(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK, staticMask?: Uint8Array | null): Segmented {
   const W = img.width,
     H = img.height;
-  const comps = components8(textMask(img, o), W, H);
+  let comps = components8(textMask(img, o), W, H);
+  if (staticMask && staticMask.length === W * H) {
+    comps = comps.filter((c) => {
+      let overlap = 0;
+      for (const i of c.pixels) if (staticMask[i]) overlap++;
+      return overlap <= c.pixels.length * 0.5;
+    });
+  }
   // 숫자 높이 후보: 영역 높이의 22%~90%
   const tall = comps.filter((c) => c.h >= Math.max(5, H * 0.22) && c.h <= H * 0.9 && c.w <= c.h * 1.6 + 2 && c.pixels.length >= 6);
   if (!tall.length) return { tokens: [], glyphs: [], hasColon: false };
@@ -186,6 +197,22 @@ export function segment(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK): Se
     lastGlyph = g;
   }
   return { tokens, glyphs, hasColon: tokens.includes(":") };
+}
+
+/** 흑백 기준 이미지에서 '늘 밝은' 픽셀 마스크 (1픽셀 넓혀서 테두리 번짐까지 덮음) */
+export function staticBrightMask(gray: ArrayLike<number>, W: number, H: number, min = 170): Uint8Array {
+  const m = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (gray[y * W + x] < min) continue;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx,
+            ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < W && ny < H) m[ny * W + nx] = 1;
+        }
+    }
+  return m;
 }
 
 /** 두 글자 모양의 상관계수 (-1~1) */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CooldownSequenceRecorder } from "../detect/digitLearner";
-import { labelGlyphs, readDigits, segment, type DigitTemplates } from "./digits";
+import { labelGlyphs, readDigits, segment, staticBrightMask, type DigitTemplates } from "./digits";
 import type { Pixels } from "./image";
 
 // 테스트용 5×7 픽셀 글꼴 (실제 게임 글꼴과는 무관)
@@ -66,6 +66,21 @@ describe("숫자 읽기", () => {
     const seg = segment(render("45.23", 110));
     expect(labelGlyphs(seg, "45.23")?.map((x) => x.digit)).toEqual([4, 5, 2, 3]);
     expect(labelGlyphs(seg, "45.2")).toBeNull();
+  });
+  it("평소에도 있는 밝은 글자(퀵슬롯 키 이름)는 쿨타임 숫자로 보지 않는다", () => {
+    // 사용 가능 상태: 왼쪽 위에 키 이름처럼 생긴 밝은 막대
+    const withLabel = (img: Pixels) => {
+      for (let y = 2; y < 14; y++) for (let x = 2; x < 5; x++) img.data.set([255, 255, 255, 255], (y * img.width + x) * 4);
+      return img;
+    };
+    const ready = withLabel(render(""));
+    const gray = Array.from({ length: ready.width * ready.height }, (_, i) => ready.data[i * 4]);
+    const mask = staticBrightMask(gray, ready.width, ready.height);
+    // 숫자가 없을 때는 키 이름이 가장 큰 글자라서 숫자로 잘못 잡힌다 → 기준 마스크로 뺀다
+    expect(segment(ready).glyphs.length).toBe(1);
+    expect(segment(ready, undefined, mask).glyphs.length).toBe(0);
+    // 쿨타임 숫자는 그대로 잡힌다
+    expect(segment(withLabel(render("43")), undefined, mask).glyphs.length).toBe(2);
   });
   it("숫자가 없으면 null", () => {
     expect(readDigits(segment(render("")), templatesFromFont())).toBeNull();

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { screenCapture } from "../../capture/screenCapture";
 import { regionValidFor } from "../../capture/types";
-import { segment } from "../../cv/digits";
+import { segment, staticBrightMask } from "../../cv/digits";
 import { digitStore, learnedDigitCount } from "../../detect/digitLearner";
 import { teachDigits } from "../teachDigits";
 import { makeReference } from "../../detect/quickslotCast";
@@ -229,7 +229,9 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
                   title="자동 학습이 잘 안 될 때: 쿨타임 숫자가 보이는 순간 눌러서 직접 입력"
                   onClick={() => {
                     const img = debugCrops.get(`skill:${s.id}`);
-                    teachDigits(img ? segment(img) : null, "퀵슬롯");
+                    const r = s.readyRef;
+                    const staticMask = r && img && r.width === img.width && r.height === img.height ? staticBrightMask(r.data, r.width, r.height) : null;
+                    teachDigits(img ? segment(img, undefined, staticMask) : null, "퀵슬롯");
                   }}
                 >
                   숫자 직접 가르치기

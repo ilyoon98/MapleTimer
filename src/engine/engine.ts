@@ -16,7 +16,7 @@ import { PresenceTracker } from "../detect/presence";
 import { QuickslotCastDetector, type IconState } from "../detect/quickslotCast";
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
 import { appTicker } from "../core/ticker";
-import { readDigits, segment, textMask } from "../cv/digits";
+import { readDigits, segment, staticBrightMask, textMask } from "../cv/digits";
 import {
   CooldownSequenceRecorder,
   activeTemplates,
@@ -147,6 +147,8 @@ interface SkillRuntime {
   /** 이번 쿨타임 숫자가 처음 나타난 시각 */
   cycleStart: number | null;
   cycleUsed: boolean;
+  staticKey: unknown;
+  staticMask: Uint8Array | null;
 }
 const skillRt = new Map<string, SkillRuntime>();
 
@@ -166,6 +168,8 @@ function skillRuntime(s: SkillEntry): SkillRuntime {
       digitsAbsentSince: null,
       cycleStart: null,
       cycleUsed: true,
+      staticKey: undefined,
+      staticMask: null,
     };
     skillRt.set(s.id, rt);
   }
@@ -232,7 +236,12 @@ function tickSkills(p: Profile, now: number, live: boolean) {
           rt.alerted = false;
           r.reset();
         };
-        const seg = segment(img);
+        // 기준 이미지(사용 가능 상태)에도 있는 밝은 글자(키 이름 등)는 쿨타임 숫자가 아니다
+        if (rt.staticKey !== s.readyRef) {
+          rt.staticKey = s.readyRef;
+          rt.staticMask = s.readyRef ? staticBrightMask(s.readyRef.data, s.readyRef.width, s.readyRef.height) : null;
+        }
+        const seg = segment(img, undefined, rt.staticMask);
         const castAt = rt.detector.observe(img, now, textMask(img));
         if (castAt != null) startCycle(castAt);
 
