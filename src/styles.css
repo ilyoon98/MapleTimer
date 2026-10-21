@@ -631,6 +631,12 @@ input[type="text"] {
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
+.picker-preview {
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  image-rendering: pixelated;
+  max-height: 96px;
+}
 .sound-list {
   list-style: none;
   padding: 0;

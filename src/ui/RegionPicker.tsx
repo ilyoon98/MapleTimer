@@ -8,6 +8,22 @@ export interface PickResult {
   pixels: ImageData;
 }
 
+/** 고른 영역을 확대해서 보여준다 (작은 아이콘을 딱 맞게 골랐는지 확인용) */
+function SelectionPreview({ snap, rect }: { snap: HTMLCanvasElement; rect: Rect }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const scale = Math.max(1, Math.min(8, Math.floor(Math.min(240 / rect.w, 96 / rect.h))));
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    c.width = rect.w * scale;
+    c.height = rect.h * scale;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(snap, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w * scale, rect.h * scale);
+  }, [snap, rect, scale]);
+  return <canvas ref={ref} className="picker-preview" title={`${scale}배 확대`} />;
+}
+
 /**
  * 공유 화면을 한 장 멈춰 놓고, 드래그로 영역을 고르는 창.
  * within 을 주면 그 영역 안에서만 고른다 (예: 버프칸 안에서 아이콘 고르기).
@@ -199,6 +215,7 @@ export function RegionPicker({
           )}
         </div>
         <footer className="modal-foot">
+          {snap && rect && rect.w >= 2 && rect.h >= 2 && <SelectionPreview snap={snap} rect={rect} />}
           <span className="muted">{rect ? `선택: ${rect.w}×${rect.h}px @ (${rect.x + offset.x}, ${rect.y + offset.y})` : "영역을 드래그하세요"}</span>
           <span className="spacer" />
           <button onClick={onClose}>취소</button>

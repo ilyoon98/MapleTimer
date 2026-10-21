@@ -284,9 +284,19 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
           </ul>
         </section>
         <section className="modal-section">
-          <h4>4. 잘 안 될 때</h4>
+          <h4>4. 숫자 학습 (처음 한 번)</h4>
           <ul className="guide-list">
+            <li>쿨타임 10초 이상 스킬의 퀵슬롯 영역을 잡고, 스킬을 쓴 뒤 <b>쿨타임이 끝날 때까지</b> 두면 0~9 숫자 모양을 자동으로 배워요.</li>
+            <li>숫자를 배우면 쿨타임 도중에 켜도 남은 시간을 맞추고, 버프 아이콘의 남은 시간(야누스·파운틴 정밀)과 부스터 타이머도 읽어요.</li>
+            <li>잘 안 배워지면 진단의 <b>숫자 직접 가르치기</b>로 화면 숫자를 입력해 주세요.</li>
+          </ul>
+        </section>
+        <section className="modal-section">
+          <h4>5. 잘 안 될 때</h4>
+          <ul className="guide-list">
+            <li>맨 위 <b>준비 체크리스트</b>에서 빠진 단계를 확인하세요.</li>
             <li>각 항목의 ▾ 를 눌러 <b>진단</b> 화면에서 실제로 잘린 영역과 수치를 확인하고 기준값을 조절하세요.</li>
+            <li>설정 &gt; <b>진단 파일 저장</b>으로 그 순간의 화면·설정을 저장해 두면 원인을 찾기 쉬워요.</li>
             <li>소리가 안 나면: 페이지를 한 번 클릭했는지, 탭 음소거·시스템 볼륨을 확인하세요.</li>
             <li>PIP 타이머를 켜 두면 게임 위에 남은 시간이 항상 보여요.</li>
           </ul>
