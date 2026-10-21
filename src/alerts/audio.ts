@@ -57,11 +57,12 @@ class AudioEngine {
   /** 소리를 재생하고, 재생이 끝나면 resolve 한다 (반복 알림 간격 계산용) */
   async play(spec: SoundSpec, volume = 1): Promise<void> {
     if (this.muted) return;
-    const vol = Math.max(0, Math.min(1, volume * this.masterVolume));
+    // 비프음·내 소리 파일은 최대 2배(200%)까지 키울 수 있다 (음성 읽기는 브라우저 한계로 100%)
+    const vol = Math.max(0, Math.min(2, volume * this.masterVolume));
     if (vol === 0) return;
     switch (spec.kind) {
       case "tts":
-        return this.speak(spec.text, vol);
+        return this.speak(spec.text, Math.min(1, vol));
       case "beep":
         return this.beep(spec.pattern, vol);
       case "custom":

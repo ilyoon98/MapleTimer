@@ -87,12 +87,13 @@ export function AlertSettings({ value, onChange }: { value: AlertConfig; onChang
         <input
           type="range"
           min={0}
-          max={100}
+          max={s.kind === "tts" ? 100 : 200}
           step={5}
-          value={Math.round(value.volume * 100)}
+          value={Math.round(Math.min(value.volume, s.kind === "tts" ? 1 : 2) * 100)}
           onChange={(e) => onChange({ ...value, volume: Number(e.target.value) / 100 })}
         />
-        <span className="mono">{Math.round(value.volume * 100)}%</span>
+        <span className="mono">{Math.round(Math.min(value.volume, s.kind === "tts" ? 1 : 2) * 100)}%</span>
+        {value.volume > 1 && s.kind !== "tts" && <span className="muted small">100% 넘으면 소리가 깨질 수 있어요</span>}
       </div>
       <div className="field-row">
         <span className="field-label">반복</span>
