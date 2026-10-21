@@ -37,6 +37,9 @@ export function onAlertLog(l: LogListener) {
   logListeners.add(l);
   return () => logListeners.delete(l);
 }
+export function emitAlertLog(label: string, at = Date.now()) {
+  for (const l of logListeners) l({ at, label });
+}
 
 /**
  * 알림 한 건의 재생/반복을 관리한다.
@@ -49,6 +52,8 @@ export class AlertRunner {
   private played = 0;
   private playing = false;
   private active = false;
+  /** 사용자가 '알림 멈춤'을 눌렀음: 조건이 풀릴 때(reset)까지 다시 울리지 않음 */
+  private acked = false;
   lastFiredAt: number | null = null;
 
   constructor(
@@ -60,12 +65,17 @@ export class AlertRunner {
     return this.active;
   }
 
+  /** 지금 소리가 나고 있거나 반복 대기 중 */
+  get isRinging() {
+    return this.active && (this.playing || this.nextAt != null);
+  }
+
   setLabel(label: string) {
     this.label = label;
   }
 
   trigger(now = Date.now(), opts: { jitter?: boolean } = {}) {
-    if (this.active) return;
+    if (this.active || this.acked) return;
     this.active = true;
     this.played = 0;
     this.nextAt = now + (opts.jitter === false ? 0 : pickJitterMs());
@@ -73,8 +83,17 @@ export class AlertRunner {
 
   reset() {
     this.active = false;
+    this.acked = false;
     this.nextAt = null;
     this.played = 0;
+  }
+
+  /** 지금 울리거나 반복 중인 알림을 멈춘다. 조건이 풀렸다가 다시 생기면 그때 다시 울린다 */
+  ack() {
+    if (!this.active) return;
+    this.active = false;
+    this.acked = true;
+    this.nextAt = null;
   }
 
   tick(now = Date.now()) {
@@ -83,7 +102,7 @@ export class AlertRunner {
     this.playing = true;
     this.played++;
     this.lastFiredAt = now;
-    for (const l of logListeners) l({ at: now, label: this.label });
+    emitAlertLog(this.label, now);
     const repeatsLeft = (() => {
       if (!cfg.repeat.enabled) return false;
       if (cfg.repeat.maxCount == null) return true;

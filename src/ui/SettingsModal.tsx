@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
-import { defaultProfile, profileStore, uid } from "../state/profile";
+import { defaultProfile, profileStore, uid, type ThemeMode } from "../state/profile";
 import { refreshCustomSounds } from "./AlertSettings";
+import { Toggle } from "./common";
 
 function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -14,6 +15,8 @@ function useEscape(onClose: () => void) {
 
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   useEscape(onClose);
+  const theme = profileStore.use((p) => p.theme);
+  const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const [sounds, setSounds] = useState<CustomSound[]>([]);
   const reload = async () => {
     setSounds(await listCustomSounds());
@@ -65,6 +68,24 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             ✕
           </button>
         </header>
+        <section className="modal-section">
+          <h4>일반</h4>
+          <div className="field-row">
+            <span className="field-label">테마</span>
+            <select value={theme} onChange={(e) => profileStore.set({ theme: e.target.value as ThemeMode })}>
+              <option value="system">시스템 설정 따르기</option>
+              <option value="light">밝게</option>
+              <option value="dark">어둡게</option>
+            </select>
+          </div>
+          <div className="field-row">
+            <Toggle
+              checked={alertOnShareEnd}
+              onChange={(v) => profileStore.set({ alertOnShareEnd: v })}
+              label="화면 공유가 끊기면 음성으로 알려주기 (게임 창이 닫히거나 최소화로 끊긴 경우)"
+            />
+          </div>
+        </section>
         <section className="modal-section">
           <h4>내 소리 파일</h4>
           <p className="muted small">mp3 · m4a · wav · ogg (5MB 이하). 이 브라우저에만 저장돼요. 30초가 넘는 부분은 잘려서 재생돼요.</p>

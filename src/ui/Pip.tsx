@@ -1,6 +1,5 @@
 import { createRoot, type Root } from "react-dom/client";
-import { audioEngine } from "../alerts/audio";
-import { liveStore } from "../engine/engine";
+import { liveStore, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
 import { profileStore, shortName } from "../state/profile";
 import { fmtRemaining } from "./common";
@@ -139,15 +138,15 @@ function PipView() {
           onChange={(e) => profileStore.set({ masterVolume: Number(e.target.value) / 100 })}
         />
         <span className="mono">{Math.round(p.masterVolume * 100)}%</span>
-        <button
-          onClick={() => {
-            audioEngine.muted = !audioEngine.muted;
-            liveStore.set({});
-          }}
-        >
-          {audioEngine.muted ? "🔇" : "🔊"}
+        <button title={p.muted ? "알림 소리 켜기" : "모든 알림 소리 끄기"} onClick={() => profileStore.set({ muted: !p.muted })}>
+          {p.muted ? "🔇" : "🔊"}
         </button>
       </div>
+      {live.ringing.length > 0 && (
+        <button className="ringing-btn" onClick={stopRingingAlerts}>
+          🔕 알림 멈춤
+        </button>
+      )}
     </div>
   );
 }

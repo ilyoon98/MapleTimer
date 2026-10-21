@@ -17,7 +17,7 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #141716;
     --card: #1d2120;
     --text: #e6ebe8;
@@ -35,6 +35,31 @@
     --shadow: none;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #141716;
+  --card: #1d2120;
+  --text: #e6ebe8;
+  --muted: #94a09a;
+  --line: #2d3331;
+  --accent: #4cc38a;
+  --accent-soft: #1b3328;
+  --warn: #e2b04a;
+  --warn-soft: #3a2f17;
+  --alert: #ff6b61;
+  --alert-soft: #3d1d1b;
+  --info: #6aa7ea;
+  --info-soft: #1a2a3d;
+  --input: #252a28;
+  --shadow: none;
+  color-scheme: dark;
+}
+.ringing-btn {
+  background: var(--alert);
+  border-color: var(--alert);
+  color: #fff;
+  font-weight: 700;
+  animation: pip-flash 0.8s infinite alternate;
 }
 
 * {

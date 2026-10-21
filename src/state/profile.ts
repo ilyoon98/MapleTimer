@@ -203,9 +203,16 @@ export function newTimer(preset: TimerPreset): TimerEntry {
 /* ───────── 프로필 ───────── */
 export type RegionKey = "minimap" | "stall" | "buffbar" | `skill:${string}`;
 
+export type ThemeMode = "system" | "light" | "dark";
+
 export interface Profile {
   v: 1;
   masterVolume: number;
+  /** 모든 알림 소리 끄기 */
+  muted: boolean;
+  theme: ThemeMode;
+  /** 화면 공유가 끊기면 알림 */
+  alertOnShareEnd: boolean;
   randomDelay: boolean;
   skills: SkillEntry[];
   rune: RuneSettings;
@@ -224,6 +231,9 @@ export function defaultProfile(): Profile {
   return {
     v: 1,
     masterVolume: 1,
+    muted: false,
+    theme: "system",
+    alertOnShareEnd: true,
     randomDelay: false,
     skills: [newSkill("sol-janus-2min"), newSkill("erda-fountain")],
     rune: {

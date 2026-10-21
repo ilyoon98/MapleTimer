@@ -1,4 +1,11 @@
-import { AlertRunner, onAlertLog, randomDelaySetting, type AlertConfig, type AlertLogEntry } from "../alerts/alertRunner";
+import {
+  AlertRunner,
+  emitAlertLog,
+  onAlertLog,
+  randomDelaySetting,
+  type AlertConfig,
+  type AlertLogEntry,
+} from "../alerts/alertRunner";
 import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
@@ -50,6 +57,8 @@ export interface LiveState {
   stall: StallLive;
   buffs: Record<string, BuffLive>;
   log: AlertLogEntry[];
+  /** 지금 울리거나 반복 중인 알림 이름 */
+  ringing: string[];
 }
 
 export const liveStore = createStore<LiveState>({
@@ -59,6 +68,7 @@ export const liveStore = createStore<LiveState>({
   stall: { status: "off", idleMs: 0, changedCells: 0, totalCells: 0, lastAlertAt: null },
   buffs: {},
   log: [],
+  ringing: [],
 });
 
 /** 진단 화면에서 보여줄 마지막 잘라낸 영역 이미지 */
@@ -429,14 +439,32 @@ function tickTimers(p: Profile, now: number) {
   }
 }
 
+/** 지금 울리거나 반복 중인 알림을 모두 멈춘다 */
+export function stopRingingAlerts() {
+  for (const r of runners.values()) r.ack();
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+
 /* ───────── 메인 루프 ───────── */
 let lastSlow = 0;
 let lastBuff = 0;
+let prevCaptureState = screenCapture.state;
+
+function checkShareEnded(p: Profile, now: number) {
+  const st = screenCapture.state;
+  if (prevCaptureState === "live" && st === "ended" && p.alertOnShareEnd) {
+    emitAlertLog("화면 공유 끊김", now);
+    void audioEngine.play(tts("화면 공유가 끊겼어요"), 1);
+  }
+  prevCaptureState = st;
+}
 
 function tick(now: number) {
   const p = profileStore.get();
   audioEngine.masterVolume = p.masterVolume;
+  audioEngine.muted = p.muted;
   randomDelaySetting.enabled = p.randomDelay;
+  checkShareEnded(p, now);
   const live = screenCapture.state === "live" && screenCapture.refresh();
   const prev = liveStore.get();
 
@@ -460,7 +488,18 @@ function tick(now: number) {
   }
 
   tickTimers(p, now);
-  liveStore.set({ now, skills, rune, stall, buffs });
+  let ringing: string[] = [];
+  for (const [key, r] of runners) if (r.isRinging) ringing.push(runnerLabel(key, p));
+  if (ringing.join("|") === prev.ringing.join("|")) ringing = prev.ringing; // 바뀐 게 없으면 같은 배열 유지 (불필요한 다시 그리기 방지)
+  liveStore.set({ now, skills, rune, stall, buffs, ringing });
+}
+
+function runnerLabel(key: string, p: Profile) {
+  const [kind, id] = key.split(":");
+  if (kind === "skill") return shortName(p.skills.find((s) => s.id === id)?.name ?? "스킬");
+  if (kind === "buff") return p.buffs.find((b) => b.id === id)?.name ?? "버프";
+  if (kind === "timer") return shortName(p.timers.find((t) => t.id === id)?.name ?? "타이머");
+  return kind === "rune" ? "룬" : kind === "stall" ? "사냥 멈춤" : kind;
 }
 
 let started = false;

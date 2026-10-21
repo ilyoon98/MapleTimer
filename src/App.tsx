@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "./alerts/audio";
 import { screenCapture } from "./capture/screenCapture";
-import { liveStore, startEngine } from "./engine/engine";
+import { liveStore, startEngine, stopRingingAlerts } from "./engine/engine";
 import { profileStore, type PanelId } from "./state/profile";
 import { fmtClock, Toggle } from "./ui/common";
 import { closePicker, pickerStore } from "./ui/pickerStore";
@@ -71,7 +71,7 @@ function ShareChip() {
           화면 저장
         </button>
         <button onClick={start}>다른 창 선택</button>
-        <button onClick={() => screenCapture.stop()}>중지</button>
+        <button onClick={() => screenCapture.stop("user")}>중지</button>
       </div>
     );
   return (
@@ -105,6 +105,14 @@ export function App() {
   const collapsed = profileStore.use((p) => p.collapsed);
   const masterVolume = profileStore.use((p) => p.masterVolume);
   const randomDelay = profileStore.use((p) => p.randomDelay);
+  const muted = profileStore.use((p) => p.muted);
+  const theme = profileStore.use((p) => p.theme);
+  const ringing = liveStore.use((s) => s.ringing);
+
+  useEffect(() => {
+    if (theme === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+  }, [theme]);
   const picker = pickerStore.use((s) => s.req);
   const pipOpen = pipStore.use((s) => s.open);
   const [modal, setModal] = useState<"settings" | "guide" | null>(null);
@@ -155,6 +163,12 @@ export function App() {
           <span className="mono">{Math.round(masterVolume * 100)}%</span>
         </label>
         <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="랜덤 지연 (첫 알림 0~2초)" />
+        <Toggle checked={muted} onChange={(v) => profileStore.set({ muted: v })} label="모든 알림 소리 끄기" />
+        {ringing.length > 0 && (
+          <button className="ringing-btn" onClick={stopRingingAlerts} title="지금 울리는 알림과 남은 반복을 멈춰요">
+            🔕 알림 멈춤 ({ringing.join(", ")})
+          </button>
+        )}
         <span className="spacer" />
         <AlertLog />
         <button onClick={() => setEditOrder(!editOrder)}>{editOrder ? "순서 편집 끝" : "순서 편집"}</button>

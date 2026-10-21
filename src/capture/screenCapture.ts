@@ -40,7 +40,7 @@ export class ScreenCapture {
   }
 
   async start() {
-    this.stop();
+    this.stop("user");
     this.state = "starting";
     this.emit();
     try {
@@ -56,7 +56,8 @@ export class ScreenCapture {
           });
       this.stream = stream;
       const track = stream.getVideoTracks()[0];
-      track.addEventListener("ended", () => this.stop());
+      // 게임 창이 닫히거나 브라우저의 '공유 중지'로 끊긴 경우
+      track.addEventListener("ended", () => this.stop("ended"));
       if (TrackProcessor) {
         void this.pump(new TrackProcessor({ track }).readable.getReader());
       } else {
@@ -91,7 +92,8 @@ export class ScreenCapture {
     }
   }
 
-  stop() {
+  /** user: 이 앱에서 직접 멈춤(알림 없음), ended: 공유가 바깥에서 끊김 */
+  stop(reason: "user" | "ended" = "user") {
     this.reader?.cancel().catch(() => {});
     this.reader = null;
     this.latest?.close();
@@ -101,7 +103,7 @@ export class ScreenCapture {
     if (this.video) this.video.srcObject = null;
     this.video = null;
     if (this.state !== "idle") {
-      this.state = "ended";
+      this.state = reason === "ended" ? "ended" : "idle";
       this.emit();
     }
   }
