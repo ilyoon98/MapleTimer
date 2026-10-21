@@ -5,6 +5,7 @@ import { liveStore, startEngine, stopRingingAlerts } from "./engine/engine";
 import { profileStore, type PanelId } from "./state/profile";
 import { fmtClock, Toggle } from "./ui/common";
 import { closePicker, pickerStore } from "./ui/pickerStore";
+import { BoosterPanel } from "./ui/panels/BoosterPanel";
 import { BuffsPanel } from "./ui/panels/BuffsPanel";
 import { RunePanel } from "./ui/panels/RunePanel";
 import { SkillsPanel } from "./ui/panels/SkillsPanel";
@@ -20,6 +21,7 @@ const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => 
   rune: (p) => <RunePanel {...p} />,
   stall: (p) => <StallPanel {...p} />,
   buffs: (p) => <BuffsPanel {...p} />,
+  booster: (p) => <BoosterPanel {...p} />,
   timers: (p) => <TimersPanel {...p} />,
 };
 

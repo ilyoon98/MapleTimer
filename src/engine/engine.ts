@@ -67,8 +67,15 @@ export interface BuffLive {
   /** 아이콘에서 읽은 남은 시간 */
   readText: string | null;
 }
+export interface BoosterLive {
+  status: "off" | "no-share" | "no-region" | "searching" | "reading" | "running";
+  readText: string | null;
+  endsAt: number | null;
+  lastAlertAt: number | null;
+}
 export interface LiveState {
   now: number;
+  booster: BoosterLive;
   skills: Record<string, SkillLive>;
   rune: RuneLive;
   stall: StallLive;
@@ -82,6 +89,7 @@ export interface LiveState {
 
 export const liveStore = createStore<LiveState>({
   now: Date.now(),
+  booster: { status: "off", readText: null, endsAt: null, lastAlertAt: null },
   skills: {},
   rune: { status: "off", boxes: [], lastAlertAt: null },
   stall: { status: "off", idleMs: 0, changedCells: 0, totalCells: 0, lastAlertAt: null },
@@ -590,6 +598,73 @@ function tickBuffTimers(p: Profile, now: number) {
   return out;
 }
 
+/* ───────── 부스터 종료 ───────── */
+interface BoosterRuntime {
+  ests: number[];
+  endsAt: number | null;
+  alerted: boolean;
+  lastReadAt: number;
+  readText: string | null;
+}
+const boosterRt: BoosterRuntime = { ests: [], endsAt: null, alerted: false, lastReadAt: 0, readText: null };
+
+/** 부스터 진단 화면의 '직접 가르치기'용: 마지막으로 나눈 글자 */
+export let lastBoosterSegment: ReturnType<typeof segment> | null = null;
+
+/**
+ * 화면 위쪽 부스터 타이머 숫자("45.23" 또는 "1:05")를 읽어 끝나기 전에 알린다.
+ * 3번 연달아 1.5초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용) 새 주기로 본다.
+ */
+function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
+  const r = runner("booster", "부스터", () => profileStore.get().booster.alert);
+  const b = p.booster;
+  const rt = boosterRt;
+  const base = { readText: null, lastAlertAt: r.lastFiredAt };
+  if (!b.enabled) {
+    r.reset();
+    rt.endsAt = null;
+    return { ...base, status: "off", endsAt: null };
+  }
+  if (!live) return { ...base, status: "no-share", endsAt: rt.endsAt };
+  const region = p.regions.booster;
+  if (!regionValidFor(region, screenCapture.width, screenCapture.height)) return { ...base, status: "no-region", endsAt: null };
+  const img = screenCapture.crop(region);
+  if (img) {
+    debugCrops.set("booster", img);
+    const seg = segment(img);
+    lastBoosterSegment = seg;
+    const read = readDigits(seg, activeTemplates());
+    rt.readText = read?.text ?? null;
+    if (read && read.seconds > 0 && read.seconds < 3600) {
+      rt.lastReadAt = now;
+      const est = now + read.seconds * 1000;
+      rt.ests = [...rt.ests.filter((e) => Math.abs(e - est) <= 1500), est].slice(-3);
+      if (rt.ests.length >= 3) {
+        const agreed = rt.ests.reduce((a, c) => a + c, 0) / rt.ests.length;
+        if (rt.endsAt == null || agreed - rt.endsAt > 5000) {
+          // 새로 확인한 주기: 이미 알림 시점이 지났으면 이번 주기는 조용히 넘긴다
+          rt.endsAt = agreed;
+          rt.alerted = agreed - now <= b.leadSec * 1000;
+          r.reset();
+        } else if (Math.abs(agreed - rt.endsAt) <= 1500) {
+          rt.endsAt = (rt.endsAt + agreed) / 2;
+        }
+      }
+    } else if (!read) {
+      rt.ests = [];
+    }
+  }
+  // 20초 넘게 못 읽으면 부스터가 끝났거나 사라진 것으로 본다
+  if (rt.endsAt != null && now - rt.lastReadAt > 20_000 && now > rt.endsAt) rt.endsAt = null;
+  if (rt.endsAt != null && !rt.alerted && rt.endsAt - now <= b.leadSec * 1000) {
+    rt.alerted = true;
+    r.trigger(now);
+  }
+  r.tick(now);
+  const status: BoosterLive["status"] = rt.endsAt != null ? "running" : rt.readText ? "reading" : "searching";
+  return { readText: rt.readText, lastAlertAt: r.lastFiredAt, status, endsAt: rt.endsAt };
+}
+
 /* ───────── 일반 타이머 ───────── */
 const timerAlerted = new Set<string>();
 export function resetTimerAlert(id: string) {
@@ -652,9 +727,13 @@ function tick(now: number) {
 
   const skills = tickSkills(p, now, live);
 
+  let booster = prev.booster;
   if (now - lastBuff >= 500) {
     lastBuff = now;
     detectBuffs(p, now, live);
+    booster = tickBooster(p, now, live);
+  } else {
+    runners.get("booster")?.tick(now);
   }
   trackBuffIcons(p, now, live);
   const buffs = tickBuffTimers(p, now);
@@ -677,7 +756,7 @@ function tick(now: number) {
   // 게임 화면은 늘 조금씩 움직이므로 10초 넘게 새 프레임이 없으면 멈춘 것으로 본다
   const lf = screenCapture.lastFrameAt;
   const captureStale = screenCapture.state === "live" && lf != null && now - lf > 10_000;
-  liveStore.set({ now, skills, rune, stall, buffs, ringing, captureStale });
+  liveStore.set({ now, skills, rune, stall, buffs, booster, ringing, captureStale });
 }
 
 function runnerLabel(key: string, p: Profile) {
@@ -685,7 +764,7 @@ function runnerLabel(key: string, p: Profile) {
   if (kind === "skill") return shortName(p.skills.find((s) => s.id === id)?.name ?? "스킬");
   if (kind === "buff") return p.buffs.find((b) => b.id === id)?.name ?? "버프";
   if (kind === "timer") return shortName(p.timers.find((t) => t.id === id)?.name ?? "타이머");
-  return kind === "rune" ? "룬" : kind === "stall" ? "사냥 멈춤" : kind;
+  return kind === "rune" ? "룬" : kind === "stall" ? "사냥 멈춤" : kind === "booster" ? "부스터" : kind;
 }
 
 // 개발 모드에서만: 브라우저 콘솔에서 감지 상태를 들여다보기 위한 손잡이

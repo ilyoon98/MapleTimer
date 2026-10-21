@@ -176,6 +176,14 @@ export function newBuff(kind: BuffKind): BuffEntry {
       };
 }
 
+/* ───────── 부스터 종료 ───────── */
+export interface BoosterSettings {
+  enabled: boolean;
+  /** 종료 몇 초 전에 알릴지 (음수면 종료 후) */
+  leadSec: number;
+  alert: AlertConfig;
+}
+
 /* ───────── 일반 타이머 ───────── */
 export interface TimerPreset {
   name: string;
@@ -223,7 +231,7 @@ export function newTimer(preset: TimerPreset): TimerEntry {
 }
 
 /* ───────── 프로필 ───────── */
-export type RegionKey = "minimap" | "stall" | "buffbar" | `skill:${string}`;
+export type RegionKey = "minimap" | "stall" | "buffbar" | "booster" | `skill:${string}`;
 
 export type ThemeMode = "system" | "light" | "dark";
 export type PipSize = "small" | "medium" | "large";
@@ -250,14 +258,15 @@ export interface Profile {
   rune: RuneSettings;
   stall: StallSettings;
   buffs: BuffEntry[];
+  booster: BoosterSettings;
   timers: TimerEntry[];
   regions: Partial<Record<RegionKey, SavedRegion>>;
   panelOrder: PanelId[];
   collapsed: Partial<Record<PanelId | "checklist", boolean>>;
 }
 
-export type PanelId = "skills" | "rune" | "stall" | "buffs" | "timers";
-export const PANEL_IDS: PanelId[] = ["skills", "rune", "stall", "buffs", "timers"];
+export type PanelId = "skills" | "rune" | "stall" | "buffs" | "booster" | "timers";
+export const PANEL_IDS: PanelId[] = ["skills", "rune", "stall", "buffs", "booster", "timers"];
 
 export function defaultProfile(): Profile {
   return {
@@ -288,6 +297,7 @@ export function defaultProfile(): Profile {
       alert: alertCfg(tts("사냥이 멈춘 것 같아요")),
     },
     buffs: [],
+    booster: { enabled: false, leadSec: 10, alert: alertCfg(tts("부스터 곧 끝나요")) },
     timers: [newTimer(TIMER_PRESETS[0])],
     regions: {},
     panelOrder: [...PANEL_IDS],
@@ -300,11 +310,18 @@ function migrate(raw: unknown): Profile {
   if (!raw || typeof raw !== "object" || (raw as Profile).v !== 1) return d;
   const p = raw as Partial<Profile>;
   const order = (p.panelOrder ?? []).filter((x): x is PanelId => PANEL_IDS.includes(x as PanelId));
-  for (const id of PANEL_IDS) if (!order.includes(id)) order.push(id);
+  // 새로 생긴 패널은 원래 자리(앞 패널 바로 뒤)에 끼워 넣는다
+  PANEL_IDS.forEach((id, i) => {
+    if (order.includes(id)) return;
+    const after = PANEL_IDS[i - 1];
+    const at = after ? order.indexOf(after) + 1 : 0;
+    order.splice(at > 0 ? at : order.length, 0, id);
+  });
   return {
     ...d,
     ...p,
     rune: { ...d.rune, ...p.rune, color: { ...d.rune.color, ...p.rune?.color } },
+    booster: { ...d.booster, ...p.booster },
     stall: { ...d.stall, ...p.stall, sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity } },
     // 예전 버전에서 저장한 항목엔 새 필드가 없을 수 있음
     buffs: (p.buffs ?? []).map((b) => ({ readTime: b.kind === "expiry", ...(b as Partial<BuffEntry>) }) as BuffEntry),

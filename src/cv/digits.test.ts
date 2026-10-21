@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CooldownSequenceRecorder } from "../detect/digitLearner";
-import { readDigits, segment, type DigitTemplates } from "./digits";
+import { labelGlyphs, readDigits, segment, type DigitTemplates } from "./digits";
 import type { Pixels } from "./image";
 
 // 테스트용 5×7 픽셀 글꼴 (실제 게임 글꼴과는 무관)
@@ -16,6 +16,7 @@ const FONT: Record<string, string[]> = {
   "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
   "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
   ":": ["00000", "00100", "00100", "00000", "00100", "00100", "00000"],
+  ".": ["00000", "00000", "00000", "00000", "00000", "01100", "01100"],
 };
 const S = 3; // 확대 배율
 
@@ -54,6 +55,17 @@ describe("숫자 읽기", () => {
     expect(readDigits(segment(render("43")), t)?.seconds).toBe(43);
     expect(readDigits(segment(render("1:05", 90)), t)?.seconds).toBe(65);
     expect(readDigits(segment(render("7")), t)?.seconds).toBe(7);
+  });
+  it("부스터처럼 소수점이 있는 시간(45.23)도 읽는다", () => {
+    const t = templatesFromFont();
+    const r = readDigits(segment(render("45.23", 110)), t);
+    expect(r?.text).toBe("45.23");
+    expect(r?.seconds).toBeCloseTo(45.23);
+  });
+  it("화면 숫자를 직접 입력해 가르칠 수 있다 (글자 수가 맞을 때만)", () => {
+    const seg = segment(render("45.23", 110));
+    expect(labelGlyphs(seg, "45.23")?.map((x) => x.digit)).toEqual([4, 5, 2, 3]);
+    expect(labelGlyphs(seg, "45.2")).toBeNull();
   });
   it("숫자가 없으면 null", () => {
     expect(readDigits(segment(render("")), templatesFromFont())).toBeNull();

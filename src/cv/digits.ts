@@ -20,8 +20,8 @@ export interface Glyph {
 }
 
 export interface Segmented {
-  /** 숫자 후보와 콜론(':')을 왼쪽부터 */
-  tokens: Array<Glyph | ":">;
+  /** 숫자 후보와 콜론(':'), 소수점('.')을 왼쪽부터 */
+  tokens: Array<Glyph | ":" | ".">;
   glyphs: Glyph[];
   hasColon: boolean;
 }
@@ -167,12 +167,23 @@ export function segment(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK): Se
       if (a !== b && b.y > a.y + a.h && Math.abs(a.x + a.w / 2 - (b.x + b.w / 2)) <= 2 && !colonXs.some((x) => Math.abs(x - a.x) < 3))
         colonXs.push(a.x);
 
+  // 소수점: 줄 아래쪽에 붙은 작은 점 하나 (콜론의 점이 아닌 것)
+  const decimalXs = dots
+    .filter((d) => d.y + d.h >= lineBot - Math.max(2, maxH * 0.2) && !colonXs.some((x) => Math.abs(x - d.x) < 3))
+    .filter((d) => !dots.some((o) => o !== d && Math.abs(o.x - d.x) <= 2 && o.y + o.h < d.y))
+    .map((d) => d.x);
+
   const glyphs: Glyph[] = parts.map((c) => ({ x: c.x, y: c.y, w: c.w, h: c.h, v: normalize(c, W) }));
-  const tokens: Array<Glyph | ":"> = [];
+  const tokens: Array<Glyph | ":" | "."> = [];
+  let lastGlyph: Glyph | null = null;
   for (const g of glyphs) {
-    const prev = tokens[tokens.length - 1];
-    if (prev && prev !== ":" && colonXs.some((x) => x > prev.x + prev.w - 1 && x < g.x)) tokens.push(":");
+    if (lastGlyph) {
+      const between = (x: number) => x > lastGlyph!.x + lastGlyph!.w - 1 && x < g.x;
+      if (colonXs.some(between)) tokens.push(":");
+      else if (decimalXs.some(between)) tokens.push(".");
+    }
     tokens.push(g);
+    lastGlyph = g;
   }
   return { tokens, glyphs, hasColon: tokens.includes(":") };
 }
@@ -235,8 +246,8 @@ export function readDigits(seg: Segmented, templates: DigitTemplates, minScore =
   let text = "";
   let conf = 1;
   for (const tok of seg.tokens) {
-    if (tok === ":") {
-      text += ":";
+    if (tok === ":" || tok === ".") {
+      text += tok;
       continue;
     }
     const c = classifyGlyph(tok.v, templates);
@@ -248,13 +259,24 @@ export function readDigits(seg: Segmented, templates: DigitTemplates, minScore =
   return seconds == null ? null : { text, seconds, confidence: conf };
 }
 
-/** "1:05" → 65, "43" → 43, "1:02:03" → 3723 */
+/** "1:05" → 65, "43" → 43, "1:02:03" → 3723, "45.23" → 45.23 (부스터 타이머) */
 export function parseClock(text: string): number | null {
-  if (!/^\d+(:\d\d)*$/.test(text)) return null;
-  const parts = text.split(":").map(Number);
+  if (!/^\d+(:\d\d)*(\.\d{1,2})?$/.test(text)) return null;
+  const [main, frac] = text.split(".");
+  const parts = main.split(":").map(Number);
   let s = 0;
   for (const p of parts) s = s * 60 + p;
-  return s;
+  return frac ? s + Number(frac) / 10 ** frac.length : s;
+}
+
+/**
+ * 사용자가 화면의 숫자를 직접 입력해 가르치기 ("45.23", "1:05").
+ * 화면에서 나눈 글자 수와 입력한 숫자 개수가 같아야 한다.
+ */
+export function labelGlyphs(seg: Segmented, typed: string): Array<{ digit: number; v: Float32Array; h: number }> | null {
+  const digits = typed.replace(/[^0-9]/g, "");
+  if (!digits.length || digits.length !== seg.glyphs.length) return null;
+  return seg.glyphs.map((g, i) => ({ digit: Number(digits[i]), v: g.v, h: g.h }));
 }
 
 /** 값 v 가 화면에 몇 글자로 찍히는지 (콜론 형식이면 m:ss) */

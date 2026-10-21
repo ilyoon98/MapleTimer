@@ -5,6 +5,7 @@
  *  - 퀵슬롯(우하단): 'k' 키를 누르면 스킬 사용(아이콘 어두워짐, 쿨 15초, 숫자 표시)
  *  - 경험치(하단): 2초마다 숫자 증가, 's' 키로 멈춤/재개
  *  - 버프칸(우상단): 'b' 키로 버프 아이콘 켜고 끄기
+ *  - 부스터(위쪽 가운데): 시작 5초 뒤부터 60초 "SS.cc" 카운트다운
  */
 export function createDemoStream(): MediaStream {
   const W = 1280,
@@ -37,8 +38,11 @@ export function createDemoStream(): MediaStream {
       }
   };
 
+  const t0 = performance.now();
   const draw = () => {
-    const t = performance.now();
+    const now = performance.now();
+    const t = now;
+    const sinceStart = now - t0;
     ctx.fillStyle = "#3a5a40";
     ctx.fillRect(0, 0, W, H);
     // 미니맵
@@ -74,6 +78,21 @@ export function createDemoStream(): MediaStream {
       ctx.textBaseline = "alphabetic";
     }
     drawIcon(960, 20, 120, 1);
+    // 부스터 타이머 (위쪽 가운데, 60초짜리 "SS.cc" 형식, 시작하고 5초 뒤부터)
+    const boostLeft = 65000 - sinceStart;
+    if (boostLeft > 0 && boostLeft <= 60000) {
+      const txt = (boostLeft / 1000).toFixed(2).padStart(5, "0");
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.strokeText(txt, 640, 40);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(txt, 640, 40);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    }
     // 퀵슬롯 (쿨타임 15초, 가운데 큰 숫자)
     const cooling = t - castAt < 15000;
     drawIcon(1100, 640, 290, cooling ? 0.45 : 1);
