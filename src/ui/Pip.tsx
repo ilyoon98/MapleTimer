@@ -44,7 +44,7 @@ export async function openPip() {
   const mount = pip.document.createElement("div");
   pip.document.body.appendChild(mount);
   pipRoot = createRoot(mount);
-  pipRoot.render(<PipView />);
+  pipRoot.render(<PipRoot />);
   pipStore.set({ open: true });
   pip.addEventListener("pagehide", () => {
     pipRoot?.unmount();
@@ -64,6 +64,39 @@ interface Item {
   urgent: boolean;
   tone: "alert" | "running" | "waiting";
   text?: string;
+}
+
+/** 보스용: 특수 코어 쿨타임 하나만 크게 */
+function CorePipView() {
+  const live = liveStore.use((s) => s);
+  const p = profileStore.use((s) => s);
+  const core = p.buffs.find((b) => b.enabled && b.kind === "cooldown");
+  const l = core ? live.buffs[core.id] : undefined;
+  const rem = l?.endsAt != null ? l.endsAt - live.now : null;
+  const soon = core != null && rem != null && rem > 0 && rem <= core.leadSec * 1000;
+  const ready = rem == null || rem <= 0;
+  return (
+    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize}`}>
+      <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
+      <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
+      <div className="pip-core-state muted">{!core ? "버프칸 감지에서 '+ 특수 코어'를 추가하세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
+      <ModeSwitch />
+    </div>
+  );
+}
+
+function ModeSwitch() {
+  const mode = profileStore.use((s) => s.pipMode);
+  return (
+    <button className="pip-btn pip-mode" onClick={() => profileStore.set({ pipMode: mode === "core" ? "hunting" : "core" })}>
+      {mode === "core" ? "전체 보기" : "특수 코어만"}
+    </button>
+  );
+}
+
+function PipRoot() {
+  const mode = profileStore.use((s) => s.pipMode);
+  return mode === "core" ? <CorePipView /> : <PipView />;
 }
 
 function PipView() {
@@ -147,6 +180,7 @@ function PipView() {
         <button title={p.muted ? "알림 소리 켜기" : "모든 알림 소리 끄기"} onClick={() => profileStore.set({ muted: !p.muted })}>
           {p.muted ? "🔇" : "🔊"}
         </button>
+        {p.buffs.some((b) => b.kind === "cooldown") && <ModeSwitch />}
       </div>
       {live.ringing.length > 0 && (
         <button className="ringing-btn" onClick={stopRingingAlerts}>

@@ -252,6 +252,8 @@ export interface Profile {
   /** 화면 공유가 끊기면 알림 */
   alertOnShareEnd: boolean;
   pipSize: PipSize;
+  /** PIP 표시: 사냥(전체 목록) / 특수 코어(크게 하나) */
+  pipMode: "hunting" | "core";
   /** 음성 읽기 목소리(voiceURI)와 속도 */
   ttsVoice: string | null;
   ttsRate: number;
@@ -278,6 +280,7 @@ export function defaultProfile(): Profile {
     theme: "system",
     alertOnShareEnd: true,
     pipSize: "medium",
+    pipMode: "hunting",
     ttsVoice: null,
     ttsRate: 1.1,
     randomDelay: false,
