@@ -128,6 +128,13 @@ function TimerRow({ t }: { t: TimerEntry }) {
                   </option>
                 ))}
             </select>
+            {t.linkedBuffId && (
+              <Toggle
+                checked={!!t.pauseWithoutBuff}
+                onChange={(v) => updateTimer(t.id, { pauseWithoutBuff: v })}
+                label="버프가 사라지면 일시정지, 다시 뜨면 이어서"
+              />
+            )}
           </div>
           <AlertSettings value={t.alert} onChange={(alert) => updateTimer(t.id, { alert })} />
           <div className="field-row">

@@ -209,6 +209,8 @@ export interface TimerEntry {
   autoRestart: boolean;
   /** 버프 연계: 지정한 버프 아이콘이 나타나면 자동 시작 */
   linkedBuffId: string | null;
+  /** 연계한 버프가 사라지면 일시정지, 다시 나타나면 이어서 */
+  pauseWithoutBuff?: boolean;
   alert: AlertConfig;
   /** 실행 중이면 종료 시각(ms) */
   endsAt: number | null;

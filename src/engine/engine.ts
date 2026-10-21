@@ -427,10 +427,21 @@ export function isBuffPresent(id: string) {
 function startLinkedTimers(buffId: string, now: number) {
   for (const t of profileStore.get().timers)
     if (t.linkedBuffId === buffId) {
+      if (t.pauseWithoutBuff && t.pausedRemainingMs != null && t.pausedRemainingMs > 0) {
+        // 일시정지돼 있던 타이머는 이어서 진행
+        updateTimer(t.id, { endsAt: now + t.pausedRemainingMs, pausedRemainingMs: null });
+        continue;
+      }
       updateTimer(t.id, { endsAt: now + t.durationSec * 1000, pausedRemainingMs: null });
       runners.get(`timer:${t.id}`)?.reset();
       timerAlerted.delete(t.id);
     }
+}
+
+function pauseLinkedTimers(buffId: string, now: number) {
+  for (const t of profileStore.get().timers)
+    if (t.linkedBuffId === buffId && t.pauseWithoutBuff && t.endsAt != null && t.endsAt > now)
+      updateTimer(t.id, { endsAt: null, pausedRemainingMs: t.endsAt - now });
 }
 
 function detectBuffs(p: Profile, now: number, live: boolean) {
@@ -546,6 +557,7 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
     if (res && b.readTime) learnFrom(res, b.name, now);
     rt.readEsts = [];
     rt.endsAt = null;
+    pauseLinkedTimers(b.id, now);
     if (b.alertOnDisappear) {
       r.reset();
       r.trigger(now);
@@ -579,7 +591,13 @@ function tickBuffTimers(p: Profile, now: number) {
         }
       } else if (!rt.alerted && remaining <= b.leadSec * 1000) {
         rt.alerted = true;
-        r.trigger(now);
+        // 다른 버프 종료 알림이 15초 안에 이미 울렸으면 한 번으로 합친다 (유니온 부·행운을 같이 쓴 경우 등)
+        const merged = p.buffs.some((o) => {
+          if (o.id === b.id || o.kind !== "expiry") return false;
+          const f = runners.get(`buff:${o.id}`)?.lastFiredAt;
+          return f != null && now - f <= 15_000;
+        });
+        if (!merged) r.trigger(now);
       }
       if (remaining < -60000) rt.endsAt = null;
     }
