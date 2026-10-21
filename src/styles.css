@@ -732,6 +732,12 @@ input[type="text"] {
 .pip-waiting {
   opacity: 0.6;
 }
+.pip-clickable {
+  cursor: pointer;
+}
+.pip-clickable:hover {
+  border-color: var(--accent);
+}
 .pip-btn {
   padding: 2px 8px;
 }

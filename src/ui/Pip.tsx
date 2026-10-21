@@ -1,5 +1,5 @@
 import { createRoot, type Root } from "react-dom/client";
-import { liveStore, stopRingingAlerts } from "../engine/engine";
+import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
 import { PIP_SIZES, profileStore, shortName } from "../state/profile";
 import { fmtRemaining } from "./common";
@@ -64,6 +64,9 @@ interface Item {
   urgent: boolean;
   tone: "alert" | "running" | "waiting";
   text?: string;
+  /** 누르면 실행할 동작 (스킬: 지금 사용한 것으로 타이머 시작) */
+  onClick?: () => void;
+  title?: string;
 }
 
 /** 보스용: 특수 코어 쿨타임 하나만 크게 */
@@ -110,7 +113,15 @@ function PipView() {
     const l = live.skills[s.id];
     const rem = l?.expiresAt != null ? l.expiresAt - now : null;
     const urgent = rem != null && rem <= s.leadSec * 1000;
-    items.push({ key: s.id, name: shortName(s.name), remaining: rem, urgent, tone: urgent ? "alert" : rem != null ? "running" : "waiting" });
+    items.push({
+      key: s.id,
+      name: shortName(s.name),
+      remaining: rem,
+      urgent,
+      tone: urgent ? "alert" : rem != null ? "running" : "waiting",
+      onClick: () => manualSkillCast(s.id),
+      title: "누르면 지금 스킬을 쓴 것으로 타이머를 시작해요",
+    });
   }
   for (const b of p.buffs) {
     if (!b.enabled) continue;
@@ -158,7 +169,12 @@ function PipView() {
       </div>
       <div className="pip-list">
         {items.map((it) => (
-          <div key={it.key} className={`pip-item pip-${it.tone}`}>
+          <div
+            key={it.key}
+            className={`pip-item pip-${it.tone} ${it.onClick ? "pip-clickable" : ""}`}
+            onClick={it.onClick}
+            title={it.title}
+          >
             <span className="pip-name">{it.name}</span>
             <span className="pip-time mono">{it.text ?? fmtRemaining(it.remaining)}</span>
             {p.timers.some((t) => t.id === it.key) && <PipTimerButton id={it.key} />}
