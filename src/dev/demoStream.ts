@@ -2,7 +2,7 @@
  * 개발용 가짜 게임 화면 (주소에 ?demo 를 붙였을 때만 사용).
  * 실제 화면 공유 없이 영역 선택 → 감지 → 알림 흐름을 시험하기 위한 것.
  *  - 미니맵(좌상단): 10초마다 보라색 룬이 나타났다 사라짐
- *  - 퀵슬롯(우하단): 'k' 키를 누르면 스킬 사용(아이콘 어두워짐, 쿨 8초)
+ *  - 퀵슬롯(우하단): 'k' 키를 누르면 스킬 사용(아이콘 어두워짐, 쿨 15초, 숫자 표시)
  *  - 경험치(하단): 2초마다 숫자 증가, 's' 키로 멈춤/재개
  *  - 버프칸(우상단): 'b' 키로 버프 아이콘 켜고 끄기
  */
@@ -54,13 +54,21 @@ export function createDemoStream(): MediaStream {
     drawIcon(880, 20, 20, 1);
     if (buffOn) drawIcon(920, 20, 200, 1);
     drawIcon(960, 20, 120, 1);
-    // 퀵슬롯
-    const cooling = t - castAt < 8000;
+    // 퀵슬롯 (쿨타임 15초, 가운데 큰 숫자)
+    const cooling = t - castAt < 15000;
     drawIcon(1100, 640, 290, cooling ? 0.45 : 1);
     if (cooling) {
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      const txt = String(Math.ceil((15000 - (t - castAt)) / 1000));
+      ctx.strokeText(txt, 1116, 657);
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText(String(Math.ceil((8000 - (t - castAt)) / 1000)), 1110, 662);
+      ctx.fillText(txt, 1116, 657);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
     }
     // 경험치바
     if (!stalled && t - lastExp > 2000) {

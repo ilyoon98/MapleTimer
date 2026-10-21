@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
+import { digitStore, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
 import { defaultProfile, profileStore, uid, type ThemeMode } from "../state/profile";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
@@ -17,6 +18,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   useEscape(onClose);
   const theme = profileStore.use((p) => p.theme);
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
+  const learned = digitStore.use((d) => learnedDigitCount(d));
   const [sounds, setSounds] = useState<CustomSound[]>([]);
   const reload = async () => {
     setSounds(await listCustomSounds());
@@ -84,6 +86,21 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               onChange={(v) => profileStore.set({ alertOnShareEnd: v })}
               label="화면 공유가 끊기면 음성으로 알려주기 (게임 창이 닫히거나 최소화로 끊긴 경우)"
             />
+          </div>
+        </section>
+        <section className="modal-section">
+          <h4>숫자 학습</h4>
+          <p className="muted small">
+            쿨타임 10초 이상인 스킬의 퀵슬롯 영역을 잡아 두고, 스킬을 한 번 쓴 뒤 쿨타임이 끝날 때까지 두면 화면의 숫자 모양을 자동으로 배워요.
+            0~9 를 모두 배우면 쿨타임 숫자로 사용 시점을 다시 계산해요. 해상도나 UI 크기를 바꿨다면 초기화 후 다시 배우세요.
+          </p>
+          <div className="field-row">
+            <span>
+              학습한 숫자: <b>{learned}/10</b>
+            </span>
+            <button className="danger" onClick={() => confirm("학습한 숫자 모양을 지울까요?") && resetLearnedDigits()}>
+              숫자 학습 초기화
+            </button>
           </div>
         </section>
         <section className="modal-section">

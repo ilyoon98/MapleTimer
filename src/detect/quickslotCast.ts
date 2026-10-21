@@ -64,11 +64,27 @@ export class QuickslotCastDetector {
     return !!this.ref;
   }
 
-  classify(img: Pixels): QuickslotReading {
+  /**
+   * textMask 를 주면 쿨타임 숫자(밝은 글자) 픽셀은 밝기 비교에서 뺀다.
+   * 어두워진 아이콘 위에 흰 숫자가 크게 찍히면 평균 밝기가 덜 떨어져 보이기 때문.
+   */
+  classify(img: Pixels, textMask?: Uint8Array): QuickslotReading {
     if (!this.ref) return { state: "unknown", diff: NaN, lumaRatio: NaN };
     const g = toGray(img);
     const diff = meanAbsDiff(g, this.ref);
-    const lumaRatio = this.refLuma > 0 ? meanLuma(g) / this.refLuma : 1;
+    let lumaRatio: number;
+    if (textMask && g.width === this.ref.width && g.height === this.ref.height) {
+      let cur = 0,
+        ref = 0;
+      for (let i = 0; i < g.data.length; i++)
+        if (!textMask[i]) {
+          cur += g.data[i];
+          ref += this.ref.data[i];
+        }
+      lumaRatio = ref > 0 ? cur / ref : 1;
+    } else {
+      lumaRatio = this.refLuma > 0 ? meanLuma(g) / this.refLuma : 1;
+    }
     let state: IconState = "unknown";
     if (diff <= this.opts.readyMaxDiff) state = "ready";
     else if (lumaRatio <= this.opts.coolingLumaRatio) state = "cooling";
@@ -76,8 +92,8 @@ export class QuickslotCastDetector {
   }
 
   /** 한 프레임 관찰. 스킬 사용이 확정되면 사용 시각(ms)을 돌려준다 */
-  observe(img: Pixels, now: number): number | null {
-    const r = this.classify(img);
+  observe(img: Pixels, now: number, textMask?: Uint8Array): number | null {
+    const r = this.classify(img, textMask);
     this.last = r;
     if (r.state === "cooling") {
       if (this.coolingStreak === 0) this.coolingStartAt = now;

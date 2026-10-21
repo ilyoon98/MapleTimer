@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { screenCapture } from "../../capture/screenCapture";
 import { regionValidFor } from "../../capture/types";
+import { digitStore, learnedDigitCount } from "../../detect/digitLearner";
 import { makeReference } from "../../detect/quickslotCast";
 import { clearSkill, debugCrops, liveStore, manualSkillCast } from "../../engine/engine";
 import {
@@ -46,6 +47,9 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
       <p className="panel-hint">
         우하단 퀵슬롯의 스킬 아이콘을 <b>쿨타임 숫자까지 포함해서</b> 선택하면, 아이콘이 어두워지는 순간을 스킬 사용 시점으로 보고
         지속시간이 끝나기 전에 알려줘요. 영역은 <b>스킬을 쓸 수 있는 상태(밝은 아이콘)</b>일 때 선택해 주세요.
+        <br />
+        처음 한 번은 스킬을 쓰고 <b>쿨타임이 끝날 때까지</b> 두세요. 쿨타임 숫자 모양을 자동으로 배워서, 그다음부터는 숫자로도 사용 시점을
+        맞춰요.
       </p>
       {skills.length === 0 && <div className="empty">등록된 스킬이 없어요.</div>}
       {skills.map((s) => (
@@ -82,6 +86,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const regionOk = sharing && regionValidFor(region, screenCapture.width, screenCapture.height);
   const remaining = live?.expiresAt != null ? live.expiresAt - now : null;
   const leadMin = s.presetId === "class-install" ? LEAD_MIN_INSTALL : LEAD_MIN;
+  const learnedCount = digitStore.use((d) => learnedDigitCount(d));
 
   const pickRegion = () =>
     openPicker({
@@ -195,6 +200,16 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
               <div className="diag-values mono">
                 <div>
                   상태: <b>{STATE_LABEL[live?.iconState ?? "unknown"]}</b>
+                </div>
+                <div>
+                  쿨타임 숫자: <b>{live?.digitText ?? "--"}</b>
+                  {live?.digitText && ` (일치 ${live.digitConf.toFixed(2)})`}
+                  {learnedCount < 10 && <span className="muted"> · 기본 글꼴로 추정 중</span>}
+                </div>
+                <div>
+                  숫자 학습: {learnedCount}/10 자리
+                  {live?.learning ? ` · 관찰 중 (${live.learnObserved}개 값)` : ""}
+                  {live?.learnMessage && !live.learning ? ` · 마지막: ${live.learnMessage}` : ""}
                 </div>
                 <div>
                   기준과 차이: {Number.isFinite(live?.diff) ? live!.diff.toFixed(1) : "--"} (≤ {s.options.readyMaxDiff} 이면 사용 가능)

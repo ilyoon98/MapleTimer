@@ -1,0 +1,88 @@
+import { describe, expect, it } from "vitest";
+import { CooldownSequenceRecorder } from "../detect/digitLearner";
+import { readDigits, segment, type DigitTemplates } from "./digits";
+import type { Pixels } from "./image";
+
+// 테스트용 5×7 픽셀 글꼴 (실제 게임 글꼴과는 무관)
+const FONT: Record<string, string[]> = {
+  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+  "3": ["11111", "00010", "00100", "00010", "00001", "10001", "01110"],
+  "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+  "5": ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+  "6": ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+  "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+  ":": ["00000", "00100", "00100", "00000", "00100", "00100", "00000"],
+};
+const S = 3; // 확대 배율
+
+function render(text: string, w = 64, h = 40): Pixels {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) data.set([40, 60, 90, 255], i * 4); // 아이콘 배경
+  const totalW = text.length * 6 * S;
+  let ox = Math.floor((w - totalW) / 2);
+  const oy = Math.floor((h - 7 * S) / 2);
+  for (const ch of text) {
+    const rows = FONT[ch];
+    rows.forEach((row, y) =>
+      [...row].forEach((bit, x) => {
+        if (bit !== "1") return;
+        for (let dy = 0; dy < S; dy++)
+          for (let dx = 0; dx < S; dx++) data.set([255, 255, 255, 255], ((oy + y * S + dy) * w + ox + x * S + dx) * 4);
+      }),
+    );
+    ox += 6 * S;
+  }
+  return { data, width: w, height: h };
+}
+
+function templatesFromFont(): DigitTemplates {
+  return Array.from({ length: 10 }, (_, d) => segment(render(String(d))).glyphs.map((g) => g.v));
+}
+
+describe("숫자 읽기", () => {
+  it("글자를 나누고 콜론을 찾는다", () => {
+    const seg = segment(render("1:05", 90));
+    expect(seg.glyphs).toHaveLength(3);
+    expect(seg.hasColon).toBe(true);
+  });
+  it("템플릿으로 초 단위 값을 읽는다", () => {
+    const t = templatesFromFont();
+    expect(readDigits(segment(render("43")), t)?.seconds).toBe(43);
+    expect(readDigits(segment(render("1:05", 90)), t)?.seconds).toBe(65);
+    expect(readDigits(segment(render("7")), t)?.seconds).toBe(7);
+  });
+  it("숫자가 없으면 null", () => {
+    expect(readDigits(segment(render("")), templatesFromFont())).toBeNull();
+  });
+});
+
+describe("쿨타임 한 바퀴로 숫자 학습", () => {
+  it("56 → 1 로 줄어드는 숫자를 끝에서부터 세어 0~9 를 모두 배운다", () => {
+    const rec = new CooldownSequenceRecorder();
+    let t = 0;
+    let result = null;
+    for (let v = 56; v >= 1; v--)
+      for (let k = 0; k < 4; k++, t += 250) result = rec.feed(segment(render(String(v))), t) ?? result;
+    for (let k = 0; k < 8; k++, t += 250) result = rec.feed(segment(render("")), t) ?? result;
+    expect(result?.ok).toBe(true);
+    const learned: DigitTemplates = Array.from({ length: 10 }, () => []);
+    for (const s of result!.samples) learned[s.digit].push(s.v);
+    expect(learned.every((x) => x.length > 0)).toBe(true);
+    // 배운 템플릿으로 다시 읽기
+    expect(readDigits(segment(render("38")), learned)?.seconds).toBe(38);
+    expect(readDigits(segment(render("9")), learned)?.seconds).toBe(9);
+  });
+  it("마지막 값이 0 으로 끝나면(순서가 한 칸 밀리면) 학습하지 않는다", () => {
+    const rec = new CooldownSequenceRecorder();
+    let t = 0;
+    let result = null;
+    for (let v = 30; v >= 0; v--)
+      for (let k = 0; k < 4; k++, t += 250) result = rec.feed(segment(render(String(v))), t) ?? result;
+    for (let k = 0; k < 8; k++, t += 250) result = rec.feed(segment(render("")), t) ?? result;
+    expect(result?.ok).toBe(false);
+  });
+});

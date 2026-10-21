@@ -16,6 +16,8 @@ import { PresenceTracker } from "../detect/presence";
 import { QuickslotCastDetector, type IconState } from "../detect/quickslotCast";
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
 import { appTicker } from "../core/ticker";
+import { readDigits, segment, textMask } from "../cv/digits";
+import { CooldownSequenceRecorder, activeTemplates, addDigitSamples, learnedDigitCount } from "../detect/digitLearner";
 import { createStore } from "../state/createStore";
 import { profileStore, shortName, updateTimer, type BuffEntry, type Profile, type SkillEntry } from "../state/profile";
 import { tts } from "../state/profile";
@@ -29,6 +31,13 @@ export interface SkillLive {
   castAt: number | null;
   expiresAt: number | null;
   lastAlertAt: number | null;
+  /** 읽은 쿨타임 숫자 */
+  digitText: string | null;
+  digitConf: number;
+  /** 숫자 학습 상태 */
+  learning: boolean;
+  learnObserved: number;
+  learnMessage: string | null;
 }
 export interface RuneLive {
   status: "off" | "no-share" | "no-region" | "searching" | "candidate" | "present" | "dark";
@@ -109,13 +118,36 @@ interface SkillRuntime {
   castAt: number | null;
   expiresAt: number | null;
   alerted: boolean;
+  recorder: CooldownSequenceRecorder;
+  /** 숫자로 거꾸로 계산한 사용 시각 후보들 (최근 몇 개가 서로 맞아야 믿는다) */
+  readCasts: number[];
+  digitText: string | null;
+  digitConf: number;
+  /** 숫자가 안 보이기 시작한 시각 (null = 보이는 중이거나 아직 모름) */
+  digitsAbsentSince: number | null;
+  /** 이번 쿨타임 숫자가 처음 나타난 시각 */
+  cycleStart: number | null;
+  cycleUsed: boolean;
 }
 const skillRt = new Map<string, SkillRuntime>();
 
 function skillRuntime(s: SkillEntry): SkillRuntime {
   let rt = skillRt.get(s.id);
   if (!rt) {
-    rt = { detector: new QuickslotCastDetector(), refKey: null, castAt: null, expiresAt: null, alerted: false };
+    rt = {
+      detector: new QuickslotCastDetector(),
+      refKey: null,
+      castAt: null,
+      expiresAt: null,
+      alerted: false,
+      recorder: new CooldownSequenceRecorder(),
+      readCasts: [],
+      digitText: null,
+      digitConf: 0,
+      digitsAbsentSince: null,
+      cycleStart: null,
+      cycleUsed: true,
+    };
     skillRt.set(s.id, rt);
   }
   if (rt.refKey !== s.readyRef) {
@@ -155,19 +187,69 @@ function tickSkills(p: Profile, now: number, live: boolean) {
     const regionOk = live && regionValidFor(region, screenCapture.width, screenCapture.height);
     if (!s.enabled) {
       r.reset();
-      out[s.id] = { regionOk, iconState: "unknown", diff: NaN, lumaRatio: NaN, castAt: null, expiresAt: null, lastAlertAt: r.lastFiredAt };
+      out[s.id] = {
+        regionOk,
+        iconState: "unknown",
+        diff: NaN,
+        lumaRatio: NaN,
+        castAt: null,
+        expiresAt: null,
+        lastAlertAt: r.lastFiredAt,
+        digitText: null,
+        digitConf: 0,
+        learning: false,
+        learnObserved: 0,
+        learnMessage: null,
+      };
       continue;
     }
     if (regionOk && region) {
       const img = screenCapture.crop(region);
       if (img) {
         debugCrops.set(`skill:${s.id}`, img);
-        const castAt = rt.detector.observe(img, now);
-        if (castAt != null) {
+        const startCycle = (castAt: number) => {
           rt.castAt = castAt;
           rt.expiresAt = castAt + s.durationSec * 1000;
           rt.alerted = false;
           r.reset();
+        };
+        const seg = segment(img);
+        const castAt = rt.detector.observe(img, now, textMask(img));
+        if (castAt != null) startCycle(castAt);
+
+        // 쿨타임 숫자: 학습 + 읽기
+        const learned = rt.recorder.feed(seg, now);
+        if (learned) {
+          if (learned.ok) addDigitSamples(learned.samples);
+          emitAlertLog(`숫자 학습 ${learned.ok ? "완료" : "실패"} (${shortName(s.name)}): ${learned.reason}`, now);
+        }
+        const read = readDigits(seg, activeTemplates());
+        rt.digitText = read?.text ?? null;
+        rt.digitConf = read?.confidence ?? 0;
+
+        // 숫자가 (1.5초 넘게 없다가) 새로 나타난 순간 = 쿨타임 시작 = 스킬 사용
+        if (seg.glyphs.length) {
+          if (rt.digitsAbsentSince != null && now - rt.digitsAbsentSince >= 1500) {
+            rt.cycleStart = now;
+            rt.cycleUsed = false;
+          }
+          rt.digitsAbsentSince = null;
+        } else if (rt.digitsAbsentSince == null) {
+          rt.digitsAbsentSince = now;
+        }
+
+        const trusted = read && learnedDigitCount() === 10 && read.seconds >= 2;
+        if (trusted && rt.cycleStart != null && !rt.cycleUsed && now - rt.cycleStart <= 3000) {
+          // 숫자가 실제로 읽혀야 진짜 쿨타임 시작으로 인정 (아이콘 그림의 밝은 부분 오인 방지)
+          rt.cycleUsed = true;
+          if (rt.castAt == null || rt.cycleStart - rt.castAt > 3000) startCycle(rt.cycleStart);
+        } else if (trusted && rt.castAt == null && rt.cycleStart == null && read.seconds <= s.cooldownSec + 1) {
+          // 앱을 쿨타임 도중에 켠 경우: 설정한 쿨타임으로 사용 시각을 거꾸로 추정 (3번 일치해야 인정)
+          const est = now - (s.cooldownSec - read.seconds) * 1000 - 500;
+          rt.readCasts = [...rt.readCasts.filter((c) => Math.abs(c - est) <= 1500), est].slice(-3);
+          if (rt.readCasts.length >= 3) startCycle(rt.readCasts.reduce((a, b) => a + b, 0) / rt.readCasts.length);
+        } else if (!read) {
+          rt.readCasts = [];
         }
       }
     }
@@ -192,6 +274,11 @@ function tickSkills(p: Profile, now: number, live: boolean) {
       castAt: rt.castAt,
       expiresAt: rt.expiresAt,
       lastAlertAt: r.lastFiredAt,
+      digitText: rt.digitText,
+      digitConf: rt.digitConf,
+      learning: rt.recorder.status === "recording",
+      learnObserved: rt.recorder.observedValues,
+      learnMessage: rt.recorder.lastResult?.reason ?? null,
     };
   }
   for (const id of skillRt.keys()) if (!p.skills.some((s) => s.id === id)) skillRt.delete(id);

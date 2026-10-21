@@ -1,0 +1,203 @@
+import { expectedText, glyphSimilarity, segment, GH, GW, type DigitTemplates, type Glyph, type Segmented } from "../cv/digits";
+import { createPersistentStore } from "../state/createStore";
+
+/* ───────── 학습한 숫자 모양 저장소 ───────── */
+interface LearnedDigits {
+  v: 1;
+  /** 숫자별 누적 합 (GW*GH) */
+  sums: Array<number[] | null>;
+  counts: number[];
+}
+const emptyLearned = (): LearnedDigits => ({ v: 1, sums: Array(10).fill(null), counts: Array(10).fill(0) });
+
+export const digitStore = createPersistentStore<LearnedDigits>("maple-timer-personal.digits.v1", emptyLearned(), (raw) => {
+  const r = raw as LearnedDigits;
+  return r?.v === 1 && Array.isArray(r.sums) && r.sums.length === 10 ? r : emptyLearned();
+});
+
+export function resetLearnedDigits() {
+  digitStore.set(() => emptyLearned());
+  cache = null;
+}
+
+export function learnedDigitCount(s = digitStore.get()) {
+  return s.counts.filter((c) => c > 0).length;
+}
+
+export function addDigitSamples(samples: Array<{ digit: number; v: Float32Array }>) {
+  digitStore.set((s) => {
+    const sums = s.sums.map((x) => (x ? [...x] : null));
+    const counts = [...s.counts];
+    for (const { digit, v } of samples) {
+      // 너무 많이 쌓이면 오래된 영향이 줄도록 상한
+      if (counts[digit] >= 200) continue;
+      const acc = sums[digit] ?? new Array(GW * GH).fill(0);
+      for (let i = 0; i < acc.length; i++) acc[i] += v[i];
+      sums[digit] = acc;
+      counts[digit]++;
+    }
+    return { v: 1, sums, counts };
+  });
+  cache = null;
+}
+
+/* ───────── 글꼴로 그린 기본 템플릿 (학습 전 임시) ───────── */
+let fontTemplates: DigitTemplates | null = null;
+function buildFontTemplates(): DigitTemplates {
+  const out: DigitTemplates = Array.from({ length: 10 }, () => []);
+  if (typeof document === "undefined") return out;
+  const fonts = ["bold 26px Arial", "bold 26px Tahoma", "bold 26px Verdana", "bold 26px 'Malgun Gothic'", "900 26px sans-serif"];
+  const c = document.createElement("canvas");
+  c.width = 40;
+  c.height = 40;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  for (const font of fonts)
+    for (let d = 0; d < 10; d++) {
+      ctx.fillStyle = "#304050";
+      ctx.fillRect(0, 0, 40, 40);
+      ctx.font = font;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.strokeText(String(d), 20, 21);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(String(d), 20, 21);
+      const g = segment(ctx.getImageData(0, 0, 40, 40)).glyphs;
+      if (g.length === 1) out[d].push(g[0].v);
+    }
+  return out;
+}
+
+let cache: DigitTemplates | null = null;
+/** 학습한 숫자가 있으면 그것을, 없는 숫자는 글꼴 템플릿을 쓴다 */
+export function activeTemplates(): DigitTemplates {
+  if (cache) return cache;
+  fontTemplates ??= buildFontTemplates();
+  const s = digitStore.get();
+  cache = Array.from({ length: 10 }, (_, d) => {
+    const sum = s.sums[d];
+    if (sum && s.counts[d] > 0) return [Float32Array.from(sum, (x) => x / s.counts[d])];
+    return fontTemplates![d];
+  });
+  return cache;
+}
+
+/* ───────── 쿨타임 한 바퀴를 지켜보며 숫자 학습 ───────── */
+interface SeqState {
+  glyphs: Glyph[];
+  colon: boolean;
+  first: number;
+  last: number;
+  samples: number;
+}
+
+export interface LearnResult {
+  ok: boolean;
+  reason: string;
+  samples: Array<{ digit: number; v: Float32Array }>;
+}
+
+function sameGlyphs(a: Glyph[], b: Glyph[]) {
+  return a.length === b.length && a.every((g, i) => glyphSimilarity(g.v, b[i].v) >= 0.9);
+}
+
+/**
+ * 숫자가 나타났다가 사라질 때까지 화면에 찍힌 값들의 '순서'를 기록한다.
+ * 쿨타임은 1초마다 1씩 줄어들고 마지막 값은 1 이므로, 끝에서부터 1, 2, 3… 으로 이름을 붙여 학습한다.
+ * (시계로 계산하지 않아서 반올림 오차로 잘못 배우는 일이 없다)
+ */
+export class CooldownSequenceRecorder {
+  private states: SeqState[] = [];
+  private recording = false;
+  private seenStreak = 0;
+  private lastSeenAt = 0;
+  status: "idle" | "recording" = "idle";
+  lastResult: LearnResult | null = null;
+
+  reset() {
+    this.states = [];
+    this.recording = false;
+    this.seenStreak = 0;
+    this.status = "idle";
+  }
+
+  get observedValues() {
+    return this.states.length;
+  }
+
+  /** 한 프레임 관찰. 기록이 끝나면 학습 결과를 돌려준다 */
+  feed(seg: Segmented, now: number): LearnResult | null {
+    const has = seg.glyphs.length > 0 && seg.glyphs.length <= 5;
+    if (has) {
+      this.lastSeenAt = now;
+      this.seenStreak++;
+      if (!this.recording && this.seenStreak >= 2) {
+        this.recording = true;
+        this.status = "recording";
+        this.states = [];
+      }
+      if (this.recording) {
+        const cur = this.states[this.states.length - 1];
+        if (cur && sameGlyphs(cur.glyphs, seg.glyphs)) {
+          cur.last = now;
+          cur.samples++;
+          cur.glyphs = seg.glyphs;
+        } else {
+          this.states.push({ glyphs: seg.glyphs, colon: seg.hasColon, first: now, last: now, samples: 1 });
+        }
+      }
+      return null;
+    }
+    this.seenStreak = 0;
+    if (this.recording && now - this.lastSeenAt >= 1500) {
+      const res = this.finish();
+      this.reset();
+      this.lastResult = res;
+      return res;
+    }
+    return null;
+  }
+
+  private finish(): LearnResult {
+    // 잠깐 스친 잡음 상태 제거 후, 같은 모양이 연달아 있으면 합친다
+    const clean: SeqState[] = [];
+    for (const s of this.states) {
+      if (s.samples < 2) continue;
+      const prev = clean[clean.length - 1];
+      if (prev && sameGlyphs(prev.glyphs, s.glyphs)) {
+        prev.last = s.last;
+        prev.samples += s.samples;
+      } else clean.push({ ...s });
+    }
+    const n = clean.length;
+    // 10 이상부터 세어야 9→10 경계로 순서를 검증할 수 있다
+    if (n < 10) return { ok: false, reason: `관찰한 값이 너무 적어요 (${n}개, 쿨타임 10초 이상인 스킬로 학습해 주세요)`, samples: [] };
+    const durs = clean
+      .slice(1, -1)
+      .map((s, i) => clean[i + 2].first - s.first)
+      .sort((a, b) => a - b);
+    const med = durs[Math.floor(durs.length / 2)] ?? 1000;
+    if (med < 700 || med > 1400) return { ok: false, reason: `숫자가 1초마다 바뀌지 않아요 (${Math.round(med)}ms)`, samples: [] };
+
+    const samples: Array<{ digit: number; v: Float32Array }> = [];
+    let mismatch = 0;
+    for (let i = 0; i < n; i++) {
+      const value = n - i; // 끝에서부터 1, 2, 3…
+      const text = expectedText(value, clean[i].colon).replace(/:/g, "");
+      if (text.length !== clean[i].glyphs.length) {
+        mismatch++;
+        continue;
+      }
+      clean[i].glyphs.forEach((g, k) => samples.push({ digit: Number(text[k]), v: g.v }));
+    }
+    // 9 → 10 경계에서 글자 수가 정확히 맞아야 순서가 한 칸 밀리지 않았다고 확신할 수 있다
+    const s9 = clean[n - 9],
+      s10 = clean[n - 10];
+    const ok9 = s9.colon || s9.glyphs.length === 1;
+    const ok10 = s10.colon || s10.glyphs.length === 2;
+    if (!ok9 || !ok10) return { ok: false, reason: "숫자 순서를 맞추지 못했어요 (9→10 경계 불일치)", samples: [] };
+    if (mismatch > 1) return { ok: false, reason: `글자 수가 안 맞는 값이 ${mismatch}개 있어요`, samples: [] };
+    return { ok: true, reason: `${n}개 값에서 숫자 ${samples.length}개 학습`, samples };
+  }
+}
