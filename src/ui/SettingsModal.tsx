@@ -20,6 +20,16 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const pipSize = profileStore.use((p) => p.pipSize);
+  const ttsVoice = profileStore.use((p) => p.ttsVoice);
+  const ttsRate = profileStore.use((p) => p.ttsRate);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const load = () => setVoices(speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith("ko")));
+    load();
+    speechSynthesis.addEventListener("voiceschanged", load);
+    return () => speechSynthesis.removeEventListener("voiceschanged", load);
+  }, []);
   const [sounds, setSounds] = useState<CustomSound[]>([]);
   const reload = async () => {
     setSounds(await listCustomSounds());
@@ -84,6 +94,37 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <option value="dark">어둡게</option>
             </select>
           </div>
+          <div className="field-row">
+            <span className="field-label">읽어주는 목소리</span>
+            <select value={ttsVoice ?? ""} onChange={(e) => profileStore.set({ ttsVoice: e.target.value || null })}>
+              <option value="">자동 (첫 한국어 목소리)</option>
+              {voices.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} {v.localService ? "" : "(온라인)"}
+                </option>
+              ))}
+            </select>
+            <span className="field-label">속도</span>
+            <input
+              type="range"
+              min={0.7}
+              max={1.8}
+              step={0.1}
+              value={ttsRate}
+              onChange={(e) => profileStore.set({ ttsRate: Number(e.target.value) })}
+            />
+            <span className="mono">{ttsRate.toFixed(1)}×</span>
+            <button
+              onClick={() => {
+                audioEngine.ttsVoiceURI = ttsVoice;
+                audioEngine.ttsRate = ttsRate;
+                void audioEngine.play({ kind: "tts", text: "룬이 나타났어요" });
+              }}
+            >
+              들어보기
+            </button>
+          </div>
+          {voices.length === 0 && <p className="muted small">한국어 목소리를 찾지 못했어요. Windows 설정 &gt; 시간 및 언어 &gt; 음성에서 한국어 음성을 추가할 수 있어요.</p>}
           <div className="field-row">
             <span className="field-label">PIP 크기</span>
             <select value={pipSize} onChange={(e) => profileStore.set({ pipSize: e.target.value as PipSize })}>

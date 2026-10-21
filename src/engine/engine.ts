@@ -643,6 +643,8 @@ function tick(now: number) {
   const p = profileStore.get();
   audioEngine.masterVolume = p.masterVolume;
   audioEngine.muted = p.muted;
+  audioEngine.ttsVoiceURI = p.ttsVoice;
+  audioEngine.ttsRate = p.ttsRate;
   randomDelaySetting.enabled = p.randomDelay;
   checkShareEnded(p, now);
   const live = screenCapture.state === "live" && screenCapture.refresh();

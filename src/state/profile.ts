@@ -242,6 +242,9 @@ export interface Profile {
   /** 화면 공유가 끊기면 알림 */
   alertOnShareEnd: boolean;
   pipSize: PipSize;
+  /** 음성 읽기 목소리(voiceURI)와 속도 */
+  ttsVoice: string | null;
+  ttsRate: number;
   randomDelay: boolean;
   skills: SkillEntry[];
   rune: RuneSettings;
@@ -264,6 +267,8 @@ export function defaultProfile(): Profile {
     theme: "system",
     alertOnShareEnd: true,
     pipSize: "medium",
+    ttsVoice: null,
+    ttsRate: 1.1,
     randomDelay: false,
     skills: [newSkill("sol-janus-2min"), newSkill("erda-fountain")],
     rune: {

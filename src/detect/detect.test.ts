@@ -5,7 +5,7 @@ import { toGray } from "../cv/image";
 import { ChangeMonitor } from "./changeMonitor";
 import { PresenceTracker } from "./presence";
 import { QuickslotCastDetector, makeReference } from "./quickslotCast";
-import { RuneTracker, detectRuneByColor, DEFAULT_RUNE_COLOR } from "./rune";
+import { RuneTracker, colorRangeFromTemplate, detectRuneByColor, DEFAULT_RUNE_COLOR } from "./rune";
 
 function solid(w: number, h: number, rgb: [number, number, number]): Pixels {
   const data = new Uint8ClampedArray(w * h * 4);
@@ -118,8 +118,10 @@ describe("PresenceTracker", () => {
   });
 });
 
+const minimapBg = () => solid(160, 100, [60, 70, 60]);
+
 describe("룬 감지", () => {
-  const minimap = () => solid(160, 100, [60, 70, 60]);
+  const minimap = minimapBg;
   const withRune = (x: number, y: number) => paint(minimap(), x, y, 7, 7, [200, 60, 230]);
 
   it("보라색 덩어리를 후보로 찾음", () => {
@@ -144,6 +146,14 @@ describe("룬 감지", () => {
     see(13000);
     expect(see(14000).newRune).toBe(false);
   });
+  it("등록한 룬 아이콘 색으로 색상 범위를 맞춘다 (빨강처럼 0°를 걸치는 색도)", () => {
+    const red = paint(solid(9, 9, [30, 30, 30]), 2, 2, 5, 5, [230, 30, 50]);
+    const range = colorRangeFromTemplate(red)!;
+    expect(range.hueMin).toBeGreaterThan(range.hueMax); // 0° 를 걸침
+    expect(detectRuneByColor(paint(minimapBg(), 50, 40, 6, 6, [230, 30, 50]), range)).toHaveLength(1);
+    expect(detectRuneByColor(paint(minimapBg(), 50, 40, 6, 6, [200, 60, 230]), range)).toHaveLength(0); // 보라는 아님
+  });
+
   it("맵 이동(암전)하면 상태를 지우고 새 룬은 다시 알림", () => {
     const t = new RuneTracker();
     const see = (now: number, img = withRune(40, 30)) => t.observe(img, detectRuneByColor(img, DEFAULT_RUNE_COLOR), now);

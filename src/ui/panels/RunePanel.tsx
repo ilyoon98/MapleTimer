@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { storeTemplate } from "../../cv/match";
-import { DEFAULT_RUNE_COLOR } from "../../detect/rune";
+import { DEFAULT_RUNE_COLOR, colorRangeFromTemplate } from "../../detect/rune";
 import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
@@ -47,7 +47,11 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
         "룬 아이콘 하나만 딱 맞게 작게 선택하세요. 캐릭터 표시와 겹치지 않은 순간이 좋아요.",
       ],
       within: region,
-      onConfirm: ({ pixels }) => setRune({ template: storeTemplate(pixels, false), mode: "template" }),
+      onConfirm: ({ pixels }) => {
+        // 템플릿을 저장하면서 색상 방식의 색 범위도 실제 룬 색으로 맞춘다
+        const color = colorRangeFromTemplate(pixels);
+        setRune({ template: storeTemplate(pixels, false), mode: "template", ...(color ? { color } : {}) });
+      },
     });
 
   return (

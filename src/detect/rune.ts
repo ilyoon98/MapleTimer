@@ -46,6 +46,44 @@ export function detectRuneByColor(img: Pixels, c: RuneColorRange): RuneBox[] {
     .map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h, score: Math.min(1, b.area / (b.w * b.h)) }));
 }
 
+/**
+ * 사용자가 등록한 룬 아이콘에서 색상 범위를 뽑는다 (색상 방식도 실제 룬 색에 맞추기).
+ * 채도·명도가 있는 픽셀의 색상(H)을 원형 평균 기준으로 펼쳐 5~95% 범위에 여유를 둔다.
+ */
+export function colorRangeFromTemplate(img: Pixels): RuneColorRange | null {
+  const hs: number[] = [],
+    ss: number[] = [],
+    vs: number[] = [];
+  for (let p = 0; p < img.data.length; p += 4) {
+    const [h, s, v] = rgbToHsv(img.data[p], img.data[p + 1], img.data[p + 2]);
+    if (s >= 0.35 && v >= 0.45) {
+      hs.push(h);
+      ss.push(s);
+      vs.push(v);
+    }
+  }
+  if (hs.length < 4) return null;
+  let sx = 0,
+    sy = 0;
+  for (const h of hs) {
+    sx += Math.cos((h * Math.PI) / 180);
+    sy += Math.sin((h * Math.PI) / 180);
+  }
+  const mean = ((Math.atan2(sy, sx) * 180) / Math.PI + 360) % 360;
+  const d = hs.map((h) => ((h - mean + 540) % 360) - 180).sort((a, b) => a - b);
+  const q = (arr: number[], f: number) => arr[Math.min(arr.length - 1, Math.floor(arr.length * f))];
+  const sSorted = [...ss].sort((a, b) => a - b),
+    vSorted = [...vs].sort((a, b) => a - b);
+  return {
+    hueMin: Math.round((mean + q(d, 0.05) - 10 + 360) % 360),
+    hueMax: Math.round((mean + q(d, 0.95) + 10 + 360) % 360),
+    satMin: Math.max(0.25, Math.round((q(sSorted, 0.1) - 0.08) * 100) / 100),
+    valMin: Math.max(0.3, Math.round((q(vSorted, 0.1) - 0.08) * 100) / 100),
+    minArea: Math.max(3, Math.floor(hs.length * 0.3)),
+    maxSide: Math.max(img.width, img.height) + 6,
+  };
+}
+
 export function detectRuneByTemplate(img: Pixels, t: PreparedTemplate, minScore: number): RuneBox[] {
   const g = toGray(img);
   return findTemplate(img, g, t, 3)

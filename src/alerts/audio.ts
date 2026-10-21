@@ -39,6 +39,9 @@ class AudioEngine {
   /** 0~1 */
   masterVolume = 1;
   muted = false;
+  /** 음성 읽기에 쓸 목소리 (null = 첫 한국어 목소리) */
+  ttsVoiceURI: string | null = null;
+  ttsRate = 1.1;
 
   /** 사용자 제스처(클릭) 안에서 한 번 호출해 브라우저 자동재생 제한을 푼다 */
   unlock() {
@@ -71,9 +74,11 @@ class AudioEngine {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "ko-KR";
     u.volume = vol;
-    u.rate = 1.1;
-    const ko = speechSynthesis.getVoices().find((v) => v.lang.startsWith("ko"));
-    if (ko) u.voice = ko;
+    u.rate = this.ttsRate;
+    const voices = speechSynthesis.getVoices();
+    const voice =
+      (this.ttsVoiceURI && voices.find((v) => v.voiceURI === this.ttsVoiceURI)) || voices.find((v) => v.lang.startsWith("ko"));
+    if (voice) u.voice = voice;
     return new Promise((resolve) => {
       const done = () => resolve();
       u.onend = done;
