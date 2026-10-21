@@ -253,7 +253,7 @@ export interface Profile {
   timers: TimerEntry[];
   regions: Partial<Record<RegionKey, SavedRegion>>;
   panelOrder: PanelId[];
-  collapsed: Partial<Record<PanelId, boolean>>;
+  collapsed: Partial<Record<PanelId | "checklist", boolean>>;
 }
 
 export type PanelId = "skills" | "rune" | "stall" | "buffs" | "timers";

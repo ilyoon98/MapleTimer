@@ -13,6 +13,7 @@ import { TimersPanel } from "./ui/panels/TimersPanel";
 import { closePip, openPip, pipStore, pipSupported } from "./ui/Pip";
 import { RegionPicker } from "./ui/RegionPicker";
 import { GuideModal, SettingsModal } from "./ui/SettingsModal";
+import { SetupChecklist } from "./ui/SetupChecklist";
 
 const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => void }) => React.ReactNode> = {
   skills: (p) => <SkillsPanel {...p} />,
@@ -175,6 +176,8 @@ export function App() {
         <AlertLog />
         <button onClick={() => setEditOrder(!editOrder)}>{editOrder ? "순서 편집 끝" : "순서 편집"}</button>
       </div>
+
+      <SetupChecklist />
 
       <main className="panels">
         {order.map((id) => (

@@ -218,6 +218,49 @@ input[type="text"] {
   padding: 1px 6px;
 }
 
+.checklist {
+  background: var(--card);
+  border: 1px solid var(--warn);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.checklist-done {
+  border-color: var(--accent);
+}
+.checklist-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+.checklist-done .checklist-head b {
+  color: var(--accent);
+}
+.checklist-items {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 4px 16px;
+  font-size: 13px;
+}
+.ck-mark {
+  display: inline-block;
+  width: 18px;
+  font-weight: 700;
+}
+.ck-done .ck-mark {
+  color: var(--accent);
+}
+.ck-todo .ck-mark {
+  color: var(--warn);
+}
+.ck-optional {
+  color: var(--muted);
+}
 .panels {
   display: flex;
   flex-direction: column;
