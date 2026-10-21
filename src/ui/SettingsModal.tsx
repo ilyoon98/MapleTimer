@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
-import { digitStore, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
-import { defaultProfile, profileStore, uid, type ThemeMode } from "../state/profile";
+import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
+import { PIP_SIZES, defaultProfile, profileStore, uid, type PipSize, type ThemeMode } from "../state/profile";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
 
@@ -19,6 +19,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const theme = profileStore.use((p) => p.theme);
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
+  const pipSize = profileStore.use((p) => p.pipSize);
   const [sounds, setSounds] = useState<CustomSound[]>([]);
   const reload = async () => {
     setSounds(await listCustomSounds());
@@ -41,7 +42,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   const exportProfile = () => {
-    const blob = new Blob([JSON.stringify(profileStore.get(), null, 1)], { type: "application/json" });
+    // 설정 + 학습한 숫자 모양을 함께 내보낸다 (다른 컴퓨터에서 바로 쓰기)
+    const data = { ...profileStore.get(), learnedDigits: digitStore.get() };
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `maple-timer-settings-${new Date().toISOString().slice(0, 10)}.json`;
@@ -52,10 +55,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     const f = files?.[0];
     if (!f) return;
     try {
-      const data = JSON.parse(await f.text());
+      const { learnedDigits, ...data } = JSON.parse(await f.text());
       if (data?.v !== 1) throw new Error("형식이 달라요");
       profileStore.set(() => ({ ...defaultProfile(), ...data }));
-      alert("설정을 불러왔어요.");
+      const withDigits = importLearnedDigits(learnedDigits);
+      alert(withDigits ? "설정과 학습한 숫자를 불러왔어요." : "설정을 불러왔어요.");
     } catch (e) {
       alert(`불러오기 실패: ${(e as Error).message}`);
     }
@@ -79,6 +83,17 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <option value="light">밝게</option>
               <option value="dark">어둡게</option>
             </select>
+          </div>
+          <div className="field-row">
+            <span className="field-label">PIP 크기</span>
+            <select value={pipSize} onChange={(e) => profileStore.set({ pipSize: e.target.value as PipSize })}>
+              {(Object.keys(PIP_SIZES) as PipSize[]).map((k) => (
+                <option key={k} value={k}>
+                  {PIP_SIZES[k].label} ({PIP_SIZES[k].width}×{PIP_SIZES[k].height})
+                </option>
+              ))}
+            </select>
+            <span className="muted small">다음에 PIP 를 열 때 적용돼요</span>
           </div>
           <div className="field-row">
             <Toggle

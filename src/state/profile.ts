@@ -226,6 +226,12 @@ export function newTimer(preset: TimerPreset): TimerEntry {
 export type RegionKey = "minimap" | "stall" | "buffbar" | `skill:${string}`;
 
 export type ThemeMode = "system" | "light" | "dark";
+export type PipSize = "small" | "medium" | "large";
+export const PIP_SIZES: Record<PipSize, { label: string; width: number; height: number }> = {
+  small: { label: "작게", width: 280, height: 240 },
+  medium: { label: "보통", width: 360, height: 320 },
+  large: { label: "크게", width: 520, height: 420 },
+};
 
 export interface Profile {
   v: 1;
@@ -235,6 +241,7 @@ export interface Profile {
   theme: ThemeMode;
   /** 화면 공유가 끊기면 알림 */
   alertOnShareEnd: boolean;
+  pipSize: PipSize;
   randomDelay: boolean;
   skills: SkillEntry[];
   rune: RuneSettings;
@@ -256,6 +263,7 @@ export function defaultProfile(): Profile {
     muted: false,
     theme: "system",
     alertOnShareEnd: true,
+    pipSize: "medium",
     randomDelay: false,
     skills: [newSkill("sol-janus-2min"), newSkill("erda-fountain")],
     rune: {

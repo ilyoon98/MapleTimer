@@ -1,7 +1,7 @@
 import { createRoot, type Root } from "react-dom/client";
 import { liveStore, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
-import { profileStore, shortName } from "../state/profile";
+import { PIP_SIZES, profileStore, shortName } from "../state/profile";
 import { fmtRemaining } from "./common";
 import { pauseTimer, startTimer } from "./panels/TimersPanel";
 
@@ -28,7 +28,8 @@ export async function openPip() {
   if (window.documentPictureInPicture.window) return;
   let pip: Window;
   try {
-    pip = await window.documentPictureInPicture.requestWindow({ width: 340, height: 300 });
+    const size = PIP_SIZES[profileStore.get().pipSize] ?? PIP_SIZES.medium;
+    pip = await window.documentPictureInPicture.requestWindow({ width: size.width, height: size.height });
   } catch (e) {
     alert(`PIP 창을 열 수 없어요. 일반 Chrome/Edge 창에서 열어 주세요.\n(${(e as Error).message})`);
     return;
@@ -112,7 +113,7 @@ function PipView() {
           : "—";
 
   return (
-    <div className="pip">
+    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize}`}>
       <div className="pip-status">
         <span className={`pip-chip ${live.rune.status === "present" ? "pip-chip-alert" : ""}`}>룬 · {runeText}</span>
         <span className={`pip-chip ${live.stall.status === "stalled" ? "pip-chip-alert" : ""}`}>사냥 · {stallText}</span>

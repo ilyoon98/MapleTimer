@@ -27,6 +27,15 @@ export function resetLearnedDigits() {
   cache = null;
 }
 
+/** 설정 파일에서 불러온 학습 데이터를 적용. 형식이 맞으면 true */
+export function importLearnedDigits(raw: unknown): boolean {
+  const r = raw as LearnedDigits;
+  if (r?.v !== 2 || !Array.isArray(r.sets)) return false;
+  digitStore.set(() => r);
+  cache = null;
+  return true;
+}
+
 /** 0~9 중 (어느 크기로든) 배운 숫자 개수 */
 export function learnedDigitCount(s = digitStore.get()) {
   let n = 0;

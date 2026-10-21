@@ -687,6 +687,30 @@ input[type="text"] {
 .pip-foot input[type="range"] {
   flex: 1;
 }
+.pip-ringing {
+  box-shadow: inset 0 0 0 4px var(--alert);
+  animation: pip-ring 0.7s infinite alternate;
+}
+@keyframes pip-ring {
+  from {
+    background: var(--bg);
+  }
+  to {
+    background: var(--alert-soft);
+  }
+}
+.pip-small .pip-time {
+  font-size: 18px;
+}
+.pip-small .pip-name {
+  font-size: 12px;
+}
+.pip-large .pip-time {
+  font-size: 30px;
+}
+.pip-large .pip-name {
+  font-size: 16px;
+}
 @keyframes pip-flash {
   from {
     opacity: 1;
