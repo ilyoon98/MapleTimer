@@ -3,6 +3,14 @@ chcp 65001 >nul
 cd /d "%~dp0"
 title 메이플 타이머
 
+rem 이미 켜져 있으면 브라우저만 연다
+netstat -ano | findstr ":5173" | findstr "LISTENING" >nul 2>nul
+if not errorlevel 1 (
+  echo 메이플 타이머가 이미 켜져 있어요. 브라우저를 엽니다.
+  start "" http://localhost:5173
+  exit /b 0
+)
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo [!] Node.js 가 설치돼 있지 않아요. https://nodejs.org 에서 설치한 뒤 다시 실행해 주세요.
