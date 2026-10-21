@@ -25,6 +25,8 @@ export class ScreenCapture {
   private ctx = this.canvas.getContext("2d", { willReadFrequently: true })!;
   private frameStamp = 0;
   private drawnStamp = -1;
+  /** 마지막으로 새 프레임이 들어온 시각 (Date.now). video 대체 경로에서는 알 수 없어 null */
+  lastFrameAt: number | null = null;
   private listeners = new Set<() => void>();
 
   onChange(l: () => void) {
@@ -41,6 +43,7 @@ export class ScreenCapture {
 
   async start() {
     this.stop("user");
+    this.lastFrameAt = null;
     this.state = "starting";
     this.emit();
     try {
@@ -86,6 +89,7 @@ export class ScreenCapture {
         this.latest?.close();
         this.latest = value;
         this.frameStamp++;
+        this.lastFrameAt = Date.now();
       }
     } catch {
       /* 스트림 종료 */

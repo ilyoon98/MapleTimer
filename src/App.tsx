@@ -52,6 +52,7 @@ function saveFrame() {
 
 function ShareChip() {
   const cap = useCaptureState();
+  const stale = liveStore.use((s) => s.captureStale);
   const [err, setErr] = useState<string | null>(null);
   const start = async () => {
     setErr(null);
@@ -65,8 +66,9 @@ function ShareChip() {
   };
   if (cap.state === "live")
     return (
-      <div className="share-chip share-live">
-        <span className="dot" /> 화면 공유 중 {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
+      <div className={`share-chip share-live ${stale ? "share-stale" : ""}`}>
+        <span className="dot" /> {stale ? "화면이 멈춤 (게임 창 최소화?)" : "화면 공유 중"}{" "}
+        {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
         <button title="지금 공유 중인 게임 화면을 PNG 로 저장 (감지 기준 조정용)" onClick={saveFrame}>
           화면 저장
         </button>

@@ -76,6 +76,8 @@ export interface LiveState {
   log: AlertLogEntry[];
   /** 지금 울리거나 반복 중인 알림 이름 */
   ringing: string[];
+  /** 공유는 이어져 있지만 새 화면이 한동안 안 들어옴 (게임 창 최소화 등) */
+  captureStale: boolean;
 }
 
 export const liveStore = createStore<LiveState>({
@@ -86,6 +88,7 @@ export const liveStore = createStore<LiveState>({
   buffs: {},
   log: [],
   ringing: [],
+  captureStale: false,
 });
 
 /** 진단 화면에서 보여줄 마지막 잘라낸 영역 이미지 */
@@ -669,7 +672,10 @@ function tick(now: number) {
   let ringing: string[] = [];
   for (const [key, r] of runners) if (r.isRinging) ringing.push(runnerLabel(key, p));
   if (ringing.join("|") === prev.ringing.join("|")) ringing = prev.ringing; // 바뀐 게 없으면 같은 배열 유지 (불필요한 다시 그리기 방지)
-  liveStore.set({ now, skills, rune, stall, buffs, ringing });
+  // 게임 화면은 늘 조금씩 움직이므로 10초 넘게 새 프레임이 없으면 멈춘 것으로 본다
+  const lf = screenCapture.lastFrameAt;
+  const captureStale = screenCapture.state === "live" && lf != null && now - lf > 10_000;
+  liveStore.set({ now, skills, rune, stall, buffs, ringing, captureStale });
 }
 
 function runnerLabel(key: string, p: Profile) {

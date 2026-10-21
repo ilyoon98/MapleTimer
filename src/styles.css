@@ -177,6 +177,14 @@ input[type="text"] {
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.share-stale {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+}
+.share-stale .dot {
+  background: var(--warn);
+  box-shadow: none;
+}
 .share-off {
   border-color: var(--alert-soft);
   background: var(--alert-soft);
