@@ -7,12 +7,25 @@
 
 ## 실행
 
+**가장 쉬운 방법 (Windows):** 폴더의 `start.bat` 을 더블클릭하면 필요한 파일을 설치하고 브라우저까지 열어 줍니다. 창을 닫으면 꺼져요.
+
+직접 실행하려면:
+
 ```bash
 npm install
 npm run dev
 ```
 
 Chrome 또는 Edge 에서 http://localhost:5173 을 엽니다.
+
+### 다른 컴퓨터에서
+
+1. [Git](https://git-scm.com) 과 [Node.js](https://nodejs.org) (24 이상) 설치
+2. `git clone https://github.com/ilyoon98/MapleTimer.git`
+3. 받은 폴더의 `start.bat` 더블클릭
+4. 원래 컴퓨터에서 **설정 > 설정 파일로 내보내기** 한 파일을 새 컴퓨터에서 **설정 파일 불러오기** (영역·학습한 숫자 포함. 해상도가 다르면 영역은 다시 선택)
+
+코드가 바뀌면 폴더에서 `git pull` 하면 최신 버전이 됩니다.
 
 `npm run build` 로 만든 `dist/` 폴더는 정적 파일이라 아무 웹 서버(https 또는 localhost)에 올려서 쓸 수 있습니다.
 
