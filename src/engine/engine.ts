@@ -709,7 +709,8 @@ function tickTimers(p: Profile, now: number) {
       }
       if (remaining <= 0 && remaining <= t.leadSec * 1000) {
         if (t.autoRestart) {
-          updateTimer(t.id, { endsAt: t.endsAt + t.durationSec * 1000 });
+          const delay = Math.max(0, t.autoRestartDelaySec ?? 0) * 1000;
+          updateTimer(t.id, { endsAt: t.endsAt + delay + t.durationSec * 1000 });
           timerAlerted.delete(t.id);
         } else if (remaining < -1000) {
           updateTimer(t.id, { endsAt: null });

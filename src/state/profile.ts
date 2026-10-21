@@ -207,6 +207,8 @@ export interface TimerEntry {
   leadSec: number;
   /** 끝나면 자동으로 다시 시작 */
   autoRestart: boolean;
+  /** 다시 시작하기 전 기다리는 시간(초) */
+  autoRestartDelaySec?: number;
   /** 버프 연계: 지정한 버프 아이콘이 나타나면 자동 시작 */
   linkedBuffId: string | null;
   /** 연계한 버프가 사라지면 일시정지, 다시 나타나면 이어서 */

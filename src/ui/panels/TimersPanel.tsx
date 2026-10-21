@@ -115,6 +115,16 @@ function TimerRow({ t }: { t: TimerEntry }) {
             <span className="field-label">알림 시점</span>
             <NumberInput value={t.leadSec} min={-5} max={600} suffix="초 전" onChange={(v) => updateTimer(t.id, { leadSec: v })} />
             <Toggle checked={t.autoRestart} onChange={(v) => updateTimer(t.id, { autoRestart: v })} label="끝나면 자동으로 다시 시작" />
+            {t.autoRestart && (
+              <NumberInput
+                value={t.autoRestartDelaySec ?? 0}
+                min={0}
+                max={600}
+                suffix="초 뒤에"
+                width={56}
+                onChange={(v) => updateTimer(t.id, { autoRestartDelaySec: v })}
+              />
+            )}
           </div>
           <div className="field-row">
             <span className="field-label">버프 연계</span>
