@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
+import { screenCapture } from "../capture/screenCapture";
+import { liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
 import { PIP_SIZES, defaultProfile, profileStore, uid, type PipSize, type ThemeMode } from "../state/profile";
@@ -49,6 +51,30 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       await putCustomSound({ id: uid(), name: f.name.replace(/\.[^.]+$/, ""), blob: f });
     }
     await reload();
+  };
+
+  /** 지금 화면 + 설정(영역) + 학습 숫자 + 감지 상태를 파일 하나로 저장 (기준값 조정용) */
+  const exportDiagnostics = () => {
+    const frame = screenCapture.snapshot();
+    const live = liveStore.get();
+    const data = {
+      kind: "maple-timer-diagnostics",
+      savedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      capture: { state: screenCapture.state, width: screenCapture.width, height: screenCapture.height },
+      profile: profileStore.get(),
+      learnedDigits: digitStore.get(),
+      live: { skills: live.skills, rune: live.rune, stall: live.stall, buffs: live.buffs, booster: live.booster, log: live.log },
+      framePng: frame ? frame.toDataURL("image/png") : null,
+    };
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const d = new Date();
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    a.download = `maple-diagnostics-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
   const exportProfile = () => {
@@ -185,6 +211,18 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             소리 파일 추가
             <input type="file" accept="audio/*" multiple onChange={(e) => addSound(e.target.files)} />
           </label>
+        </section>
+        <section className="modal-section">
+          <h4>진단</h4>
+          <p className="muted small">
+            감지가 잘 안 될 때, 문제가 보이는 순간에 눌러 주세요. 지금 게임 화면·선택한 영역·학습한 숫자·감지 수치가 파일 하나로 저장돼요 (다운로드
+            폴더). 이 파일을 보면 기준값을 정확히 맞출 수 있어요.
+          </p>
+          <div className="field-row">
+            <button onClick={exportDiagnostics} disabled={screenCapture.state !== "live"}>
+              진단 파일 저장
+            </button>
+          </div>
         </section>
         <section className="modal-section">
           <h4>설정 백업</h4>
