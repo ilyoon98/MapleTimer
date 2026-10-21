@@ -1,0 +1,81 @@
+/**
+ * 개발용 가짜 게임 화면 (주소에 ?demo 를 붙였을 때만 사용).
+ * 실제 화면 공유 없이 영역 선택 → 감지 → 알림 흐름을 시험하기 위한 것.
+ *  - 미니맵(좌상단): 10초마다 보라색 룬이 나타났다 사라짐
+ *  - 퀵슬롯(우하단): 'k' 키를 누르면 스킬 사용(아이콘 어두워짐, 쿨 8초)
+ *  - 경험치(하단): 2초마다 숫자 증가, 's' 키로 멈춤/재개
+ *  - 버프칸(우상단): 'b' 키로 버프 아이콘 켜고 끄기
+ */
+export function createDemoStream(): MediaStream {
+  const W = 1280,
+    H = 720;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  let castAt = -1e9;
+  let stalled = false;
+  let buffOn = true;
+  let exp = 1234567;
+  let lastExp = 0;
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "k") castAt = performance.now();
+    if (e.key === "s") stalled = !stalled;
+    if (e.key === "b") buffOn = !buffOn;
+  });
+
+  const drawIcon = (x: number, y: number, hue: number, dim: number) => {
+    for (let i = 0; i < 32; i++)
+      for (let j = 0; j < 32; j++) {
+        const l = 35 + 25 * Math.sin((i + hue) * 0.4) * Math.cos(j * 0.3);
+        ctx.fillStyle = `hsl(${(hue + i * 4) % 360} 70% ${l * dim}%)`;
+        ctx.fillRect(x + i, y + j, 1, 1);
+      }
+  };
+
+  const draw = () => {
+    const t = performance.now();
+    ctx.fillStyle = "#3a5a40";
+    ctx.fillRect(0, 0, W, H);
+    // 미니맵
+    ctx.fillStyle = "#222";
+    ctx.fillRect(10, 30, 220, 140);
+    ctx.fillStyle = "#556b55";
+    ctx.fillRect(20, 50, 200, 110);
+    ctx.fillStyle = "#ffd400";
+    ctx.fillRect(60 + ((t / 100) % 120), 120, 4, 4); // 캐릭터 점
+    if (Math.floor(t / 10000) % 2 === 1) {
+      ctx.fillStyle = "#c83ce6";
+      ctx.fillRect(150, 80, 7, 7); // 룬
+    }
+    // 버프칸
+    ctx.fillStyle = "#111";
+    ctx.fillRect(860, 10, 400, 80);
+    drawIcon(880, 20, 20, 1);
+    if (buffOn) drawIcon(920, 20, 200, 1);
+    drawIcon(960, 20, 120, 1);
+    // 퀵슬롯
+    const cooling = t - castAt < 8000;
+    drawIcon(1100, 640, 290, cooling ? 0.45 : 1);
+    if (cooling) {
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(String(Math.ceil((8000 - (t - castAt)) / 1000)), 1110, 662);
+    }
+    // 경험치바
+    if (!stalled && t - lastExp > 2000) {
+      exp += 1357;
+      lastExp = t;
+    }
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 700, W, 20);
+    ctx.fillStyle = "#e8e800";
+    ctx.fillRect(0, 704, (exp % 100000) / 100000 * W, 12);
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px monospace";
+    ctx.fillText(`${exp.toLocaleString()} [${((exp % 100000) / 1000).toFixed(3)}%]`, 560, 714);
+  };
+  setInterval(draw, 100);
+  draw();
+  return c.captureStream(10);
+}
