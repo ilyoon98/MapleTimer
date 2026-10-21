@@ -17,7 +17,13 @@ import { QuickslotCastDetector, type IconState } from "../detect/quickslotCast";
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
 import { appTicker } from "../core/ticker";
 import { readDigits, segment, textMask } from "../cv/digits";
-import { CooldownSequenceRecorder, activeTemplates, addDigitSamples, learnedDigitCount } from "../detect/digitLearner";
+import {
+  CooldownSequenceRecorder,
+  activeTemplates,
+  addDigitSamples,
+  learnedDigitCount,
+  type LearnResult,
+} from "../detect/digitLearner";
 import { createStore } from "../state/createStore";
 import { profileStore, shortName, updateTimer, type BuffEntry, type Profile, type SkillEntry } from "../state/profile";
 import { tts } from "../state/profile";
@@ -377,6 +383,10 @@ interface BuffRuntime {
   colorDist: number;
   readText: string | null;
   readEsts: number[];
+  /** 버프칸 안에서 마지막으로 찾은 아이콘 위치 (버프칸 영역 기준) */
+  lastPos: { x: number; y: number } | null;
+  /** 버프가 끝날 때까지 숫자를 지켜보며 학습 */
+  recorder: CooldownSequenceRecorder;
 }
 const buffRt = new Map<string, BuffRuntime>();
 function buffRuntime(id: string) {
@@ -392,6 +402,8 @@ function buffRuntime(id: string) {
       colorDist: 0,
       readText: null,
       readEsts: [],
+      lastPos: null,
+      recorder: new CooldownSequenceRecorder(90, false),
     };
     buffRt.set(id, rt);
   }
@@ -430,10 +442,44 @@ function detectBuffs(p: Profile, now: number, live: boolean) {
     rt.score = m?.score ?? 0;
     rt.colorDist = m?.colorDist ?? 0;
     const hit = !!m && m.score >= b.minScore && m.colorDist <= 60;
+    if (hit && m) rt.lastPos = { x: m.x, y: m.y };
     const ev = rt.presence.observe(hit, now);
     onBuffEvent(b, rt, ev, now);
-    rt.readText = null;
-    if (hit && m && b.readTime && b.kind === "expiry") readBuffTime(b, rt, cropPixels(img, m.x, m.y, t.gray.width, t.gray.height), now);
+    if (!hit) rt.readText = null;
+  }
+}
+
+function learnFrom(res: LearnResult, name: string, now: number) {
+  if (res.ok) addDigitSamples(res.samples);
+  emitAlertLog(`숫자 학습 ${res.ok ? "완료" : "실패"} (${name}): ${res.reason}`, now);
+}
+
+/**
+ * 남은 시간을 읽는 버프는 매 tick(0.25초) 마지막 위치 주변만 다시 찾아 숫자를 읽는다.
+ * (버프칸 전체 탐색은 0.5초마다, 이건 작은 창이라 가볍다)
+ */
+function trackBuffIcons(p: Profile, now: number, live: boolean) {
+  const region = p.regions.buffbar;
+  if (!live || !regionValidFor(region, screenCapture.width, screenCapture.height)) return;
+  for (const b of p.buffs) {
+    if (!b.enabled || !b.template || !b.readTime || b.kind !== "expiry") continue;
+    const rt = buffRuntime(b.id);
+    if (!rt.presence.present || !rt.lastPos) continue;
+    const t = prepared(b.template);
+    const pad = 4;
+    const wx = Math.max(0, region.x + rt.lastPos.x - pad);
+    const wy = Math.max(0, region.y + rt.lastPos.y - pad);
+    const img = screenCapture.crop({ x: wx, y: wy, w: t.gray.width + pad * 2, h: t.gray.height + pad * 2 });
+    if (!img) continue;
+    const m = findTemplate(img, toGray(img), t, 1)[0];
+    if (!m || m.score < b.minScore || m.colorDist > 60) continue;
+    rt.lastPos = { x: wx + m.x - region.x, y: wy + m.y - region.y };
+    const icon = cropPixels(img, m.x, m.y, t.gray.width, t.gray.height);
+    debugCrops.set(`buff:${b.id}`, new ImageData(new Uint8ClampedArray(icon.data), icon.width, icon.height));
+    const seg = segment(icon);
+    readBuffTime(b, rt, icon, now, seg);
+    const res = rt.recorder.feed(seg, now);
+    if (res) learnFrom(res, b.name, now);
   }
 }
 
@@ -441,8 +487,8 @@ function detectBuffs(p: Profile, now: number, live: boolean) {
  * 버프 아이콘 위의 남은 시간 숫자를 읽어 종료 시각을 맞춘다 (정밀 감지).
  * 3번 연달아 서로 2초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용·자석펫 연장) 새 주기로 본다.
  */
-function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number) {
-  const read = readDigits(segment(icon), activeTemplates());
+function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, seg = segment(icon)) {
+  const read = readDigits(seg, activeTemplates());
   rt.readText = read?.text ?? null;
   if (!read || read.seconds < 1 || (learnedDigitCount() < 10 && read.confidence < 0.9)) {
     rt.readEsts = [];
@@ -484,6 +530,10 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
     startLinkedTimers(b.id, now);
   }
   if (ev === "disappeared" && b.kind === "expiry") {
+    // 버프가 끝난 순간: 마지막으로 보인 숫자가 1 이므로 지금까지의 순서로 숫자 학습
+    const res = rt.recorder.finishNow();
+    if (res && b.readTime) learnFrom(res, b.name, now);
+    rt.readEsts = [];
     rt.endsAt = null;
     if (b.alertOnDisappear) {
       r.reset();
@@ -601,6 +651,7 @@ function tick(now: number) {
     lastBuff = now;
     detectBuffs(p, now, live);
   }
+  trackBuffIcons(p, now, live);
   const buffs = tickBuffTimers(p, now);
 
   let rune = prev.rune;

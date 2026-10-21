@@ -56,8 +56,8 @@ export function createDemoStream(): MediaStream {
     ctx.fillStyle = "#111";
     ctx.fillRect(860, 10, 400, 80);
     drawIcon(880, 20, 20, 1);
-    // 가운데 버프: 90초짜리, 남은 시간을 m:ss 로 표시
-    const buffLeft = Math.ceil((90000 - (t - buffStart)) / 1000);
+    // 가운데 버프: 70초짜리, 남은 시간을 m:ss 로 표시 ('b' 로 끄고 켜면 다시 70초)
+    const buffLeft = Math.ceil((70000 - (t - buffStart)) / 1000);
     if (buffOn && buffLeft <= 0) buffOn = false;
     if (buffOn) {
       drawIcon(920, 20, 200, 1);

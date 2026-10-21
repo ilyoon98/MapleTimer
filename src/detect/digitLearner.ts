@@ -2,17 +2,24 @@ import { expectedText, glyphSimilarity, segment, GH, GW, type DigitTemplates, ty
 import { createPersistentStore } from "../state/createStore";
 
 /* ───────── 학습한 숫자 모양 저장소 ───────── */
-interface LearnedDigits {
-  v: 1;
+/** 글자 높이(px)별로 따로 모은다: 퀵슬롯 숫자와 버프 숫자의 크기가 다를 수 있어서 */
+interface DigitSet {
+  h: number;
   /** 숫자별 누적 합 (GW*GH) */
   sums: Array<number[] | null>;
   counts: number[];
 }
-const emptyLearned = (): LearnedDigits => ({ v: 1, sums: Array(10).fill(null), counts: Array(10).fill(0) });
+interface LearnedDigits {
+  v: 2;
+  sets: DigitSet[];
+}
+const emptyLearned = (): LearnedDigits => ({ v: 2, sets: [] });
+const emptySet = (h: number): DigitSet => ({ h, sums: Array(10).fill(null), counts: Array(10).fill(0) });
+const heightBucket = (h: number) => Math.round(h / 2) * 2;
 
-export const digitStore = createPersistentStore<LearnedDigits>("maple-timer-personal.digits.v1", emptyLearned(), (raw) => {
+export const digitStore = createPersistentStore<LearnedDigits>("maple-timer-personal.digits.v2", emptyLearned(), (raw) => {
   const r = raw as LearnedDigits;
-  return r?.v === 1 && Array.isArray(r.sums) && r.sums.length === 10 ? r : emptyLearned();
+  return r?.v === 2 && Array.isArray(r.sets) ? r : emptyLearned();
 });
 
 export function resetLearnedDigits() {
@@ -20,23 +27,28 @@ export function resetLearnedDigits() {
   cache = null;
 }
 
+/** 0~9 중 (어느 크기로든) 배운 숫자 개수 */
 export function learnedDigitCount(s = digitStore.get()) {
-  return s.counts.filter((c) => c > 0).length;
+  let n = 0;
+  for (let d = 0; d < 10; d++) if (s.sets.some((set) => set.counts[d] > 0)) n++;
+  return n;
 }
 
-export function addDigitSamples(samples: Array<{ digit: number; v: Float32Array }>) {
+export function addDigitSamples(samples: Array<{ digit: number; v: Float32Array; h: number }>) {
   digitStore.set((s) => {
-    const sums = s.sums.map((x) => (x ? [...x] : null));
-    const counts = [...s.counts];
-    for (const { digit, v } of samples) {
-      // 너무 많이 쌓이면 오래된 영향이 줄도록 상한
-      if (counts[digit] >= 200) continue;
-      const acc = sums[digit] ?? new Array(GW * GH).fill(0);
+    const sets = s.sets.map((x) => ({ h: x.h, sums: x.sums.map((y) => (y ? [...y] : null)), counts: [...x.counts] }));
+    for (const { digit, v, h } of samples) {
+      const hb = heightBucket(h);
+      let set = sets.find((x) => x.h === hb);
+      if (!set) sets.push((set = emptySet(hb)));
+      // 너무 많이 쌓이면 새로 배운 모양이 반영되지 않으므로 상한
+      if (set.counts[digit] >= 200) continue;
+      const acc = set.sums[digit] ?? new Array(GW * GH).fill(0);
       for (let i = 0; i < acc.length; i++) acc[i] += v[i];
-      sums[digit] = acc;
-      counts[digit]++;
+      set.sums[digit] = acc;
+      set.counts[digit]++;
     }
-    return { v: 1, sums, counts };
+    return { v: 2, sets };
   });
   cache = null;
 }
@@ -76,9 +88,10 @@ export function activeTemplates(): DigitTemplates {
   fontTemplates ??= buildFontTemplates();
   const s = digitStore.get();
   cache = Array.from({ length: 10 }, (_, d) => {
-    const sum = s.sums[d];
-    if (sum && s.counts[d] > 0) return [Float32Array.from(sum, (x) => x / s.counts[d])];
-    return fontTemplates![d];
+    const learned = s.sets
+      .filter((set) => set.counts[d] > 0 && set.sums[d])
+      .map((set) => Float32Array.from(set.sums[d]!, (x) => x / set.counts[d]));
+    return learned.length ? learned : fontTemplates![d];
   });
   return cache;
 }
@@ -95,7 +108,7 @@ interface SeqState {
 export interface LearnResult {
   ok: boolean;
   reason: string;
-  samples: Array<{ digit: number; v: Float32Array }>;
+  samples: Array<{ digit: number; v: Float32Array; h: number }>;
 }
 
 function sameGlyphs(a: Glyph[], b: Glyph[]) {
@@ -114,6 +127,24 @@ export class CooldownSequenceRecorder {
   private lastSeenAt = 0;
   status: "idle" | "recording" = "idle";
   lastResult: LearnResult | null = null;
+
+  /**
+   * maxStates: 끝에서부터 세므로 마지막 몇 개 값만 있으면 된다 (긴 버프용)
+   * autoFinish: 숫자가 1.5초 안 보이면 끝난 것으로 볼지 (버프는 아이콘이 사라질 때 finishNow 로 끝낸다)
+   */
+  constructor(
+    private maxStates = 200,
+    private autoFinish = true,
+  ) {}
+
+  /** 버프 아이콘이 사라진 순간처럼, 끝난 시점을 바깥에서 알 때 바로 마무리 */
+  finishNow(): LearnResult | null {
+    if (!this.recording) return null;
+    const res = this.finish();
+    this.reset();
+    this.lastResult = res;
+    return res;
+  }
 
   reset() {
     this.states = [];
@@ -145,12 +176,13 @@ export class CooldownSequenceRecorder {
           cur.glyphs = seg.glyphs;
         } else {
           this.states.push({ glyphs: seg.glyphs, colon: seg.hasColon, first: now, last: now, samples: 1 });
+          if (this.states.length > this.maxStates) this.states.shift();
         }
       }
       return null;
     }
     this.seenStreak = 0;
-    if (this.recording && now - this.lastSeenAt >= 1500) {
+    if (this.autoFinish && this.recording && now - this.lastSeenAt >= 1500) {
       const res = this.finish();
       this.reset();
       this.lastResult = res;
@@ -180,7 +212,7 @@ export class CooldownSequenceRecorder {
     const med = durs[Math.floor(durs.length / 2)] ?? 1000;
     if (med < 700 || med > 1400) return { ok: false, reason: `숫자가 1초마다 바뀌지 않아요 (${Math.round(med)}ms)`, samples: [] };
 
-    const samples: Array<{ digit: number; v: Float32Array }> = [];
+    const samples: LearnResult["samples"] = [];
     let mismatch = 0;
     for (let i = 0; i < n; i++) {
       const value = n - i; // 끝에서부터 1, 2, 3…
@@ -189,7 +221,7 @@ export class CooldownSequenceRecorder {
         mismatch++;
         continue;
       }
-      clean[i].glyphs.forEach((g, k) => samples.push({ digit: Number(text[k]), v: g.v }));
+      clean[i].glyphs.forEach((g, k) => samples.push({ digit: Number(text[k]), v: g.v, h: g.h }));
     }
     // 9 → 10 경계에서 글자 수가 정확히 맞아야 순서가 한 칸 밀리지 않았다고 확신할 수 있다
     const s9 = clean[n - 9],
