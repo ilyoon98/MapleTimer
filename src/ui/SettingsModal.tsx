@@ -4,7 +4,8 @@ import { screenCapture } from "../capture/screenCapture";
 import { liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
-import { PIP_SIZES, defaultProfile, profileStore, uid, type PipSize, type ThemeMode } from "../state/profile";
+import { PIP_SIZES, defaultProfile, migrate, profileStore, uid, type PipSize, type ThemeMode } from "../state/profile";
+import { deletePreset, loadPreset, presetStore, savePreset } from "../state/presets";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
 
@@ -22,6 +23,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const pipSize = profileStore.use((p) => p.pipSize);
+  const presets = presetStore.use((s) => s.presets);
+  const [presetName, setPresetName] = useState("");
   const ttsVoice = profileStore.use((p) => p.ttsVoice);
   const ttsRate = profileStore.use((p) => p.ttsRate);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -93,7 +96,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     try {
       const { learnedDigits, ...data } = JSON.parse(await f.text());
       if (data?.v !== 1) throw new Error("형식이 달라요");
-      profileStore.set(() => ({ ...defaultProfile(), ...data }));
+      profileStore.set(() => migrate(data));
       const withDigits = importLearnedDigits(learnedDigits);
       alert(withDigits ? "설정과 학습한 숫자를 불러왔어요." : "설정을 불러왔어요.");
     } catch (e) {
@@ -211,6 +214,35 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             소리 파일 추가
             <input type="file" accept="audio/*" multiple onChange={(e) => addSound(e.target.files)} />
           </label>
+        </section>
+        <section className="modal-section">
+          <h4>프리셋 (사냥용 / 보스용 등)</h4>
+          <p className="muted small">지금 설정(영역·알림·등록한 아이콘 포함)을 이름 붙여 저장하고, 상황에 맞게 바꿔 쓸 수 있어요.</p>
+          <div className="field-row">
+            <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="예: 사냥, 보스" />
+            <button
+              onClick={() => {
+                savePreset(presetName);
+                setPresetName("");
+              }}
+            >
+              지금 설정 저장
+            </button>
+          </div>
+          <ul className="sound-list">
+            {presets.map((pr) => (
+              <li key={pr.id}>
+                <span className="grow">
+                  {pr.name} <span className="muted small">({new Date(pr.savedAt).toLocaleString()})</span>
+                </span>
+                <button onClick={() => confirm(`'${pr.name}' 프리셋으로 바꿀까요? 지금 설정은 덮어써져요.`) && loadPreset(pr.id)}>불러오기</button>
+                <button className="danger" onClick={() => confirm(`'${pr.name}' 프리셋을 지울까요?`) && deletePreset(pr.id)}>
+                  삭제
+                </button>
+              </li>
+            ))}
+            {presets.length === 0 && <li className="muted">저장된 프리셋이 없어요</li>}
+          </ul>
         </section>
         <section className="modal-section">
           <h4>진단</h4>

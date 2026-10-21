@@ -310,7 +310,8 @@ export function defaultProfile(): Profile {
   };
 }
 
-function migrate(raw: unknown): Profile {
+/** 저장된(또는 파일·프리셋에서 불러온) 설정을 지금 형식에 맞춘다 */
+export function migrate(raw: unknown): Profile {
   const d = defaultProfile();
   if (!raw || typeof raw !== "object" || (raw as Profile).v !== 1) return d;
   const p = raw as Partial<Profile>;
