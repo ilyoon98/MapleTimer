@@ -9,7 +9,7 @@ import {
 import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
-import { toGray } from "../cv/image";
+import { cropPixels, toGray, type Pixels } from "../cv/image";
 import { findTemplate, prepareTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
 import { ChangeMonitor } from "../detect/changeMonitor";
 import { PresenceTracker } from "../detect/presence";
@@ -58,6 +58,8 @@ export interface BuffLive {
   colorDist: number;
   endsAt: number | null;
   lastAlertAt: number | null;
+  /** 아이콘에서 읽은 남은 시간 */
+  readText: string | null;
 }
 export interface LiveState {
   now: number;
@@ -373,12 +375,24 @@ interface BuffRuntime {
   spokenSec: number | null;
   score: number;
   colorDist: number;
+  readText: string | null;
+  readEsts: number[];
 }
 const buffRt = new Map<string, BuffRuntime>();
 function buffRuntime(id: string) {
   let rt = buffRt.get(id);
   if (!rt) {
-    rt = { presence: new PresenceTracker(2, 2), startedAt: null, endsAt: null, alerted: false, spokenSec: null, score: 0, colorDist: 0 };
+    rt = {
+      presence: new PresenceTracker(2, 2),
+      startedAt: null,
+      endsAt: null,
+      alerted: false,
+      spokenSec: null,
+      score: 0,
+      colorDist: 0,
+      readText: null,
+      readEsts: [],
+    };
     buffRt.set(id, rt);
   }
   return rt;
@@ -418,7 +432,32 @@ function detectBuffs(p: Profile, now: number, live: boolean) {
     const hit = !!m && m.score >= b.minScore && m.colorDist <= 60;
     const ev = rt.presence.observe(hit, now);
     onBuffEvent(b, rt, ev, now);
+    rt.readText = null;
+    if (hit && m && b.readTime && b.kind === "expiry") readBuffTime(b, rt, cropPixels(img, m.x, m.y, t.gray.width, t.gray.height), now);
   }
+}
+
+/**
+ * 버프 아이콘 위의 남은 시간 숫자를 읽어 종료 시각을 맞춘다 (정밀 감지).
+ * 3번 연달아 서로 2초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용·자석펫 연장) 새 주기로 본다.
+ */
+function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number) {
+  const read = readDigits(segment(icon), activeTemplates());
+  rt.readText = read?.text ?? null;
+  if (!read || read.seconds < 1 || (learnedDigitCount() < 10 && read.confidence < 0.9)) {
+    rt.readEsts = [];
+    return;
+  }
+  const est = now + read.seconds * 1000 + 500;
+  rt.readEsts = [...rt.readEsts.filter((e) => Math.abs(e - est) <= 2000), est].slice(-3);
+  if (rt.readEsts.length < 3) return;
+  const agreed = rt.readEsts.reduce((a, c) => a + c, 0) / rt.readEsts.length;
+  if (rt.endsAt != null && Math.abs(agreed - rt.endsAt) <= 2500) return;
+  if (rt.endsAt == null || agreed > rt.endsAt) {
+    rt.alerted = false;
+    runners.get(`buff:${b.id}`)?.reset();
+  }
+  rt.endsAt = agreed;
 }
 
 function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeared" | null, now: number) {
@@ -491,6 +530,7 @@ function tickBuffTimers(p: Profile, now: number) {
       colorDist: rt.colorDist,
       endsAt: rt.endsAt,
       lastAlertAt: r.lastFiredAt,
+      readText: rt.readText,
     };
   }
   for (const id of buffRt.keys()) if (!p.buffs.some((b) => b.id === id)) buffRt.delete(id);
@@ -588,6 +628,9 @@ function runnerLabel(key: string, p: Profile) {
   if (kind === "timer") return shortName(p.timers.find((t) => t.id === id)?.name ?? "타이머");
   return kind === "rune" ? "룬" : kind === "stall" ? "사냥 멈춤" : kind;
 }
+
+// 개발 모드에서만: 브라우저 콘솔에서 감지 상태를 들여다보기 위한 손잡이
+if (import.meta.env.DEV) Object.assign(window, { __mapleTimer: { debugCrops, liveStore, profileStore } });
 
 let started = false;
 export function startEngine() {

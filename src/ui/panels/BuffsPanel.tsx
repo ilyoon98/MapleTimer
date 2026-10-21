@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { storeTemplate, type StoredTemplate } from "../../cv/match";
 import { liveStore } from "../../engine/engine";
-import { newBuff, profileStore, setRegion, updateBuff, type BuffEntry, type BuffKind } from "../../state/profile";
+import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
 import { openPicker } from "../pickerStore";
@@ -18,7 +18,7 @@ function TemplateThumb({ t }: { t: StoredTemplate | null }) {
 export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const buffs = profileStore.use((p) => p.buffs);
   const region = profileStore.use((p) => p.regions.buffbar);
-  const add = (kind: BuffKind) => profileStore.set((p) => ({ ...p, buffs: [...p.buffs, newBuff(kind)] }));
+  const add = (id: BuffPresetId) => profileStore.set((p) => ({ ...p, buffs: [...p.buffs, newBuffPreset(id)] }));
 
   const pickRegion = () =>
     openPicker({
@@ -40,14 +40,18 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
       actions={
         <>
           <button onClick={pickRegion}>{region ? "버프칸 다시 선택" : "버프칸 선택"}</button>
-          <button onClick={() => add("expiry")}>+ 버프</button>
-          <button onClick={() => add("cooldown")}>+ 특수 코어</button>
+          {BUFF_PRESETS.map((bp) => (
+            <button key={bp.id} onClick={() => add(bp.id)}>
+              {bp.label}
+            </button>
+          ))}
         </>
       }
     >
       <p className="panel-hint">
-        버프칸에서 직접 고른 아이콘이 <b>나타나면</b> 지속시간/쿨타임을 세고, <b>사라지면</b> 버프 종료로 알려줘요. 아이콘 가운데의 남은 시간
-        숫자는 무시하고 테두리 모양으로 찾습니다.
+        버프칸에서 직접 고른 아이콘을 테두리 모양으로 찾아요. 아이콘 위 <b>남은 시간 숫자</b>를 읽어서 끝나기 전에 알려주고(정밀 감지 — 야누스
+        자석펫 연장도 따라감), 숫자를 못 읽으면 <b>나타난 시점부터 지속시간</b>을 세거나 <b>사라질 때</b> 알려줘요. 숫자 읽기는 스킬 알림에서 숫자
+        학습을 마친 뒤에 정확해져요.
       </p>
       {buffs.length === 0 && <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 '+ 버프' 또는 '+ 특수 코어'를 눌러 주세요.</div>}
       {buffs.map((b) => (
@@ -112,6 +116,12 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
           <div className="cell-label">일치도</div>
           <div className="cell-value mono">{live?.score ? live.score.toFixed(2) : "--"}</div>
         </div>
+        {b.readTime && !isCore && (
+          <div className="cell">
+            <div className="cell-label">읽은 숫자</div>
+            <div className="cell-value mono">{live?.readText ?? "--"}</div>
+          </div>
+        )}
         <StatusDot tone={status.tone}>{status.text}</StatusDot>
         <div className="row-buttons">
           <button onClick={pickIcon} disabled={!hasRegion}>
@@ -160,6 +170,7 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
                 )}
               </div>
               <div className="field-row">
+                <Toggle checked={b.readTime} onChange={(v) => updateBuff(b.id, { readTime: v })} label="아이콘의 남은 시간 숫자 읽기 (정밀)" />
                 <Toggle checked={b.alertOnDisappear} onChange={(v) => updateBuff(b.id, { alertOnDisappear: v })} label="아이콘이 사라지면 알림" />
               </div>
               <p className="muted small">지속시간은 아이콘이 나타난 순간부터 셉니다. 켜기 전부터 걸려 있던 버프는 사라질 때만 알 수 있어요.</p>

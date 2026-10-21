@@ -121,7 +121,27 @@ export interface BuffEntry {
   alertOnDisappear: boolean;
   /** 알림 시점부터 0 까지 초 읽기 (특수 코어) */
   countdownVoice: boolean;
+  /** 아이콘 위 남은 시간 숫자를 읽어 종료 시각을 맞춤 (정밀 감지) */
+  readTime: boolean;
   alert: AlertConfig;
+}
+
+export type BuffPresetId = "buff" | "janus" | "fountain" | "core";
+export const BUFF_PRESETS: Array<{ id: BuffPresetId; label: string }> = [
+  { id: "buff", label: "+ 버프 종료" },
+  { id: "janus", label: "+ 솔 야누스 (정밀)" },
+  { id: "fountain", label: "+ 에르다 파운틴 (정밀)" },
+  { id: "core", label: "+ 특수 코어" },
+];
+
+export function newBuffPreset(id: BuffPresetId): BuffEntry {
+  if (id === "core") return newBuff("cooldown");
+  const b = newBuff("expiry");
+  if (id === "janus" || id === "fountain") {
+    const name = id === "janus" ? "솔 야누스" : "에르다 파운틴";
+    return { ...b, name, leadSec: 10, alertOnDisappear: false, alert: alertCfg(tts(`${name} 곧 끝나요`)) };
+  }
+  return b;
 }
 
 export function newBuff(kind: BuffKind): BuffEntry {
@@ -137,6 +157,7 @@ export function newBuff(kind: BuffKind): BuffEntry {
         leadSec: 5,
         alertOnDisappear: false,
         countdownVoice: true,
+        readTime: false,
         alert: alertCfg(tts("특수 코어")),
       }
     : {
@@ -150,6 +171,7 @@ export function newBuff(kind: BuffKind): BuffEntry {
         leadSec: 20,
         alertOnDisappear: true,
         countdownVoice: false,
+        readTime: true,
         alert: alertCfg(tts("버프가 곧 끝나요")),
       };
 }
@@ -271,6 +293,8 @@ function migrate(raw: unknown): Profile {
     ...p,
     rune: { ...d.rune, ...p.rune, color: { ...d.rune.color, ...p.rune?.color } },
     stall: { ...d.stall, ...p.stall, sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity } },
+    // 예전 버전에서 저장한 항목엔 새 필드가 없을 수 있음
+    buffs: (p.buffs ?? []).map((b) => ({ readTime: b.kind === "expiry", ...(b as Partial<BuffEntry>) }) as BuffEntry),
     regions: { ...p.regions },
     panelOrder: order,
   } as Profile;

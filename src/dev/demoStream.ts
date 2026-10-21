@@ -18,10 +18,14 @@ export function createDemoStream(): MediaStream {
   let buffOn = true;
   let exp = 1234567;
   let lastExp = 0;
+  let buffStart = performance.now();
   window.addEventListener("keydown", (e) => {
     if (e.key === "k") castAt = performance.now();
     if (e.key === "s") stalled = !stalled;
-    if (e.key === "b") buffOn = !buffOn;
+    if (e.key === "b") {
+      buffOn = !buffOn;
+      buffStart = performance.now();
+    }
   });
 
   const drawIcon = (x: number, y: number, hue: number, dim: number) => {
@@ -52,7 +56,23 @@ export function createDemoStream(): MediaStream {
     ctx.fillStyle = "#111";
     ctx.fillRect(860, 10, 400, 80);
     drawIcon(880, 20, 20, 1);
-    if (buffOn) drawIcon(920, 20, 200, 1);
+    // 가운데 버프: 90초짜리, 남은 시간을 m:ss 로 표시
+    const buffLeft = Math.ceil((90000 - (t - buffStart)) / 1000);
+    if (buffOn && buffLeft <= 0) buffOn = false;
+    if (buffOn) {
+      drawIcon(920, 20, 200, 1);
+      const txt = buffLeft >= 60 ? `${Math.floor(buffLeft / 60)}:${String(buffLeft % 60).padStart(2, "0")}` : String(buffLeft);
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.strokeText(txt, 936, 37);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(txt, 936, 37);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    }
     drawIcon(960, 20, 120, 1);
     // 퀵슬롯 (쿨타임 15초, 가운데 큰 숫자)
     const cooling = t - castAt < 15000;
