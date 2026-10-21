@@ -279,7 +279,7 @@ function tickSkills(p: Profile, now: number, live: boolean) {
         r.trigger(now);
       }
       // 종료 후 충분히 지나면 표시 정리
-      if (remaining < Math.min(-30000, (s.leadSec - 30) * 1000) && !r.isActive) {
+      if (remaining < Math.min(-30000, (s.leadSec - 30) * 1000) && !r.isRinging) {
         rt.expiresAt = null;
       }
     }
