@@ -93,6 +93,11 @@ function PipView() {
       text: rem == null ? (b.kind === "cooldown" ? "사용 가능" : l?.present ? "있음" : "없음") : undefined,
     });
   }
+  if (p.booster.enabled && live.booster.endsAt != null) {
+    const rem = live.booster.endsAt - now;
+    const urgent = rem <= p.booster.leadSec * 1000;
+    items.push({ key: "booster", name: "부스터", remaining: rem, urgent, tone: urgent ? "alert" : "running" });
+  }
   for (const t of p.timers) {
     const rem = t.endsAt != null ? t.endsAt - now : t.pausedRemainingMs;
     const urgent = t.endsAt != null && rem != null && rem <= t.leadSec * 1000;

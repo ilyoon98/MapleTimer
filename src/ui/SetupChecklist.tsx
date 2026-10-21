@@ -62,6 +62,11 @@ export function SetupChecklist() {
           : `버프칸: ${ok("buffbar") ? "선택됨" : "영역 선택"} · 아이콘 ${buffsOn.filter((b) => b.template).length}/${buffsOn.length}`,
       optional: buffsOn.length === 0,
     },
+    {
+      done: !p.booster.enabled || ok("booster"),
+      text: p.booster.enabled ? (ok("booster") ? "부스터: 영역 선택됨" : "부스터: 타이머 영역 선택") : "부스터 알림 꺼짐",
+      optional: !p.booster.enabled,
+    },
   ];
   const remaining = steps.filter((s) => !s.done && !s.optional).length;
   const toggle = () => profileStore.set((s) => ({ ...s, collapsed: { ...s.collapsed, checklist: !hidden } }));

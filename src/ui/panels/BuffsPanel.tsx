@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { storeTemplate, type StoredTemplate } from "../../cv/match";
-import { liveStore } from "../../engine/engine";
+import { segment } from "../../cv/digits";
+import { debugCrops, liveStore } from "../../engine/engine";
+import { teachDigits } from "../teachDigits";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
@@ -169,6 +171,20 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
                   </>
                 )}
               </div>
+              {b.readTime && (
+                <div className="field-row">
+                  <DebugCrop cropKey={`buff:${b.id}`} maxWidth={96} />
+                  <button
+                    title="자동 학습이 잘 안 될 때: 아이콘에 남은 시간 숫자가 보일 때 눌러서 직접 입력"
+                    onClick={() => {
+                      const img = debugCrops.get(`buff:${b.id}`);
+                      teachDigits(img ? segment(img) : null, `'${b.name}' 아이콘`);
+                    }}
+                  >
+                    숫자 직접 가르치기
+                  </button>
+                </div>
+              )}
               <div className="field-row">
                 <Toggle checked={b.readTime} onChange={(v) => updateBuff(b.id, { readTime: v })} label="아이콘의 남은 시간 숫자 읽기 (정밀)" />
                 <Toggle checked={b.alertOnDisappear} onChange={(v) => updateBuff(b.id, { alertOnDisappear: v })} label="아이콘이 사라지면 알림" />

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { screenCapture } from "../../capture/screenCapture";
 import { regionValidFor } from "../../capture/types";
+import { segment } from "../../cv/digits";
 import { digitStore, learnedDigitCount } from "../../detect/digitLearner";
+import { teachDigits } from "../teachDigits";
 import { makeReference } from "../../detect/quickslotCast";
 import { clearSkill, debugCrops, liveStore, manualSkillCast } from "../../engine/engine";
 import {
@@ -221,6 +223,16 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
               <div className="field-row">
                 <button onClick={saveReadyNow} disabled={!regionOk}>
                   지금 모습을 '사용 가능' 기준으로 저장
+                </button>
+                <button
+                  disabled={!regionOk}
+                  title="자동 학습이 잘 안 될 때: 쿨타임 숫자가 보이는 순간 눌러서 직접 입력"
+                  onClick={() => {
+                    const img = debugCrops.get(`skill:${s.id}`);
+                    teachDigits(img ? segment(img) : null, "퀵슬롯");
+                  }}
+                >
+                  숫자 직접 가르치기
                 </button>
               </div>
               <div className="field-row">
