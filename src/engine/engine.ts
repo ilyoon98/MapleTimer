@@ -655,16 +655,15 @@ interface BoosterRuntime {
   ests: EstimateConsensus;
   endsAt: number | null;
   alerted: boolean;
-  lastReadAt: number;
   readText: string | null;
 }
-const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: null, alerted: false, lastReadAt: 0, readText: null };
+const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: null, alerted: false, readText: null };
 
 /** 부스터 진단 화면의 '직접 가르치기'용: 마지막으로 나눈 글자 */
 export let lastBoosterSegment: ReturnType<typeof segment> | null = null;
 
 /**
- * 화면 위쪽 부스터 남은시간 숫자("36.83" 또는 "1:05")를 읽어 끝나기 전에 알린다.
+ * 화면 위쪽 부스터 남은시간 숫자("36.83", 1분이 넘어도 "78.20")를 읽어 끝나기 전에 알린다.
  * 3번 연달아 1.5초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용) 새 주기로 본다.
  */
 function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
@@ -689,7 +688,6 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
     const read = readSevenSegment(img) ?? readDigits(seg, activeTemplates());
     rt.readText = read?.text ?? null;
     if (read && read.seconds > 0 && read.seconds < 3600) {
-      rt.lastReadAt = now;
       const agreed = rt.ests.add(now + read.seconds * 1000);
       if (agreed != null) {
         if (rt.endsAt == null || agreed - rt.endsAt > 5000) {
@@ -705,8 +703,9 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
       rt.ests.reset();
     }
   }
-  // 20초 넘게 못 읽으면 부스터가 끝났거나 사라진 것으로 본다
-  if (rt.endsAt != null && now - rt.lastReadAt > 20_000 && now > rt.endsAt) rt.endsAt = null;
+  // 끝나는 시각이 3초 넘게 지났으면 끝난 것으로 본다. 아직 숫자가 보이면 새로 3번 맞춰 다시 잡는다
+  // (예전엔 '20초 동안 못 읽으면'이었는데, 가끔 잘못 읽은 값이 그 시간을 계속 늘려서 '진행 중'에 멈춰 있었다)
+  if (rt.endsAt != null && now > rt.endsAt + 3000) rt.endsAt = null;
   if (rt.endsAt != null && !rt.alerted && rt.endsAt - now <= b.leadSec * 1000) {
     rt.alerted = true;
     r.trigger(now);

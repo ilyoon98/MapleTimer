@@ -21,7 +21,7 @@ const T = 6; // 막대 굵기
 const TOP = 10;
 
 /** 실제 부스터 숫자처럼 그리기: 막대 위쪽 흰색 → 아래쪽 주황, 막대 사이 검은 틈, 어두운 상자 배경 */
-function render(text: string, opts: { quest?: boolean; labels?: boolean; border?: boolean } = {}): Pixels {
+function render(text: string, opts: { quest?: boolean; questTop?: boolean; labels?: boolean; border?: boolean } = {}): Pixels {
   const w = 220,
     h = 64;
   const data = new Uint8ClampedArray(w * h * 4);
@@ -59,6 +59,14 @@ function render(text: string, opts: { quest?: boolean; labels?: boolean; border?
   if (opts.labels) for (let y = TOP + CH - 12; y < TOP + CH; y++) for (let lx = x; lx < x + 10; lx += 2) put(lx, y, [230, 230, 230]); // '초'
   // 퀘스트 알림 글자: 어두운 노란 글자가 숫자 가운데 줄 위로 지나간다
   if (opts.quest) for (let y = TOP + 17; y < TOP + 23; y++) for (let qx = 0; qx < w; qx++) if (qx % 5 < 2) put(qx, y, [195, 166, 61]);
+  // 퀘스트 글자가 윗줄을 지나가면 흰 윗막대는 회색으로 어두워지고 군데군데 글자 획이 덮는다 (실제 화면 78.20)
+  if (opts.questTop)
+    for (let y = TOP; y < TOP + T; y++)
+      for (let qx = 0; qx < w; qx++) {
+        const i = (y * w + qx) * 4;
+        if (qx % 7 < 2) data.set([195, 166, 61], i);
+        else if (data[i] >= 215) data.set([204, 204, 200], i);
+      }
   return { data, width: w, height: h };
 }
 
@@ -71,6 +79,9 @@ describe("디지털 시계 모양 숫자 (부스터 남은시간)", () => {
   it("퀘스트 알림 글자가 겹쳐도, '남은시간'·'초' 글자와 상자 테두리가 같이 잡혀도 읽는다", () => {
     for (const text of ["36.83", "10.47", "59.12", "20.06"])
       expect(readSevenSegment(render(text, { quest: true, labels: true, border: true }))?.text).toBe(text);
+  });
+  it("퀘스트 글자가 윗막대를 덮어 회색으로 어두워져도 읽는다 (78.20 의 7·8·2·0)", () => {
+    for (const text of ["78.20", "36.83", "10.47", "59.12"]) expect(readSevenSegment(render(text, { questTop: true, labels: true }))?.text).toBe(text);
   });
   it("숫자가 없으면 null", () => {
     expect(readSevenSegment(render("", { labels: true, border: true }))).toBeNull();
