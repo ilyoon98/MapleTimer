@@ -88,6 +88,8 @@ export interface LiveState {
   captureStale: boolean;
   /** 공유 화면이 계속 새까맣게만 들어옴 (창 공유가 안 되는 그래픽 모드) */
   captureBlack: boolean;
+  /** 한 번 감지 돌리는 데 걸린 시간(ms): 평균과 최근 최대 */
+  perf: { avgMs: number; maxMs: number };
 }
 
 export const liveStore = createStore<LiveState>({
@@ -101,6 +103,7 @@ export const liveStore = createStore<LiveState>({
   ringing: [],
   captureStale: false,
   captureBlack: false,
+  perf: { avgMs: 0, maxMs: 0 },
 });
 
 /** 진단 화면에서 보여줄 마지막 잘라낸 영역 이미지 */
@@ -766,7 +769,25 @@ function checkShareEnded(p: Profile, now: number) {
   prevCaptureState = st;
 }
 
+let perfAvg = 0;
+let perfMax = 0;
+let perfMaxAt = 0;
+
 function tick(now: number) {
+  const t0 = performance.now();
+  tickInner(now);
+  const ms = performance.now() - t0;
+  perfAvg = perfAvg ? perfAvg * 0.95 + ms * 0.05 : ms;
+  // 최근 10초 안의 최대값
+  if (ms > perfMax || now - perfMaxAt > 10_000) {
+    perfMax = ms;
+    perfMaxAt = now;
+  }
+  const prev = liveStore.get().perf;
+  if (Math.abs(prev.avgMs - perfAvg) > 0.5 || prev.maxMs !== perfMax) liveStore.set({ perf: { avgMs: perfAvg, maxMs: perfMax } });
+}
+
+function tickInner(now: number) {
   const p = profileStore.get();
   audioEngine.masterVolume = p.masterVolume;
   audioEngine.muted = p.muted;

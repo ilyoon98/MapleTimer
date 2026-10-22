@@ -23,6 +23,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const pipSize = profileStore.use((p) => p.pipSize);
+  const perf = liveStore.use((s) => s.perf);
   const presets = presetStore.use((s) => s.presets);
   const [presetName, setPresetName] = useState("");
   const ttsVoice = profileStore.use((p) => p.ttsVoice);
@@ -67,7 +68,17 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       capture: { state: screenCapture.state, width: screenCapture.width, height: screenCapture.height },
       profile: profileStore.get(),
       learnedDigits: digitStore.get(),
-      live: { skills: live.skills, rune: live.rune, stall: live.stall, buffs: live.buffs, booster: live.booster, log: live.log },
+      live: {
+        skills: live.skills,
+        rune: live.rune,
+        stall: live.stall,
+        buffs: live.buffs,
+        booster: live.booster,
+        log: live.log,
+        perf: live.perf,
+        captureStale: live.captureStale,
+        captureBlack: live.captureBlack,
+      },
       framePng: frame ? frame.toDataURL("image/png") : null,
     };
     const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
@@ -254,6 +265,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <button onClick={exportDiagnostics} disabled={screenCapture.state !== "live"}>
               진단 파일 저장
             </button>
+            <span className="muted small mono">
+              감지 1회 평균 {perf.avgMs.toFixed(1)}ms · 최근 최대 {perf.maxMs.toFixed(1)}ms (0.25초마다 실행)
+            </span>
           </div>
         </section>
         <section className="modal-section">
