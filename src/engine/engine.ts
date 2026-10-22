@@ -88,6 +88,8 @@ export interface LiveState {
   captureStale: boolean;
   /** 공유 화면이 계속 새까맣게만 들어옴 (창 공유가 안 되는 그래픽 모드) */
   captureBlack: boolean;
+  /** 맵 이동 등으로 화면이 잠깐 어두워져 감지를 쉬는 중 */
+  screenTransition: boolean;
   /** 한 번 감지 돌리는 데 걸린 시간(ms): 평균과 최근 최대 */
   perf: { avgMs: number; maxMs: number };
 }
@@ -103,6 +105,7 @@ export const liveStore = createStore<LiveState>({
   ringing: [],
   captureStale: false,
   captureBlack: false,
+  screenTransition: false,
   perf: { avgMs: 0, maxMs: 0 },
 });
 
@@ -757,7 +760,6 @@ export function stopRingingAlerts() {
 let lastSlow = 0;
 let lastBuff = 0;
 let prevCaptureState = screenCapture.state;
-let lastBlackCheck = 0;
 let blackSince: number | null = null;
 
 function checkShareEnded(p: Profile, now: number) {
@@ -797,18 +799,27 @@ function tickInner(now: number) {
   checkShareEnded(p, now);
   const live = screenCapture.state === "live" && screenCapture.refresh();
   const prev = liveStore.get();
+  const stats = live ? screenCapture.frameStats() : null;
 
-  const skills = tickSkills(p, now, live);
+  // 화면 전환 중(맵 이동·로딩으로 화면 전체가 어두워짐)에는 퀵슬롯·버프칸·부스터를 보지 않는다.
+  // 실제 게임에서 화면이 어두워질 때 모든 퀵슬롯이 '스킬 사용'으로, 버프가 '사라짐'으로 잘못 잡혔다.
+  const transition = live && updateScreenTransition(stats, now);
+  if (transition && !wasTransition) for (const rt of skillRt.values()) rt.detector.interrupt();
+  wasTransition = transition;
+  const watch = live && !transition;
+
+  const skills = tickSkills(p, now, watch);
 
   let booster = prev.booster;
   if (now - lastBuff >= 500) {
     lastBuff = now;
-    detectBuffs(p, now, live);
-    booster = tickBooster(p, now, live);
+    detectBuffs(p, now, watch);
+    if (!transition) booster = tickBooster(p, now, live);
+    else runners.get("booster")?.tick(now);
   } else {
     runners.get("booster")?.tick(now);
   }
-  trackBuffIcons(p, now, live);
+  trackBuffIcons(p, now, watch);
   const buffs = tickBuffTimers(p, now);
 
   let rune = prev.rune;
@@ -829,15 +840,27 @@ function tickInner(now: number) {
   // 게임 화면은 늘 조금씩 움직이므로 10초 넘게 새 프레임이 없으면 멈춘 것으로 본다
   const lf = screenCapture.lastFrameAt;
   const captureStale = screenCapture.state === "live" && lf != null && now - lf > 10_000;
-  // 2초마다 화면 전체 밝기를 보고, 4초 넘게 거의 새까맣고 무늬도 없으면 검은 화면으로 본다
-  if (live && now - lastBlackCheck >= 2000) {
-    lastBlackCheck = now;
-    const st = screenCapture.frameStats();
-    const black = !!st && st.mean < 4 && st.spread < 12;
+  // 4초 넘게 거의 새까맣고 무늬도 없으면 (맵 이동의 짧은 암전이 아니라) 공유 자체가 검은 화면
+  if (live && stats) {
+    const black = stats.mean < 4 && stats.spread < 12;
     blackSince = black ? (blackSince ?? now) : null;
   } else if (!live) blackSince = null;
   const captureBlack = blackSince != null && now - blackSince >= 4000;
-  liveStore.set({ now, skills, rune, stall, buffs, booster, ringing, captureStale, captureBlack });
+  liveStore.set({ now, skills, rune, stall, buffs, booster, ringing, captureStale, captureBlack, screenTransition: transition });
+}
+
+/**
+ * 화면 전체 밝기가 평소의 55% 아래로 떨어지면 화면 전환으로 보고, 밝기가 돌아온 뒤 1.5초까지 전환 중으로 친다.
+ * 평소 밝기는 전환이 아닐 때만 천천히 따라간다.
+ */
+let screenBase = 0;
+let transitionUntil = 0;
+let wasTransition = false;
+function updateScreenTransition(stats: { mean: number } | null, now: number): boolean {
+  if (!stats) return false;
+  if (screenBase > 20 && stats.mean < screenBase * 0.55) transitionUntil = now + 1500;
+  else if (now >= transitionUntil) screenBase = screenBase ? screenBase * 0.9 + stats.mean * 0.1 : stats.mean;
+  return now < transitionUntil;
 }
 
 function runnerLabel(key: string, p: Profile) {

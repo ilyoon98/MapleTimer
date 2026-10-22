@@ -76,6 +76,17 @@ describe("QuickslotCastDetector (스킬 사용 감지)", () => {
     d.observe(dim(ready), 60_250);
     expect(d.observe(dim(ready), 60_500)).toBe(60_250);
   });
+  it("화면 전환(맵 이동) 뒤에는 '사용 가능'을 다시 볼 때까지 어두운 아이콘을 사용으로 보지 않음", () => {
+    const d = new QuickslotCastDetector();
+    d.setReference(makeReference(ready));
+    d.observe(ready, 0);
+    d.interrupt(); // 화면이 어두워짐 → 엔진이 감지를 멈추고 알려줌
+    expect(d.observe(dim(ready), 2000)).toBeNull(); // 페이드 인 도중의 어두운 아이콘
+    expect(d.observe(dim(ready), 2250)).toBeNull();
+    d.observe(ready, 3000); // 다시 사용 가능 확인
+    d.observe(dim(ready), 5000);
+    expect(d.observe(dim(ready), 5250)).toBe(5000); // 그 뒤 진짜 사용은 감지
+  });
   it("켤 때 이미 쿨타임이면 사용 시점을 모르므로 무시", () => {
     const d = new QuickslotCastDetector();
     d.setReference(makeReference(ready));

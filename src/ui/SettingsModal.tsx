@@ -78,6 +78,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         perf: live.perf,
         captureStale: live.captureStale,
         captureBlack: live.captureBlack,
+        screenTransition: live.screenTransition,
       },
       framePng: frame ? frame.toDataURL("image/png") : null,
     };

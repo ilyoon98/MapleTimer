@@ -144,6 +144,15 @@ export class QuickslotCastDetector {
     return { state, diff, lumaRatio };
   }
 
+  /**
+   * 화면 전환(맵 이동 등으로 화면 전체가 어두워짐)이 있었음.
+   * 그 사이 어두워진 아이콘을 스킬 사용으로 오해하지 않도록, 다시 '사용 가능'을 볼 때까지 사용 감지를 멈춘다.
+   */
+  interrupt() {
+    this.coolingStreak = 0;
+    this.lastStable = "unknown";
+  }
+
   /** 한 프레임 관찰. 스킬 사용이 확정되면 사용 시각(ms)을 돌려준다 */
   observe(img: Pixels, now: number, textMask?: Uint8Array): number | null {
     const r = this.classify(img, textMask);
