@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pixels } from "../cv/image";
-import { findTemplate, prepareTemplate, storeTemplate } from "../cv/match";
+import { findTemplate, prepareTemplate, storeTemplate, type StoredTemplate } from "../cv/match";
 import { toGray } from "../cv/image";
 import { ChangeMonitor } from "./changeMonitor";
 import { PresenceTracker } from "./presence";
@@ -117,6 +117,18 @@ describe("템플릿 찾기 (버프 아이콘)", () => {
     expect(m.x).toBe(120);
     expect(m.y).toBe(18);
     expect(m.score).toBeGreaterThan(0.95);
+  });
+  it("'숫자 부분만 제외' 방식: 저장할 때 숫자가 있던 자리는 빼고 아이콘 전체로 비교", () => {
+    const tplImg = paint(icon(42), 8, 8, 12, 12, [255, 255, 255]); // 저장 시점 숫자
+    const t: StoredTemplate = { ...storeTemplate(tplImg, true), matchMode: "noText" };
+    const prepared = prepareTemplate(t);
+    expect(prepared.maskIdx.length).toBeGreaterThan(24 * 24 * 0.5); // 테두리만보다 훨씬 많은 픽셀 사용
+    const bar = solid(200, 60, [20, 20, 30]);
+    blit(bar, icon(42), 120, 18);
+    paint(bar, 128, 26, 12, 12, [255, 255, 255]); // 지금 숫자
+    const m = findTemplate(bar, toGray(bar), prepared, 1)[0];
+    expect([m.x, m.y]).toEqual([120, 18]);
+    expect(m.score).toBeGreaterThan(0.9);
   });
   it("아이콘이 없으면 점수가 낮음", () => {
     const prepared = prepareTemplate(storeTemplate(icon(42), true));

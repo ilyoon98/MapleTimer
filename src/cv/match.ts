@@ -8,6 +8,17 @@ export interface StoredTemplate {
   rgba: number[];
   /** 아이콘 테두리만 비교할지 (버프 아이콘 가운데 남은시간 숫자 무시) */
   ringOnly: boolean;
+  /**
+   * 비교 방식 (없으면 ringOnly 를 따름)
+   * - ring: 테두리 띠만
+   * - noText: 아이콘 전체에서 저장할 때 찍혀 있던 숫자(밝은 글자) 부분만 빼고
+   * - full: 아이콘 전체
+   */
+  matchMode?: "ring" | "noText" | "full";
+}
+
+export function templateMode(t: StoredTemplate): "ring" | "noText" | "full" {
+  return t.matchMode ?? (t.ringOnly ? "ring" : "full");
 }
 
 export interface PreparedTemplate {
@@ -35,10 +46,41 @@ export function ringMask(w: number, h: number): Uint8Array {
   return m;
 }
 
+/** 흰색·노란색 글자 픽셀과 그 주변 1px (글자 테두리 번짐) */
+function textPixelsDilated(px: Pixels): Uint8Array {
+  const W = px.width,
+    H = px.height;
+  const m = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const p = (y * W + x) * 4;
+      const r = px.data[p],
+        g = px.data[p + 1],
+        b = px.data[p + 2];
+      const text = (r >= 185 && g >= 185 && b >= 185) || (r >= 170 && g >= 150 && b <= 130 && r - b >= 70 && g - b >= 55);
+      if (!text) continue;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx,
+            ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < W && ny < H) m[ny * W + nx] = 1;
+        }
+    }
+  return m;
+}
+
 export function prepareTemplate(t: StoredTemplate): PreparedTemplate {
   const px: Pixels = { data: Uint8ClampedArray.from(t.rgba), width: t.width, height: t.height };
   const gray = toGray(px);
-  const mask = t.ringOnly ? ringMask(t.width, t.height) : new Uint8Array(t.width * t.height).fill(1);
+  const mode = templateMode(t);
+  let mask: Uint8Array;
+  if (mode === "ring") mask = ringMask(t.width, t.height);
+  else if (mode === "noText") {
+    const text = textPixelsDilated(px);
+    mask = text.map((v) => (v ? 0 : 1));
+    // 글자를 빼고 남은 픽셀이 너무 적으면 테두리 방식으로 되돌린다
+    if (mask.reduce((a, b) => a + b, 0) < mask.length * 0.3) mask = ringMask(t.width, t.height);
+  } else mask = new Uint8Array(t.width * t.height).fill(1);
   const idx: number[] = [];
   for (let i = 0; i < mask.length; i++) if (mask[i]) idx.push(i);
   const maskIdx = Int32Array.from(idx);

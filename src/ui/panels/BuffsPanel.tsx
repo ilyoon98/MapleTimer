@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { storeTemplate, type StoredTemplate } from "../../cv/match";
+import { storeTemplate, templateMode, type StoredTemplate } from "../../cv/match";
 import { segment } from "../../cv/digits";
 import { debugCrops, liveStore } from "../../engine/engine";
 import { teachDigits } from "../teachDigits";
@@ -199,6 +199,22 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
             <NumberInput value={b.minScore} min={0.5} max={0.99} step={0.01} onChange={(v) => updateBuff(b.id, { minScore: v })} />
             <span className="muted">현재 일치도가 버프가 있을 때 이 값보다 높고, 없을 때 낮아야 해요.</span>
           </div>
+          {b.template && (
+            <div className="field-row">
+              <span className="field-label">비교 방식</span>
+              <select
+                value={templateMode(b.template)}
+                onChange={(e) =>
+                  b.template && updateBuff(b.id, { template: { ...b.template, matchMode: e.target.value as "ring" | "noText" | "full" } })
+                }
+              >
+                <option value="ring">테두리만 (기본)</option>
+                <option value="noText">아이콘 전체 (숫자 부분만 제외)</option>
+                <option value="full">아이콘 전체</option>
+              </select>
+              <span className="muted small">다른 버프와 헷갈리면 '아이콘 전체 (숫자 부분만 제외)'를 써 보세요.</span>
+            </div>
+          )}
           <AlertSettings value={b.alert} onChange={(alert) => updateBuff(b.id, { alert })} />
           <div className="field-row">
             <button
