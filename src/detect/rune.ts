@@ -16,14 +16,21 @@ export interface RuneColorRange {
   maxSide: number;
 }
 
+/**
+ * 실제 게임(카르시온 마을) 미니맵에서 잰 오탐: 연보라 나무 장식 H 266~274°, S 0.40~0.62, 3x3 px.
+ * → 청보라는 빼고(275° 이상), 채도 0.5 이상, 20px 이상 덩어리만 후보로 본다.
+ */
 export const DEFAULT_RUNE_COLOR: RuneColorRange = {
-  hueMin: 265,
-  hueMax: 330,
-  satMin: 0.4,
+  hueMin: 275,
+  hueMax: 335,
+  satMin: 0.5,
   valMin: 0.55,
-  minArea: 6,
+  minArea: 20,
   maxSide: 24,
 };
+
+/** 예전 기본값 (저장된 설정이 이 값 그대로면 새 기본값으로 바꿔 준다) */
+export const OLD_DEFAULT_RUNE_COLOR: RuneColorRange = { hueMin: 265, hueMax: 330, satMin: 0.4, valMin: 0.55, minArea: 6, maxSide: 24 };
 
 export interface RuneBox {
   x: number;

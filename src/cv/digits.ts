@@ -32,20 +32,36 @@ export interface TextMaskOptions {
 }
 export const DEFAULT_TEXT_MASK: TextMaskOptions = { whiteMin: 185 };
 
-/** 글자색 픽셀 마스크 (흰색 또는 노란색 숫자) */
+/**
+ * 메이플 쿨타임·버프 시간 숫자의 노란색.
+ * 실제 화면에서 잰 숫자 픽셀: (162,156,48) (175,166,0) (199,194,21) (216,211,62) (174,176,77) …
+ * → R·G 가 비슷하게 높고 B 가 낮다. 숫자 둘레의 갈색 테두리(R>G)는 빠지도록 |R-G| 를 제한.
+ */
+export function isTextYellow(r: number, g: number, b: number): boolean {
+  return r >= 140 && g >= 125 && b <= 120 && r - b >= 60 && g - b >= 55 && Math.abs(r - g) <= 40;
+}
+
+/**
+ * 글자색 픽셀 마스크.
+ * 노란 픽셀이 충분하면(실제 게임의 쿨타임·버프 시간 숫자) 노란색만 글자로 보고,
+ * 아니면 흰 글자로 본다. 흰색까지 같이 보면 아이콘 테두리·은색 그림이 숫자로 잡힌다.
+ */
 export function textMask(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK): Uint8Array {
   const n = img.width * img.height;
-  const m = new Uint8Array(n);
+  const yellow = new Uint8Array(n);
+  const white = new Uint8Array(n);
+  let yc = 0;
   const d = img.data;
   for (let i = 0, p = 0; i < n; i++, p += 4) {
     const r = d[p],
       g = d[p + 1],
       b = d[p + 2];
-    const white = r >= o.whiteMin && g >= o.whiteMin && b >= o.whiteMin;
-    const yellow = r >= 170 && g >= 150 && b <= 130 && r - b >= 70 && g - b >= 55;
-    if (white || yellow) m[i] = 1;
+    if (isTextYellow(r, g, b)) {
+      yellow[i] = 1;
+      yc++;
+    } else if (r >= o.whiteMin && g >= o.whiteMin && b >= o.whiteMin) white[i] = 1;
   }
-  return m;
+  return yc >= Math.max(12, n * 0.01) ? yellow : white;
 }
 
 interface Comp {

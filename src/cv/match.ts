@@ -1,3 +1,4 @@
+import { isTextYellow } from "./digits";
 import { toGray, type Gray, type Pixels } from "./image";
 
 /** 화면에서 직접 잘라 저장한 아이콘 템플릿 (localStorage 에 저장할 수 있게 숫자 배열) */
@@ -66,7 +67,7 @@ function textPixelsDilated(px: Pixels): Uint8Array {
       const r = px.data[p],
         g = px.data[p + 1],
         b = px.data[p + 2];
-      const text = (r >= 185 && g >= 185 && b >= 185) || (r >= 170 && g >= 150 && b <= 130 && r - b >= 70 && g - b >= 55);
+      const text = (r >= 185 && g >= 185 && b >= 185) || isTextYellow(r, g, b);
       if (!text) continue;
       for (let dy = -1; dy <= 1; dy++)
         for (let dx = -1; dx <= 1; dx++) {

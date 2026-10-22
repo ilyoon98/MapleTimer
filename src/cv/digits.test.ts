@@ -82,6 +82,16 @@ describe("숫자 읽기", () => {
     // 쿨타임 숫자는 그대로 잡힌다
     expect(segment(withLabel(render("43")), undefined, mask).glyphs.length).toBe(2);
   });
+  it("노란 숫자가 있으면 흰 아이콘 그림(은색·테두리)은 무시한다 (실제 게임 버프 아이콘)", () => {
+    // 실제 화면에서 잰 노란 숫자 색 (175,166,0), 아이콘 위쪽엔 흰 그림 덩어리
+    const img = render("48", 64, 40);
+    for (let i = 0; i < img.data.length; i += 4)
+      if (img.data[i] === 255 && img.data[i + 1] === 255) img.data.set([175, 166, 0, 255], i); // 숫자를 노란색으로
+    for (let y = 1; y < 12; y++) for (let x = 4; x < 60; x++) if ((x >> 3) % 2 === 0) img.data.set([240, 240, 245, 255], (y * 64 + x) * 4);
+    const seg = segment(img);
+    expect(seg.glyphs).toHaveLength(2);
+    expect(readDigits(seg, templatesFromFont())?.seconds).toBe(48);
+  });
   it("숫자가 없으면 null", () => {
     expect(readDigits(segment(render("")), templatesFromFont())).toBeNull();
   });

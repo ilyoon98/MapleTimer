@@ -5,7 +5,7 @@ import type { SavedRegion } from "../capture/types";
 import type { StoredTemplate } from "../cv/match";
 import { DEFAULT_CHANGE_OPTIONS, type ChangeMonitorOptions } from "../detect/changeMonitor";
 import { DEFAULT_QUICKSLOT_OPTIONS, type QuickslotOptions, type ReadyReference } from "../detect/quickslotCast";
-import { DEFAULT_RUNE_COLOR, type RuneColorRange } from "../detect/rune";
+import { DEFAULT_RUNE_COLOR, OLD_DEFAULT_RUNE_COLOR, type RuneColorRange } from "../detect/rune";
 import { createPersistentStore } from "./createStore";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -312,6 +312,10 @@ export function defaultProfile(): Profile {
   };
 }
 
+function sameColor(a: RuneColorRange | undefined, b: RuneColorRange) {
+  return !!a && (Object.keys(b) as Array<keyof RuneColorRange>).every((k) => a[k] === b[k]);
+}
+
 /** 저장된(또는 파일·프리셋에서 불러온) 설정을 지금 형식에 맞춘다 */
 export function migrate(raw: unknown): Profile {
   const d = defaultProfile();
@@ -328,7 +332,12 @@ export function migrate(raw: unknown): Profile {
   return {
     ...d,
     ...p,
-    rune: { ...d.rune, ...p.rune, color: { ...d.rune.color, ...p.rune?.color } },
+    rune: {
+      ...d.rune,
+      ...p.rune,
+      // 예전 기본 색 범위를 그대로 쓰고 있으면 실제 게임에서 다듬은 새 기본값으로
+      color: sameColor(p.rune?.color, OLD_DEFAULT_RUNE_COLOR) ? { ...d.rune.color } : { ...d.rune.color, ...p.rune?.color },
+    },
     booster: { ...d.booster, ...p.booster },
     stall: { ...d.stall, ...p.stall, sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity } },
     // 예전 버전에서 저장한 항목엔 새 필드가 없을 수 있음
