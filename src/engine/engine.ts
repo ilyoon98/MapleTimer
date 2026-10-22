@@ -12,6 +12,7 @@ import { regionValidFor } from "../capture/types";
 import { cropPixels, toGray, type Pixels } from "../cv/image";
 import { findTemplate, prepareTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
 import { ChangeMonitor } from "../detect/changeMonitor";
+import { EstimateConsensus, applyExpiry } from "../detect/consensus";
 import { PresenceTracker } from "../detect/presence";
 import { QuickslotCastDetector, ReferenceHealer, referenceToPixels, type IconState } from "../detect/quickslotCast";
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
@@ -139,7 +140,7 @@ interface SkillRuntime {
   alerted: boolean;
   recorder: CooldownSequenceRecorder;
   /** 숫자로 거꾸로 계산한 사용 시각 후보들 (최근 몇 개가 서로 맞아야 믿는다) */
-  readCasts: number[];
+  readCasts: EstimateConsensus;
   digitText: string | null;
   digitConf: number;
   /** 숫자가 안 보이기 시작한 시각 (null = 보이는 중이거나 아직 모름) */
@@ -166,7 +167,7 @@ function skillRuntime(s: SkillEntry): SkillRuntime {
       expiresAt: null,
       alerted: false,
       recorder: new CooldownSequenceRecorder(),
-      readCasts: [],
+      readCasts: new EstimateConsensus(1500),
       digitText: null,
       digitConf: 0,
       digitsAbsentSince: null,
@@ -295,11 +296,10 @@ function tickSkills(p: Profile, now: number, live: boolean) {
           if (rt.castAt == null || rt.cycleStart - rt.castAt > 3000) startCycle(rt.cycleStart);
         } else if (trusted && rt.castAt == null && rt.cycleStart == null && read.seconds <= s.cooldownSec + 1) {
           // 앱을 쿨타임 도중에 켠 경우: 설정한 쿨타임으로 사용 시각을 거꾸로 추정 (3번 일치해야 인정)
-          const est = now - (s.cooldownSec - read.seconds) * 1000 - 500;
-          rt.readCasts = [...rt.readCasts.filter((c) => Math.abs(c - est) <= 1500), est].slice(-3);
-          if (rt.readCasts.length >= 3) startCycle(rt.readCasts.reduce((a, b) => a + b, 0) / rt.readCasts.length);
+          const agreed = rt.readCasts.add(now - (s.cooldownSec - read.seconds) * 1000 - 500);
+          if (agreed != null) startCycle(agreed);
         } else if (!read) {
-          rt.readCasts = [];
+          rt.readCasts.reset();
         }
       }
     }
@@ -424,7 +424,7 @@ interface BuffRuntime {
   score: number;
   colorDist: number;
   readText: string | null;
-  readEsts: number[];
+  readEsts: EstimateConsensus;
   /** 버프칸 안에서 마지막으로 찾은 아이콘 위치 (버프칸 영역 기준) */
   lastPos: { x: number; y: number } | null;
   /** 버프가 끝날 때까지 숫자를 지켜보며 학습 */
@@ -443,7 +443,7 @@ function buffRuntime(id: string) {
       score: 0,
       colorDist: 0,
       readText: null,
-      readEsts: [],
+      readEsts: new EstimateConsensus(2000),
       lastPos: null,
       recorder: new CooldownSequenceRecorder(90, false),
     };
@@ -545,19 +545,17 @@ function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, 
   const read = readDigits(seg, activeTemplates());
   rt.readText = read?.text ?? null;
   if (!read || read.seconds < 1 || (learnedDigitCount() < 10 && read.confidence < 0.9)) {
-    rt.readEsts = [];
+    rt.readEsts.reset();
     return;
   }
-  const est = now + read.seconds * 1000 + 500;
-  rt.readEsts = [...rt.readEsts.filter((e) => Math.abs(e - est) <= 2000), est].slice(-3);
-  if (rt.readEsts.length < 3) return;
-  const agreed = rt.readEsts.reduce((a, c) => a + c, 0) / rt.readEsts.length;
-  if (rt.endsAt != null && Math.abs(agreed - rt.endsAt) <= 2500) return;
-  if (rt.endsAt == null || agreed > rt.endsAt) {
+  const agreed = rt.readEsts.add(now + read.seconds * 1000 + 500);
+  if (agreed == null) return;
+  const { endsAt, change } = applyExpiry(rt.endsAt, agreed, 2500);
+  if (change === "new" || change === "extended") {
     rt.alerted = false;
     runners.get(`buff:${b.id}`)?.reset();
   }
-  rt.endsAt = agreed;
+  rt.endsAt = endsAt;
 }
 
 function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeared" | null, now: number) {
@@ -587,7 +585,7 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
     // 버프가 끝난 순간: 마지막으로 보인 숫자가 1 이므로 지금까지의 순서로 숫자 학습
     const res = rt.recorder.finishNow();
     if (res && b.readTime) learnFrom(res, b.name, now);
-    rt.readEsts = [];
+    rt.readEsts.reset();
     rt.endsAt = null;
     pauseLinkedTimers(b.id, now);
     if (b.alertOnDisappear) {
@@ -650,13 +648,13 @@ function tickBuffTimers(p: Profile, now: number) {
 
 /* ───────── 부스터 종료 ───────── */
 interface BoosterRuntime {
-  ests: number[];
+  ests: EstimateConsensus;
   endsAt: number | null;
   alerted: boolean;
   lastReadAt: number;
   readText: string | null;
 }
-const boosterRt: BoosterRuntime = { ests: [], endsAt: null, alerted: false, lastReadAt: 0, readText: null };
+const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: null, alerted: false, lastReadAt: 0, readText: null };
 
 /** 부스터 진단 화면의 '직접 가르치기'용: 마지막으로 나눈 글자 */
 export let lastBoosterSegment: ReturnType<typeof segment> | null = null;
@@ -687,10 +685,8 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
     rt.readText = read?.text ?? null;
     if (read && read.seconds > 0 && read.seconds < 3600) {
       rt.lastReadAt = now;
-      const est = now + read.seconds * 1000;
-      rt.ests = [...rt.ests.filter((e) => Math.abs(e - est) <= 1500), est].slice(-3);
-      if (rt.ests.length >= 3) {
-        const agreed = rt.ests.reduce((a, c) => a + c, 0) / rt.ests.length;
+      const agreed = rt.ests.add(now + read.seconds * 1000);
+      if (agreed != null) {
         if (rt.endsAt == null || agreed - rt.endsAt > 5000) {
           // 새로 확인한 주기: 이미 알림 시점이 지났으면 이번 주기는 조용히 넘긴다
           rt.endsAt = agreed;
@@ -701,7 +697,7 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
         }
       }
     } else if (!read) {
-      rt.ests = [];
+      rt.ests.reset();
     }
   }
   // 20초 넘게 못 읽으면 부스터가 끝났거나 사라진 것으로 본다
