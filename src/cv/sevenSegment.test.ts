@@ -21,7 +21,7 @@ const T = 6; // 막대 굵기
 const TOP = 10;
 
 /** 실제 부스터 숫자처럼 그리기: 막대 위쪽 흰색 → 아래쪽 주황, 막대 사이 검은 틈, 어두운 상자 배경 */
-function render(text: string, opts: { quest?: boolean; questTop?: boolean; labels?: boolean; border?: boolean } = {}): Pixels {
+function render(text: string, opts: { quest?: boolean; questTop?: boolean; labels?: boolean; border?: boolean; blurDecimals?: boolean } = {}): Pixels {
   const w = 220,
     h = 64;
   const data = new Uint8ClampedArray(w * h * 4);
@@ -31,8 +31,9 @@ function render(text: string, opts: { quest?: boolean; questTop?: boolean; label
     const t = (y - TOP) / CH;
     return [255, Math.round(255 - 68 * t), Math.round(250 - 248 * t)];
   };
+  let blur = false; // 소수점 아래가 빠르게 바뀌며 흐릿하게 찍힌 모습: 막대 7개가 모두 반쯤 켜진다
   const rect = (x0: number, y0: number, x1: number, y1: number) => {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, lit(y));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!blur || (x + y) % 2) put(x, y, lit(y));
   };
   let x = opts.labels ? 40 : 12;
   if (opts.labels) for (let y = TOP + 4; y < TOP + 16; y++) for (let lx = 6; lx < 34; lx += 3) put(lx, y, [240, 240, 240]); // '남은시간'
@@ -41,9 +42,10 @@ function render(text: string, opts: { quest?: boolean; questTop?: boolean; label
     if (ch === ".") {
       rect(x + 1, TOP + CH - 6, x + 7, TOP + CH - 1);
       x += 11;
+      blur = !!opts.blurDecimals;
       continue;
     }
-    const s = SEGS[ch];
+    const s = blur ? SEGS["8"] : SEGS[ch];
     const mid = TOP + (CH >> 1);
     const L = x,
       R = x + CW - 1;
@@ -71,17 +73,22 @@ function render(text: string, opts: { quest?: boolean; questTop?: boolean; label
 }
 
 describe("디지털 시계 모양 숫자 (부스터 남은시간)", () => {
-  it.each(["36.83", "10.47", "59.12", "20.06", "7.94"])("%s 를 읽는다", (text) => {
+  // 소수점 아래는 필요 없어서 초(점 앞)만 읽는다
+  const sec = (text: string) => text.split(".")[0];
+  it.each(["36.83", "10.47", "59.12", "20.06", "7.94", "48.31"])("%s 에서 초를 읽는다", (text) => {
     const r = readSevenSegment(render(text));
-    expect(r?.text).toBe(text);
-    expect(r?.seconds).toBeCloseTo(Number(text));
+    expect(r?.text).toBe(sec(text));
+    expect(r?.seconds).toBeCloseTo(Number(sec(text)) + 0.5);
+  });
+  it("소수점 아래가 흐릿하게 찍혀 못 읽어도 초는 읽는다", () => {
+    for (const text of ["36.83", "78.20", "9.54"]) expect(readSevenSegment(render(text, { blurDecimals: true }))?.text).toBe(sec(text));
   });
   it("퀘스트 알림 글자가 겹쳐도, '남은시간'·'초' 글자와 상자 테두리가 같이 잡혀도 읽는다", () => {
     for (const text of ["36.83", "10.47", "59.12", "20.06"])
-      expect(readSevenSegment(render(text, { quest: true, labels: true, border: true }))?.text).toBe(text);
+      expect(readSevenSegment(render(text, { quest: true, labels: true, border: true }))?.text).toBe(sec(text));
   });
   it("퀘스트 글자가 윗막대를 덮어 회색으로 어두워져도 읽는다 (78.20 의 7·8·2·0)", () => {
-    for (const text of ["78.20", "36.83", "10.47", "59.12"]) expect(readSevenSegment(render(text, { questTop: true, labels: true }))?.text).toBe(text);
+    for (const text of ["78.20", "36.83", "10.47", "59.12"]) expect(readSevenSegment(render(text, { questTop: true, labels: true }))?.text).toBe(sec(text));
   });
   it("숫자가 없으면 null", () => {
     expect(readSevenSegment(render("", { labels: true, border: true }))).toBeNull();

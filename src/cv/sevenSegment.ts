@@ -1,4 +1,4 @@
-import { components8, parseClock, type Comp, type DigitRead } from "./digits";
+import { components8, type Comp, type DigitRead } from "./digits";
 import { type Pixels } from "./image";
 
 /**
@@ -8,6 +8,7 @@ import { type Pixels } from "./image";
  *  1) 밝은 막대 픽셀만 고르고
  *  2) 가로로 겹치는 덩어리를 한 글자 칸으로 묶은 뒤
  *  3) 칸마다 막대 7개 자리가 켜졌는지 보고 숫자로 바꾼다.
+ * 소수점 아래는 알림에 필요 없고 너무 빨리 바뀌어 흐릿하게 찍히므로, 자리만 확인하고 초(점 앞)만 읽는다.
  */
 
 /** 켜진 막대 픽셀: 밝고(R 215 이상) 파랗지 않은 색. 위쪽 흰색부터 아래쪽 주황까지 */
@@ -148,20 +149,28 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
       h = c.y1 - c.y0 + 1;
     if (c.y0 < top - bandH * 0.15 || c.y1 > bottom + bandH * 0.15) continue;
     if (h >= bandH * 0.6 && c.warm >= c.count * 0.15) {
-      if (w > bandH * 0.85) return null; // 두 글자가 붙었다
+      // 못 읽은 숫자 칸은 '?' 로 남긴다 (소수점 아래라면 괜찮다)
+      const unknown = () => toks.push({ x: c.x0, ch: "?", cost: 0 });
+      if (w > bandH * 0.85) {
+        unknown(); // 두 글자가 붙었다
+        continue;
+      }
       if (w < bandH * 0.32) {
         // '1': 오른쪽 막대 두 개만 켜진 좁은 칸. 왼쪽 윗막대 자리가 (어두워졌어도) 켜져 있으면 '7', 가려서 모르면 포기
         const up = lit(c.x0, c.x1, top + Math.round(bandH * 0.2), top + Math.round(bandH * 0.38));
         const down = lit(c.x0, c.x1, top + Math.round(bandH * 0.62), top + Math.round(bandH * 0.8));
         const aLeft = lit(c.x1 - Math.round(cellW || bandH * 0.55) + 1, c.x0 - 1, top, top + Math.round(bandH * 0.13) - 1);
         debug?.(`x${c.x0} '1'? up ${up.toFixed(2)} down ${down.toFixed(2)} a ${aLeft.toFixed(2)}`);
-        if (!(up >= ON && down >= ON)) return null;
-        if (aLeft >= ON) toks.push({ x: c.x0, ch: "7", cost: 0 });
+        if (!(up >= ON && down >= ON)) unknown();
+        else if (aLeft >= ON) toks.push({ x: c.x0, ch: "7", cost: 0 });
         else if (aLeft <= OFF) toks.push({ x: c.x0, ch: "1", cost: 0 });
-        else return null;
+        else unknown();
         continue;
       }
-      if (w < bandH * 0.4) return null;
+      if (w < bandH * 0.4) {
+        unknown();
+        continue;
+      }
       const x0 = cellW && w < cellW - 2 ? c.x1 - cellW + 1 : c.x0;
       const bw = c.x1 - x0 + 1;
       const fills = WINDOWS.map(([ax, bx, ay, by]) =>
@@ -182,24 +191,25 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
         } else if (digit !== best && cost < second) second = cost;
       }
       debug?.(`x${c.x0} fills ${fills.map((f) => f.toFixed(2)).join(" ")} → ${best} cost ${bestCost.toFixed(2)} 2nd ${second.toFixed(2)}`);
-      if (bestCost > 1 || second - bestCost < 1) return null;
-      toks.push({ x: c.x0, ch: String(best), cost: bestCost });
+      if (bestCost > 1 || second - bestCost < 1) unknown();
+      else toks.push({ x: c.x0, ch: String(best), cost: bestCost });
     } else if (w <= bandH * 0.3 && h <= bandH * 0.25 && c.y1 >= bottom - bandH * 0.12) {
       toks.push({ x: c.x0, ch: ".", cost: 0 });
     }
   }
   // 숫자 사이에 있는 점만 쓴다 (앞뒤의 작은 덩어리는 '남은시간'·'초' 글자 조각)
-  const first = toks.findIndex((t) => /\d/.test(t.ch));
+  const first = toks.findIndex((t) => t.ch !== ".");
   let last = -1;
-  toks.forEach((t, i) => /\d/.test(t.ch) && (last = i));
+  toks.forEach((t, i) => t.ch !== "." && (last = i));
   if (first < 0) return null;
   const used = toks.slice(first, last + 1);
-  const text = used.map((t) => t.ch).join("");
-  // 부스터는 1분이 넘어도 언제나 '초.소수 두 자리'(78.20, 9.54). 이 모양이 아니면 데미지 숫자 같은 잡음
-  if (!/^\d{1,3}\.\d\d$/.test(text)) return null;
-  const seconds = parseClock(text)!;
-  const worst = Math.max(...used.map((t) => t.cost));
-  return { text, seconds, confidence: 1 - worst / 7 };
+  // 부스터는 1분이 넘어도 언제나 '초.소수 두 자리'(78.20, 9.54). 이 모양이 아니면 데미지 숫자 같은 잡음.
+  // 소수 두 자리는 자리만 있으면 되고(못 읽어도 '?'), 초는 모두 읽혀야 한다
+  const m = /^(\d{1,3})\.[\d?]{2}$/.exec(used.map((t) => t.ch).join(""));
+  if (!m) return null;
+  const worst = Math.max(...used.slice(0, m[1].length).map((t) => t.cost));
+  // 화면이 36.xx 면 남은 시간은 36~37초 사이 → 가운데 36.5초로 본다
+  return { text: m[1], seconds: Number(m[1]) + 0.5, confidence: 1 - worst / 7 };
 }
 
 function median(xs: number[]): number {

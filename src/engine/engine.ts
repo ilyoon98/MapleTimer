@@ -663,7 +663,7 @@ const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: n
 export let lastBoosterSegment: ReturnType<typeof segment> | null = null;
 
 /**
- * 화면 위쪽 부스터 남은시간 숫자("36.83", 1분이 넘어도 "78.20")를 읽어 끝나기 전에 알린다.
+ * 화면 위쪽 부스터 남은시간 숫자("36.83", 1분이 넘어도 "78.20")에서 초를 읽어 끝나기 전에 알린다.
  * 3번 연달아 1.5초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용) 새 주기로 본다.
  */
 function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
