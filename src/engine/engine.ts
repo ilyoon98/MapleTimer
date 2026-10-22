@@ -18,6 +18,7 @@ import { QuickslotCastDetector, ReferenceHealer, referenceToPixels, type IconSta
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
 import { appTicker } from "../core/ticker";
 import { readDigits, segment, staticBrightMask, textMask } from "../cv/digits";
+import { readSevenSegment } from "../cv/sevenSegment";
 import {
   CooldownSequenceRecorder,
   activeTemplates,
@@ -669,7 +670,7 @@ const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: n
 export let lastBoosterSegment: ReturnType<typeof segment> | null = null;
 
 /**
- * 화면 위쪽 부스터 타이머 숫자("45.23" 또는 "1:05")를 읽어 끝나기 전에 알린다.
+ * 화면 위쪽 부스터 남은시간 숫자("36.83" 또는 "1:05")를 읽어 끝나기 전에 알린다.
  * 3번 연달아 1.5초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용) 새 주기로 본다.
  */
 function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
@@ -690,7 +691,8 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
     debugCrops.set("booster", img);
     const seg = segment(img);
     lastBoosterSegment = seg;
-    const read = readDigits(seg, activeTemplates());
+    // 실제 게임의 부스터 숫자는 디지털 시계 모양이라 막대 판독기로 먼저 읽고, 안 되면 학습한 글꼴로
+    const read = readSevenSegment(img) ?? readDigits(seg, activeTemplates());
     rt.readText = read?.text ?? null;
     if (read && read.seconds > 0 && read.seconds < 3600) {
       rt.lastReadAt = now;

@@ -1,0 +1,78 @@
+import { describe, expect, it } from "vitest";
+import type { Pixels } from "./image";
+import { readSevenSegment } from "./sevenSegment";
+
+// 막대 순서 a b c d e f g
+const SEGS: Record<string, string> = {
+  "0": "1111110",
+  "1": "0110000",
+  "2": "1101101",
+  "3": "1111001",
+  "4": "0110011",
+  "5": "1011011",
+  "6": "1011111",
+  "7": "1110000",
+  "8": "1111111",
+  "9": "1111011",
+};
+const CW = 26; // 글자 칸 너비 (실제 화면에서 잰 값)
+const CH = 42; // 글자 높이
+const T = 6; // 막대 굵기
+const TOP = 10;
+
+/** 실제 부스터 숫자처럼 그리기: 막대 위쪽 흰색 → 아래쪽 주황, 막대 사이 검은 틈, 어두운 상자 배경 */
+function render(text: string, opts: { quest?: boolean; labels?: boolean; border?: boolean } = {}): Pixels {
+  const w = 220,
+    h = 64;
+  const data = new Uint8ClampedArray(w * h * 4);
+  const put = (x: number, y: number, c: number[]) => x >= 0 && y >= 0 && x < w && y < h && data.set([...c, 255], (y * w + x) * 4);
+  for (let i = 0; i < w * h; i++) data.set([10, 12, 10, 255], i * 4);
+  const lit = (y: number) => {
+    const t = (y - TOP) / CH;
+    return [255, Math.round(255 - 68 * t), Math.round(250 - 248 * t)];
+  };
+  const rect = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, lit(y));
+  };
+  let x = opts.labels ? 40 : 12;
+  if (opts.labels) for (let y = TOP + 4; y < TOP + 16; y++) for (let lx = 6; lx < 34; lx += 3) put(lx, y, [240, 240, 240]); // '남은시간'
+  if (opts.border) for (let y = 2; y < h - 2; y++) put(3, y, [225, 225, 225]); // 상자 테두리
+  for (const ch of text) {
+    if (ch === ".") {
+      rect(x + 1, TOP + CH - 6, x + 7, TOP + CH - 1);
+      x += 11;
+      continue;
+    }
+    const s = SEGS[ch];
+    const mid = TOP + (CH >> 1);
+    const L = x,
+      R = x + CW - 1;
+    if (s[0] === "1") rect(L + 2, TOP, R - 2, TOP + T - 1);
+    if (s[6] === "1") rect(L + 2, mid - 3, R - 2, mid + 2);
+    if (s[3] === "1") rect(L + 2, TOP + CH - T, R - 2, TOP + CH - 1);
+    if (s[5] === "1") rect(L, TOP + T + 1, L + T - 1, mid - 5);
+    if (s[1] === "1") rect(R - T + 1, TOP + T + 1, R, mid - 5);
+    if (s[4] === "1") rect(L, mid + 4, L + T - 1, TOP + CH - T - 2);
+    if (s[2] === "1") rect(R - T + 1, mid + 4, R, TOP + CH - T - 2);
+    x += CW + 5;
+  }
+  if (opts.labels) for (let y = TOP + CH - 12; y < TOP + CH; y++) for (let lx = x; lx < x + 10; lx += 2) put(lx, y, [230, 230, 230]); // '초'
+  // 퀘스트 알림 글자: 어두운 노란 글자가 숫자 가운데 줄 위로 지나간다
+  if (opts.quest) for (let y = TOP + 17; y < TOP + 23; y++) for (let qx = 0; qx < w; qx++) if (qx % 5 < 2) put(qx, y, [195, 166, 61]);
+  return { data, width: w, height: h };
+}
+
+describe("디지털 시계 모양 숫자 (부스터 남은시간)", () => {
+  it.each(["36.83", "10.47", "59.12", "20.06", "7.94"])("%s 를 읽는다", (text) => {
+    const r = readSevenSegment(render(text));
+    expect(r?.text).toBe(text);
+    expect(r?.seconds).toBeCloseTo(Number(text));
+  });
+  it("퀘스트 알림 글자가 겹쳐도, '남은시간'·'초' 글자와 상자 테두리가 같이 잡혀도 읽는다", () => {
+    for (const text of ["36.83", "10.47", "59.12", "20.06"])
+      expect(readSevenSegment(render(text, { quest: true, labels: true, border: true }))?.text).toBe(text);
+  });
+  it("숫자가 없으면 null", () => {
+    expect(readSevenSegment(render("", { labels: true, border: true }))).toBeNull();
+  });
+});

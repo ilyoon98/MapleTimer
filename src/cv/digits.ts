@@ -64,7 +64,7 @@ export function textMask(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK): U
   return yc >= Math.max(12, n * 0.01) ? yellow : white;
 }
 
-interface Comp {
+export interface Comp {
   x: number;
   y: number;
   w: number;
@@ -72,7 +72,7 @@ interface Comp {
   pixels: number[];
 }
 
-function components8(mask: Uint8Array, W: number, H: number): Comp[] {
+export function components8(mask: Uint8Array, W: number, H: number): Comp[] {
   const seen = new Uint8Array(mask.length);
   const out: Comp[] = [];
   const stack: number[] = [];

@@ -32,7 +32,7 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
     openPicker({
       title: "부스터 타이머 영역 선택",
       guide: [
-        "부스터(VIP·HEXA 등)를 쓰면 화면 위쪽 가운데에 뜨는 남은 시간 숫자를 선택하세요.",
+        "부스터를 쓰면 화면 위쪽 가운데에 뜨는 '남은시간' 숫자(예: 36.83 초)를 선택하세요.",
         "부스터가 켜져 있을 때 열거나 '3초 후 가져오기'를 활용하세요. 숫자 주변을 조금 여유 있게 잡아 주세요.",
       ],
       initial: region,
@@ -88,8 +88,8 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
                 <div className="diag-title">진단</div>
                 <DebugCrop cropKey="booster" maxWidth={320} />
                 <p className="muted small">
-                  부스터 숫자는 쿨타임 숫자와 글꼴이 다를 수 있어요. 읽은 값이 비어 있거나 틀리면, 숫자가 보일 때 아래 버튼으로 화면 숫자를 직접
-                  입력해 가르쳐 주세요 (2~3번이면 충분해요).
+                  부스터의 디지털 시계 모양 숫자(예: 36.83)는 따로 가르치지 않아도 읽어요. 그래도 읽은 값이 비어 있거나 틀리면, 숫자가 보일 때
+                  아래 버튼으로 화면 숫자를 직접 입력해 가르쳐 주세요.
                 </p>
                 <div className="field-row">
                   <button onClick={() => teachDigits(lastBoosterSegment, "부스터 타이머")}>지금 보이는 숫자 가르치기</button>
