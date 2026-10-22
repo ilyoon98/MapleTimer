@@ -188,7 +188,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <section className="modal-section">
           <h4>숫자 학습</h4>
           <p className="muted small">
-            쿨타임 10초 이상인 스킬의 퀵슬롯 영역을 잡아 두고, 스킬을 한 번 쓴 뒤 쿨타임이 끝날 때까지 두면 화면의 숫자 모양을 자동으로 배워요.
+            쿨타임 10초 이상인 스킬의 퀵슬롯 영역을 잡아 두고, 스킬을 한 번 쓴 뒤 숫자가 한 자리(9 이하)가 될 때까지 두면 화면의 숫자 모양을 자동으로 배워요.
             0~9 를 모두 배우면 쿨타임 숫자로 사용 시점을 다시 계산해요. 해상도나 UI 크기를 바꿨다면 초기화 후 다시 배우세요.
           </p>
           <div className="field-row">
@@ -333,7 +333,7 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
         <section className="modal-section">
           <h4>4. 숫자 학습 (처음 한 번)</h4>
           <ul className="guide-list">
-            <li>쿨타임 10초 이상 스킬의 퀵슬롯 영역을 잡고, 스킬을 쓴 뒤 <b>쿨타임이 끝날 때까지</b> 두면 0~9 숫자 모양을 자동으로 배워요.</li>
+            <li>쿨타임 10초 이상 스킬의 퀵슬롯 영역을 잡고, 스킬을 쓴 뒤 <b>숫자가 한 자리(9 이하)가 될 때까지</b> 두면 0~9 숫자 모양을 자동으로 배워요.</li>
             <li>숫자를 배우면 쿨타임 도중에 켜도 남은 시간을 맞추고, 버프 아이콘의 남은 시간(야누스·파운틴 정밀)과 부스터 타이머도 읽어요.</li>
             <li>잘 안 배워지면 진단의 <b>숫자 직접 가르치기</b>로 화면 숫자를 입력해 주세요.</li>
           </ul>

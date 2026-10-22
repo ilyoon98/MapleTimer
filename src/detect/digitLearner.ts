@@ -214,8 +214,7 @@ export class CooldownSequenceRecorder {
       } else clean.push({ ...s });
     }
     const n = clean.length;
-    // 10 이상부터 세어야 9→10 경계로 순서를 검증할 수 있다
-    if (n < 10) return { ok: false, reason: `관찰한 값이 너무 적어요 (${n}개, 쿨타임 10초 이상인 스킬로 학습해 주세요)`, samples: [], observed: n };
+    if (n < 8) return { ok: false, reason: `관찰한 값이 너무 적어요 (${n}개, 쿨타임이 길게 보이는 스킬로 학습해 주세요)`, samples: [], observed: n };
     const durs = clean
       .slice(1, -1)
       .map((s, i) => clean[i + 2].first - s.first)
@@ -223,10 +222,36 @@ export class CooldownSequenceRecorder {
     const med = durs[Math.floor(durs.length / 2)] ?? 1000;
     if (med < 700 || med > 1400) return { ok: false, reason: `숫자가 1초마다 바뀌지 않아요 (${Math.round(med)}ms)`, samples: [], observed: n };
 
+    // 기준점 찾기: 마지막 값은 1이 아닐 수 있다 (실제 게임은 5초 미만이면 숫자를 안 보여줌).
+    //  1) 두 자리 → 한 자리로 바뀌는 순간 = 10 → 9
+    //  2) 없으면 m:ss → 두 자리로 바뀌는 순간 = 1:00 → 59
+    const plain = (s: SeqState) => !s.colon;
+    let anchorIdx = -1,
+      anchorValue = 0;
+    for (let i = 1; i < n; i++)
+      if (plain(clean[i]) && plain(clean[i - 1]) && clean[i - 1].glyphs.length === 2 && clean[i].glyphs.length === 1) {
+        anchorIdx = i;
+        anchorValue = 9;
+        break;
+      }
+    if (anchorIdx < 0)
+      for (let i = 1; i < n; i++)
+        if (clean[i - 1].colon && plain(clean[i]) && clean[i].glyphs.length === 2) {
+          anchorIdx = i;
+          anchorValue = 59;
+          break;
+        }
+    if (anchorIdx < 0)
+      return { ok: false, reason: "기준점(10→9 또는 1:00→59)을 못 찾았어요. 숫자가 한 자리까지 내려가는 걸 끝까지 보여 주세요", samples: [], observed: n };
+
     const samples: LearnResult["samples"] = [];
     let mismatch = 0;
     for (let i = 0; i < n; i++) {
-      const value = n - i; // 끝에서부터 1, 2, 3…
+      const value = anchorValue + (anchorIdx - i); // 기준점에서 1초에 1씩
+      if (value < 1) {
+        mismatch++;
+        continue;
+      }
       const text = expectedText(value, clean[i].colon).replace(/:/g, "");
       if (text.length !== clean[i].glyphs.length) {
         mismatch++;
@@ -234,13 +259,8 @@ export class CooldownSequenceRecorder {
       }
       clean[i].glyphs.forEach((g, k) => samples.push({ digit: Number(text[k]), v: g.v, h: g.h }));
     }
-    // 9 → 10 경계에서 글자 수가 정확히 맞아야 순서가 한 칸 밀리지 않았다고 확신할 수 있다
-    const s9 = clean[n - 9],
-      s10 = clean[n - 10];
-    const ok9 = s9.colon || s9.glyphs.length === 1;
-    const ok10 = s10.colon || s10.glyphs.length === 2;
-    if (!ok9 || !ok10) return { ok: false, reason: "숫자 순서를 맞추지 못했어요 (9→10 경계 불일치)", samples: [], observed: n };
     if (mismatch > 1) return { ok: false, reason: `글자 수가 안 맞는 값이 ${mismatch}개 있어요`, samples: [], observed: n };
-    return { ok: true, reason: `${n}개 값에서 숫자 ${samples.length}개 학습`, samples, observed: n };
+    const lastValue = anchorValue + (anchorIdx - (n - 1));
+    return { ok: true, reason: `${n}개 값에서 숫자 ${samples.length}개 학습 (마지막으로 보인 값 ${lastValue})`, samples, observed: n };
   }
 }

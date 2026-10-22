@@ -52,7 +52,7 @@ export function SetupChecklist() {
     {
       done: learned === 10,
       text: `숫자 학습 ${learned}/10`,
-      hint: "쿨 10초 이상 스킬을 한 번 쓰고 쿨타임이 끝날 때까지 기다리기",
+      hint: "쿨 10초 이상 스킬을 한 번 쓰고 숫자가 한 자리가 될 때까지 기다리기",
     },
     {
       done: !p.rune.enabled || ok("minimap"),

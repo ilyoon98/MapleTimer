@@ -113,13 +113,36 @@ describe("쿨타임 한 바퀴로 숫자 학습", () => {
     expect(readDigits(segment(render("38")), learned)?.seconds).toBe(38);
     expect(readDigits(segment(render("9")), learned)?.seconds).toBe(9);
   });
-  it("마지막 값이 0 으로 끝나면(순서가 한 칸 밀리면) 학습하지 않는다", () => {
+  const runSeq = (from: number, to: number) => {
     const rec = new CooldownSequenceRecorder();
     let t = 0;
     let result = null;
-    for (let v = 30; v >= 0; v--)
-      for (let k = 0; k < 4; k++, t += 250) result = rec.feed(segment(render(String(v))), t) ?? result;
+    for (let v = from; v >= to; v--) for (let k = 0; k < 4; k++, t += 250) result = rec.feed(segment(render(String(v))), t) ?? result;
     for (let k = 0; k < 8; k++, t += 250) result = rec.feed(segment(render("")), t) ?? result;
-    expect(result?.ok).toBe(false);
+    return result;
+  };
+  const learnedFrom = (r: ReturnType<typeof runSeq>) => {
+    const learned: DigitTemplates = Array.from({ length: 10 }, () => []);
+    for (const s of r!.samples) learned[s.digit].push(s.v);
+    return learned;
+  };
+
+  it("실제 게임처럼 5초 미만은 안 보여줘도(60→5) 10→9 기준점으로 맞게 학습한다", () => {
+    const r = runSeq(60, 5);
+    expect(r?.ok).toBe(true);
+    expect(r?.reason).toContain("마지막으로 보인 값 5");
+    const learned = learnedFrom(r);
+    expect(readDigits(segment(render("38")), learned)?.seconds).toBe(38);
+    expect(readDigits(segment(render("7")), learned)?.seconds).toBe(7);
+  });
+  it("마지막 값이 0 이어도 기준점으로 맞게 학습하고, 0 은 건너뛴다", () => {
+    const r = runSeq(30, 0);
+    expect(r?.ok).toBe(true);
+    expect(readDigits(segment(render("21")), learnedFrom(r))?.seconds).toBe(21);
+  });
+  it("한 자리까지 내려가지 않으면(30→12) 기준점이 없어 학습하지 않는다", () => {
+    const r = runSeq(30, 12);
+    expect(r?.ok).toBe(false);
+    expect(r?.reason).toContain("기준점");
   });
 });
