@@ -216,10 +216,9 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
                 <div>
                   쿨타임 숫자: <b>{live?.digitText ?? "--"}</b>
                   {live?.digitText && ` (일치 ${live.digitConf.toFixed(2)})`}
-                  {learnedCount < 10 && <span className="muted"> · 기본 글꼴로 추정 중</span>}
                 </div>
                 <div>
-                  숫자 학습: {learnedCount}/10 자리
+                  추가 학습: {learnedCount}/10 자리
                   {live?.learning ? ` · 관찰 중 (${live.learnObserved}개 값)` : ""}
                   {live?.learnMessage && !live.learning ? ` · 마지막: ${live.learnMessage}` : ""}
                 </div>

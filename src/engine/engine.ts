@@ -19,13 +19,7 @@ import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } fr
 import { appTicker } from "../core/ticker";
 import { readDigits, segment, staticBrightMask, textMask } from "../cv/digits";
 import { readSevenSegment } from "../cv/sevenSegment";
-import {
-  CooldownSequenceRecorder,
-  activeTemplates,
-  addDigitSamples,
-  learnedDigitCount,
-  type LearnResult,
-} from "../detect/digitLearner";
+import { CooldownSequenceRecorder, activeTemplates, addDigitSamples, type LearnResult } from "../detect/digitLearner";
 import { createStore } from "../state/createStore";
 import { profileStore, shortName, updateSkill, updateTimer, type BuffEntry, type Profile, type SkillEntry } from "../state/profile";
 import { tts } from "../state/profile";
@@ -299,7 +293,7 @@ function tickSkills(p: Profile, now: number, live: boolean) {
           rt.digitsAbsentSince = now;
         }
 
-        const trusted = read && learnedDigitCount() === 10 && read.seconds >= 2;
+        const trusted = read && read.seconds >= 2;
         if (trusted && rt.cycleStart != null && !rt.cycleUsed && now - rt.cycleStart <= 3000) {
           // 숫자가 실제로 읽혀야 진짜 쿨타임 시작으로 인정 (아이콘 그림의 밝은 부분 오인 방지)
           rt.cycleUsed = true;
@@ -554,7 +548,7 @@ function trackBuffIcons(p: Profile, now: number, live: boolean) {
 function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, seg = segment(icon)) {
   const read = readDigits(seg, activeTemplates());
   rt.readText = read?.text ?? null;
-  if (!read || read.seconds < 1 || (learnedDigitCount() < 10 && read.confidence < 0.9)) {
+  if (!read || read.seconds < 1) {
     rt.readEsts.reset();
     return;
   }

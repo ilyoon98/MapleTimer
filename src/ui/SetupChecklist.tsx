@@ -51,8 +51,9 @@ export function SetupChecklist() {
     },
     {
       done: learned === 10,
-      text: `숫자 학습 ${learned}/10`,
-      hint: "쿨 10초 이상 스킬을 한 번 쓰고 숫자가 한 자리가 될 때까지 기다리기",
+      text: learned === 10 ? "숫자 추가 학습 완료" : `숫자 추가 학습 ${learned}/10 (선택)`,
+      hint: "게임 숫자 모양이 기본으로 들어 있어 학습 없이도 읽어요. 숫자를 자꾸 못 읽을 때만 쿨 10초 이상 스킬로 학습",
+      optional: true,
     },
     {
       done: !p.rune.enabled || ok("minimap"),

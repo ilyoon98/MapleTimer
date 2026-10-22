@@ -1,4 +1,5 @@
-import { expectedText, glyphSimilarity, segment, GH, GW, type DigitTemplates, type Glyph, type Segmented } from "../cv/digits";
+import { expectedText, glyphSimilarity, GH, GW, type DigitTemplates, type Glyph, type Segmented } from "../cv/digits";
+import { gameDigitTemplates } from "../cv/gameDigits";
 import { createPersistentStore } from "../state/createStore";
 
 /* ───────── 학습한 숫자 모양 저장소 ───────── */
@@ -62,46 +63,16 @@ export function addDigitSamples(samples: Array<{ digit: number; v: Float32Array;
   cache = null;
 }
 
-/* ───────── 글꼴로 그린 기본 템플릿 (학습 전 임시) ───────── */
-let fontTemplates: DigitTemplates | null = null;
-function buildFontTemplates(): DigitTemplates {
-  const out: DigitTemplates = Array.from({ length: 10 }, () => []);
-  if (typeof document === "undefined") return out;
-  const fonts = ["bold 26px Arial", "bold 26px Tahoma", "bold 26px Verdana", "bold 26px 'Malgun Gothic'", "900 26px sans-serif"];
-  const c = document.createElement("canvas");
-  c.width = 40;
-  c.height = 40;
-  const ctx = c.getContext("2d", { willReadFrequently: true })!;
-  for (const font of fonts)
-    for (let d = 0; d < 10; d++) {
-      ctx.fillStyle = "#304050";
-      ctx.fillRect(0, 0, 40, 40);
-      ctx.font = font;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#000";
-      ctx.strokeText(String(d), 20, 21);
-      ctx.fillStyle = "#fff";
-      ctx.fillText(String(d), 20, 21);
-      const g = segment(ctx.getImageData(0, 0, 40, 40)).glyphs;
-      if (g.length === 1) out[d].push(g[0].v);
-    }
-  return out;
-}
-
 let cache: DigitTemplates | null = null;
-/** 학습한 숫자가 있으면 그것을, 없는 숫자는 글꼴 템플릿을 쓴다 */
+/** 실제 게임에서 모은 기본 숫자 모양 + 이 PC 화면에서 학습한 모양 (둘 중 더 닮은 쪽으로 읽는다) */
 export function activeTemplates(): DigitTemplates {
   if (cache) return cache;
-  fontTemplates ??= buildFontTemplates();
   const s = digitStore.get();
-  cache = Array.from({ length: 10 }, (_, d) => {
-    const learned = s.sets
-      .filter((set) => set.counts[d] > 0 && set.sums[d])
-      .map((set) => Float32Array.from(set.sums[d]!, (x) => x / set.counts[d]));
-    return learned.length ? learned : fontTemplates![d];
-  });
+  const game = gameDigitTemplates();
+  cache = Array.from({ length: 10 }, (_, d) => [
+    ...s.sets.filter((set) => set.counts[d] > 0 && set.sums[d]).map((set) => Float32Array.from(set.sums[d]!, (x) => x / set.counts[d])),
+    ...game[d],
+  ]);
   return cache;
 }
 
