@@ -858,3 +858,8 @@ export function startEngine() {
   appTicker.subscribe(tick);
   appTicker.start();
 }
+
+// 개발 서버에서 엔진이나 감지 코드가 바뀌면(HMR) 페이지를 새로 고친다.
+// 그대로 두면 옛 엔진은 보이지 않게 계속 돌고 화면은 새 (멈춘) 엔진을 보여주는 엉킨 상태가 된다.
+// 새로 고친 뒤에는 준비 체크리스트에 '화면 공유 시작'이 다시 보인다.
+if (import.meta.hot) import.meta.hot.accept(() => location.reload());
