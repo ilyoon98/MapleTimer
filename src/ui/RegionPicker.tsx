@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { screenCapture } from "../capture/screenCapture";
 import type { Rect, SavedRegion } from "../capture/types";
 
@@ -48,7 +48,10 @@ export function RegionPicker({
   const [rect, setRect] = useState<Rect | null>(null);
   const [countdown, setCountdown] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; sl: number; stp: number } | null>(null);
+  const pendingScroll = useRef<{ left: number; top: number } | null>(null);
 
   // within 영역이 있으면 그 부분만 잘라 보여준다
   const offset = within ? { x: within.x, y: within.y } : { x: 0, y: 0 };
@@ -109,11 +112,25 @@ export function RegionPicker({
   const onDown = (e: React.PointerEvent) => {
     if (!snap) return;
     (e.target as Element).setPointerCapture(e.pointerId);
+    if (e.button === 1 || e.button === 2) {
+      // 오른쪽/휠 버튼 드래그: 화면 옮기기
+      const st = stageRef.current!;
+      panRef.current = { x: e.clientX, y: e.clientY, sl: st.scrollLeft, stp: st.scrollTop };
+      e.preventDefault();
+      return;
+    }
     const p = toImg(e);
     dragRef.current = p;
     setRect({ x: Math.floor(p.x), y: Math.floor(p.y), w: 0, h: 0 });
   };
   const onMove = (e: React.PointerEvent) => {
+    const pan = panRef.current;
+    if (pan) {
+      const st = stageRef.current!;
+      st.scrollLeft = pan.sl - (e.clientX - pan.x);
+      st.scrollTop = pan.stp - (e.clientY - pan.y);
+      return;
+    }
     const s = dragRef.current;
     if (!s || !snap) return;
     const p = toImg(e);
@@ -123,7 +140,39 @@ export function RegionPicker({
   };
   const onUp = () => {
     dragRef.current = null;
+    panRef.current = null;
   };
+
+  // 마우스 휠: 커서가 가리키는 곳을 기준으로 확대/축소
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st || !snap) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = st.getBoundingClientRect();
+      const px = e.clientX - r.left,
+        py = e.clientY - r.top;
+      setZoom((z) => {
+        const nz = Math.min(8, Math.max(0.25, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+        const ix = (st.scrollLeft + px) / z,
+          iy = (st.scrollTop + py) / z;
+        pendingScroll.current = { left: ix * nz - px, top: iy * nz - py };
+        return Math.round(nz * 100) / 100;
+      });
+    };
+    st.addEventListener("wheel", onWheel, { passive: false });
+    return () => st.removeEventListener("wheel", onWheel);
+  }, [snap]);
+
+  useLayoutEffect(() => {
+    const st = stageRef.current;
+    const ps = pendingScroll.current;
+    if (st && ps) {
+      st.scrollLeft = ps.left;
+      st.scrollTop = ps.top;
+      pendingScroll.current = null;
+    }
+  }, [zoom]);
 
   // 방향키로 1px(Shift: 크기 조절) 미세 조정
   useEffect(() => {
@@ -173,6 +222,7 @@ export function RegionPicker({
             <li key={g}>{g}</li>
           ))}
           <li>드래그로 영역을 고르고, 방향키로 1px 이동 · Shift+방향키로 크기 조절할 수 있어요.</li>
+          <li>마우스 휠로 커서 위치를 확대/축소하고, 오른쪽(또는 휠) 버튼을 누른 채 끌면 화면을 옮길 수 있어요.</li>
         </ul>
         <div className="picker-toolbar">
           <button onClick={grab}>지금 화면 다시 가져오기</button>
@@ -194,7 +244,7 @@ export function RegionPicker({
             </select>
           </label>
         </div>
-        <div className="picker-stage">
+        <div className="picker-stage" ref={stageRef}>
           {!snap && <div className="debug-empty">화면 공유를 먼저 시작해 주세요.</div>}
           {snap && (
             <div className="picker-canvas-wrap" style={{ width: snap.width * scale, height: snap.height * scale }}>
@@ -204,6 +254,7 @@ export function RegionPicker({
                 onPointerDown={onDown}
                 onPointerMove={onMove}
                 onPointerUp={onUp}
+                onContextMenu={(e) => e.preventDefault()}
               />
               {rect && rect.w > 0 && (
                 <div
