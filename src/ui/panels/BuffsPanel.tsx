@@ -55,7 +55,9 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
         자석펫 연장도 따라감), 숫자를 못 읽으면 <b>나타난 시점부터 지속시간</b>을 세거나 <b>사라질 때</b> 알려줘요. 숫자 읽기는 스킬 알림에서 숫자
         학습을 마친 뒤에 정확해져요.
       </p>
-      {buffs.length === 0 && <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 '+ 버프' 또는 '+ 특수 코어'를 눌러 주세요.</div>}
+      {buffs.length === 0 && (
+        <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 위의 '+ 버프 종료', '+ 솔 야누스 (정밀)', '+ 특수 코어' 등을 눌러 주세요.</div>
+      )}
       {buffs.map((b) => (
         <BuffRow key={b.id} buff={b} hasRegion={!!region} />
       ))}
