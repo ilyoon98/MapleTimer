@@ -796,7 +796,7 @@ function runnerLabel(key: string, p: Profile) {
 }
 
 // 개발 모드에서만: 브라우저 콘솔에서 감지 상태를 들여다보기 위한 손잡이
-if (import.meta.env.DEV) Object.assign(window, { __mapleTimer: { debugCrops, liveStore, profileStore } });
+if (import.meta.env.DEV) Object.assign(window, { __mapleTimer: { debugCrops, liveStore, profileStore, screenCapture } });
 
 let started = false;
 export function startEngine() {
