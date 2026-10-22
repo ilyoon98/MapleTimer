@@ -118,6 +118,8 @@ export interface LearnResult {
   ok: boolean;
   reason: string;
   samples: Array<{ digit: number; v: Float32Array; h: number }>;
+  /** 관찰한 서로 다른 값 개수 (잡음으로 잠깐 잡힌 건 알림 기록에 남기지 않으려고) */
+  observed: number;
 }
 
 function sameGlyphs(a: Glyph[], b: Glyph[]) {
@@ -213,13 +215,13 @@ export class CooldownSequenceRecorder {
     }
     const n = clean.length;
     // 10 이상부터 세어야 9→10 경계로 순서를 검증할 수 있다
-    if (n < 10) return { ok: false, reason: `관찰한 값이 너무 적어요 (${n}개, 쿨타임 10초 이상인 스킬로 학습해 주세요)`, samples: [] };
+    if (n < 10) return { ok: false, reason: `관찰한 값이 너무 적어요 (${n}개, 쿨타임 10초 이상인 스킬로 학습해 주세요)`, samples: [], observed: n };
     const durs = clean
       .slice(1, -1)
       .map((s, i) => clean[i + 2].first - s.first)
       .sort((a, b) => a - b);
     const med = durs[Math.floor(durs.length / 2)] ?? 1000;
-    if (med < 700 || med > 1400) return { ok: false, reason: `숫자가 1초마다 바뀌지 않아요 (${Math.round(med)}ms)`, samples: [] };
+    if (med < 700 || med > 1400) return { ok: false, reason: `숫자가 1초마다 바뀌지 않아요 (${Math.round(med)}ms)`, samples: [], observed: n };
 
     const samples: LearnResult["samples"] = [];
     let mismatch = 0;
@@ -237,8 +239,8 @@ export class CooldownSequenceRecorder {
       s10 = clean[n - 10];
     const ok9 = s9.colon || s9.glyphs.length === 1;
     const ok10 = s10.colon || s10.glyphs.length === 2;
-    if (!ok9 || !ok10) return { ok: false, reason: "숫자 순서를 맞추지 못했어요 (9→10 경계 불일치)", samples: [] };
-    if (mismatch > 1) return { ok: false, reason: `글자 수가 안 맞는 값이 ${mismatch}개 있어요`, samples: [] };
-    return { ok: true, reason: `${n}개 값에서 숫자 ${samples.length}개 학습`, samples };
+    if (!ok9 || !ok10) return { ok: false, reason: "숫자 순서를 맞추지 못했어요 (9→10 경계 불일치)", samples: [], observed: n };
+    if (mismatch > 1) return { ok: false, reason: `글자 수가 안 맞는 값이 ${mismatch}개 있어요`, samples: [], observed: n };
+    return { ok: true, reason: `${n}개 값에서 숫자 ${samples.length}개 학습`, samples, observed: n };
   }
 }

@@ -13,7 +13,7 @@ import { cropPixels, toGray, type Pixels } from "../cv/image";
 import { findTemplate, prepareTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
 import { ChangeMonitor } from "../detect/changeMonitor";
 import { PresenceTracker } from "../detect/presence";
-import { QuickslotCastDetector, type IconState } from "../detect/quickslotCast";
+import { QuickslotCastDetector, ReferenceHealer, referenceToPixels, type IconState } from "../detect/quickslotCast";
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
 import { appTicker } from "../core/ticker";
 import { readDigits, segment, staticBrightMask, textMask } from "../cv/digits";
@@ -25,7 +25,7 @@ import {
   type LearnResult,
 } from "../detect/digitLearner";
 import { createStore } from "../state/createStore";
-import { profileStore, shortName, updateTimer, type BuffEntry, type Profile, type SkillEntry } from "../state/profile";
+import { profileStore, shortName, updateSkill, updateTimer, type BuffEntry, type Profile, type SkillEntry } from "../state/profile";
 import { tts } from "../state/profile";
 
 /* ───────── 화면에 보여줄 실시간 상태 ───────── */
@@ -149,6 +149,10 @@ interface SkillRuntime {
   cycleUsed: boolean;
   staticKey: unknown;
   staticMask: Uint8Array | null;
+  /** 기준 이미지에 숫자가 찍혀 있음 (쿨타임 중에 저장한 듯) */
+  refSuspicious: boolean;
+  suspKey: unknown;
+  healer: ReferenceHealer;
 }
 const skillRt = new Map<string, SkillRuntime>();
 
@@ -170,6 +174,9 @@ function skillRuntime(s: SkillEntry): SkillRuntime {
       cycleUsed: true,
       staticKey: undefined,
       staticMask: null,
+      refSuspicious: false,
+      suspKey: undefined,
+      healer: new ReferenceHealer(),
     };
     skillRt.set(s.id, rt);
   }
@@ -245,12 +252,27 @@ function tickSkills(p: Profile, now: number, live: boolean) {
         const castAt = rt.detector.observe(img, now, textMask(img));
         if (castAt != null) startCycle(castAt);
 
+        // 기준 이미지에 숫자가 찍혀 있으면(쿨타임 중에 저장) 준비된 모습이 보일 때 스스로 다시 맞춘다
+        if (rt.suspKey !== s.readyRef) {
+          rt.suspKey = s.readyRef;
+          rt.refSuspicious = !!s.readyRef && segment(referenceToPixels(s.readyRef)).glyphs.length > 0;
+          rt.healer.reset();
+        }
+        const healed = rt.healer.observe({
+          suspicious: rt.refSuspicious,
+          img,
+          hasDigits: seg.glyphs.length > 0,
+          lumaRatio: rt.detector.last?.lumaRatio ?? NaN,
+          now,
+        });
+        if (healed) {
+          updateSkill(s.id, { readyRef: healed });
+          emitAlertLog(`기준 이미지 자동 교체 (${shortName(s.name)}): 쿨타임 숫자가 찍힌 기준을 준비된 모습으로 바꿨어요`, now);
+        }
+
         // 쿨타임 숫자: 학습 + 읽기
         const learned = rt.recorder.feed(seg, now);
-        if (learned) {
-          if (learned.ok) addDigitSamples(learned.samples);
-          emitAlertLog(`숫자 학습 ${learned.ok ? "완료" : "실패"} (${shortName(s.name)}): ${learned.reason}`, now);
-        }
+        if (learned) learnFrom(learned, shortName(s.name), now);
         const read = readDigits(seg, activeTemplates());
         rt.digitText = read?.text ?? null;
         rt.digitConf = read?.confidence ?? 0;
@@ -482,7 +504,8 @@ function detectBuffs(p: Profile, now: number, live: boolean) {
 
 function learnFrom(res: LearnResult, name: string, now: number) {
   if (res.ok) addDigitSamples(res.samples);
-  emitAlertLog(`숫자 학습 ${res.ok ? "완료" : "실패"} (${name}): ${res.reason}`, now);
+  // 값을 몇 개 못 본 실패는 잠깐 스친 잡음이므로 기록하지 않는다
+  if (res.ok || res.observed >= 5) emitAlertLog(`숫자 학습 ${res.ok ? "완료" : "실패"} (${name}): ${res.reason}`, now);
 }
 
 /**

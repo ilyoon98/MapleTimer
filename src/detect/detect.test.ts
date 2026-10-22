@@ -4,7 +4,7 @@ import { findTemplate, prepareTemplate, storeTemplate } from "../cv/match";
 import { toGray } from "../cv/image";
 import { ChangeMonitor } from "./changeMonitor";
 import { PresenceTracker } from "./presence";
-import { QuickslotCastDetector, makeReference } from "./quickslotCast";
+import { QuickslotCastDetector, ReferenceHealer, makeReference } from "./quickslotCast";
 import { RuneTracker, colorRangeFromTemplate, detectRuneByColor, DEFAULT_RUNE_COLOR } from "./rune";
 
 function solid(w: number, h: number, rgb: [number, number, number]): Pixels {
@@ -81,6 +81,26 @@ describe("QuickslotCastDetector (스킬 사용 감지)", () => {
     d.setReference(makeReference(ready));
     d.observe(dim(ready), 0);
     expect(d.observe(dim(ready), 250)).toBeNull();
+  });
+});
+
+describe("ReferenceHealer (쿨타임 중에 저장한 기준 이미지 자동 교정)", () => {
+  const bright = icon(9, 32, 32);
+  it("의심스러운 기준일 때만, 숫자 없이 밝은 모습이 3초 유지되면 교체", () => {
+    const h = new ReferenceHealer();
+    const base = { img: bright, hasDigits: false, lumaRatio: 1.6 };
+    expect(h.observe({ ...base, suspicious: true, now: 0 })).toBeNull();
+    expect(h.observe({ ...base, suspicious: true, now: 1500 })).toBeNull();
+    const healed = h.observe({ ...base, suspicious: true, now: 3100 });
+    expect(healed?.width).toBe(32);
+  });
+  it("기준이 멀쩡하거나(의심 없음), 숫자가 보이거나, 더 밝지 않으면 바꾸지 않는다", () => {
+    const h = new ReferenceHealer();
+    for (let t = 0; t <= 6000; t += 500) {
+      expect(h.observe({ img: bright, hasDigits: false, lumaRatio: 1.6, suspicious: false, now: t })).toBeNull();
+      expect(h.observe({ img: bright, hasDigits: true, lumaRatio: 1.6, suspicious: true, now: t })).toBeNull();
+      expect(h.observe({ img: bright, hasDigits: false, lumaRatio: 1.02, suspicious: true, now: t })).toBeNull();
+    }
   });
 });
 

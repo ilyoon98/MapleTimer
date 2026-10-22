@@ -33,6 +33,59 @@ export function makeReference(img: Pixels): ReadyReference {
   return { data: Array.from(g.data, (v) => Math.round(v)), width: g.width, height: g.height };
 }
 
+/** 흑백 기준 이미지를 RGBA 로 (숫자 찾기 등에 다시 쓰기 위해) */
+export function referenceToPixels(r: ReadyReference): Pixels {
+  const data = new Uint8ClampedArray(r.width * r.height * 4);
+  r.data.forEach((v, i) => data.set([v, v, v, 255], i * 4));
+  return { data, width: r.width, height: r.height };
+}
+
+export function referenceDiff(a: ReadyReference, b: ReadyReference): number {
+  if (a.width !== b.width || a.height !== b.height) return Infinity;
+  let s = 0;
+  for (let i = 0; i < a.data.length; i++) s += Math.abs(a.data[i] - b.data[i]);
+  return s / a.data.length;
+}
+
+/**
+ * '사용 가능' 기준 이미지를 쿨타임 중에 잘못 저장한 경우를 스스로 고친다.
+ * 기준 이미지에 숫자가 찍혀 있으면(의심) → 숫자 없이 기준보다 10% 이상 밝은 모습이
+ * 3초 동안 거의 그대로 유지될 때 그 모습을 새 기준으로 제안한다.
+ */
+export class ReferenceHealer {
+  private cand: ReadyReference | null = null;
+  private since = 0;
+
+  constructor(
+    private stableMs = 3000,
+    private minBrighter = 1.1,
+  ) {}
+
+  reset() {
+    this.cand = null;
+  }
+
+  /** 새 기준으로 바꿀 이미지가 확정되면 돌려준다 */
+  observe(opts: { suspicious: boolean; img: Pixels; hasDigits: boolean; lumaRatio: number; now: number }): ReadyReference | null {
+    const { suspicious, img, hasDigits, lumaRatio, now } = opts;
+    if (!suspicious || hasDigits || !(lumaRatio >= this.minBrighter)) {
+      this.cand = null;
+      return null;
+    }
+    const cur = makeReference(img);
+    if (!this.cand || referenceDiff(this.cand, cur) > 8) {
+      this.cand = cur;
+      this.since = now;
+      return null;
+    }
+    if (now - this.since >= this.stableMs) {
+      this.cand = null;
+      return cur;
+    }
+    return null;
+  }
+}
+
 function refToGray(r: ReadyReference): Gray {
   return { data: Float32Array.from(r.data), width: r.width, height: r.height };
 }

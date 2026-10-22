@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { screenCapture } from "../../capture/screenCapture";
 import { regionValidFor } from "../../capture/types";
 import { segment, staticBrightMask } from "../../cv/digits";
 import { digitStore, learnedDigitCount } from "../../detect/digitLearner";
 import { teachDigits } from "../teachDigits";
-import { makeReference } from "../../detect/quickslotCast";
+import { makeReference, referenceToPixels } from "../../detect/quickslotCast";
 import { clearSkill, debugCrops, liveStore, manualSkillCast } from "../../engine/engine";
 import {
   LEAD_MAX,
@@ -74,9 +74,15 @@ function RefThumb({ skill: s }: { skill: SkillEntry }) {
     r.data.forEach((v, i) => img.data.set([v, v, v, 255], i * 4));
     c.getContext("2d")!.putImageData(img, 0, 0);
   }, [r]);
+  const suspicious = useMemo(() => !!r && segment(referenceToPixels(r)).glyphs.length > 0, [r]);
   if (!r) return <div className="debug-empty">없음</div>;
   const scale = Math.max(1, Math.min(6, Math.floor(160 / r.width)));
-  return <canvas ref={ref} className="debug-crop" style={{ width: r.width * scale, height: r.height * scale }} />;
+  return (
+    <>
+      <canvas ref={ref} className="debug-crop" style={{ width: r.width * scale, height: r.height * scale }} />
+      {suspicious && <div className="small warn-text">⚠ 숫자가 찍혀 있어요 (준비된 모습이 보이면 자동으로 다시 맞춰요)</div>}
+    </>
+  );
 }
 
 function SkillRow({ skill: s }: { skill: SkillEntry }) {
@@ -102,6 +108,10 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
       onConfirm: ({ region, pixels }) => {
         setRegion(`skill:${s.id}`, region);
         updateSkill(s.id, { readyRef: makeReference(pixels) });
+        if (segment(pixels).glyphs.length > 0)
+          alert(
+            "선택한 아이콘에 쿨타임 숫자가 보이는 것 같아요.\n'사용 가능' 기준은 스킬이 준비된(숫자 없는 밝은) 모습이어야 해요.\n\n일단 저장해 두고, 스킬이 준비된 모습이 3초쯤 보이면 자동으로 다시 맞출게요.",
+          );
       },
     });
 
