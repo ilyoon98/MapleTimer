@@ -137,6 +137,49 @@ function normalize(c: Comp, W: number): Float32Array {
 }
 
 /**
+ * 덩어리 둘레 1~2픽셀 안에서 어두운(밝기 70 미만) 픽셀의 비율: 글자 테두리가 검은지 보기 위함.
+ * 바로 옆 1픽셀은 글자색이 번진 경계(안티앨리어싱)라 밝을 수 있고('132'의 1처럼 1픽셀 굵기 획),
+ * 2픽셀 바깥은 테두리를 지나 아이콘 그림일 수 있어서, 둘을 합쳐 '어두운 비율'로 본다.
+ */
+function darkRingFraction(img: Pixels, c: Comp, W: number, H: number): number {
+  const x0 = Math.max(0, c.x - 2),
+    y0 = Math.max(0, c.y - 2);
+  const x1 = Math.min(W - 1, c.x + c.w + 1),
+    y1 = Math.min(H - 1, c.y + c.h + 1);
+  const bw = x1 - x0 + 1,
+    bh = y1 - y0 + 1;
+  // 0 = 바깥, 1 = 덩어리, 2 = 덩어리에서 1칸, 3 = 2칸
+  const d = new Uint8Array(bw * bh);
+  for (const i of c.pixels) d[((i / W) | 0) * bw - y0 * bw + (i % W) - x0] = 1;
+  for (const level of [2, 3])
+    for (let y = 0; y < bh; y++)
+      for (let x = 0; x < bw; x++) {
+        if (d[y * bw + x]) continue;
+        let near = false;
+        for (let dy = -1; dy <= 1 && !near; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx,
+              ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < bw && ny < bh && d[ny * bw + nx] === level - 1) {
+              near = true;
+              break;
+            }
+          }
+        if (near) d[y * bw + x] = level;
+      }
+  let dark = 0,
+    n = 0;
+  for (let y = 0; y < bh; y++)
+    for (let x = 0; x < bw; x++)
+      if (d[y * bw + x] >= 2) {
+        const p = ((y0 + y) * W + x0 + x) * 4;
+        if (0.299 * img.data[p] + 0.587 * img.data[p + 1] + 0.114 * img.data[p + 2] < 70) dark++;
+        n++;
+      }
+  return n ? dark / n : 0;
+}
+
+/**
  * 마스크에서 숫자처럼 생긴 덩어리를 골라 왼쪽부터 정렬.
  * staticMask: 평소(사용 가능 상태)에도 밝은 픽셀. 여기에 절반 넘게 겹치는 덩어리는
  * 쿨타임 숫자가 아니라 퀵슬롯 키 이름("A", "Shift")이나 아이콘 그림이므로 뺀다.
@@ -155,11 +198,23 @@ export function segment(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK, sta
   // 숫자 높이 후보: 영역 높이의 22%~90%
   const tall = comps.filter((c) => c.h >= Math.max(5, H * 0.22) && c.h <= H * 0.9 && c.w <= c.h * 1.6 + 2 && c.pixels.length >= 6);
   if (!tall.length) return { tokens: [], glyphs: [], hasColon: false };
-  // 가장 많이 겹치는 높이대(줄)를 고른다: 키가 가장 큰 덩어리 기준
-  const maxH = Math.max(...tall.map((c) => c.h));
-  const ref = tall.filter((c) => c.h >= maxH * 0.7);
-  const cy = ref.map((c) => c.y + c.h / 2).sort((a, b) => a - b)[Math.floor(ref.length / 2)];
-  const line = ref.filter((c) => Math.abs(c.y + c.h / 2 - cy) <= maxH * 0.35);
+
+  // 게임 숫자는 검은 테두리가 있다: 1~2픽셀 둘레에 어두운 픽셀이 많은 덩어리를 우선한다
+  // (실제 화면: 금색 고리·노란 장식 같은 아이콘 그림이 숫자보다 커서 숫자를 밀어내던 문제)
+  const info = tall.map((c) => ({ c, dark: darkRingFraction(img, c, W, H), cy: c.y + c.h / 2 }));
+  const outlined = info.filter((i) => i.dark >= 0.35);
+  const pool = outlined.length ? outlined : info;
+  // 높이가 비슷하고 가로로 나란한 덩어리 묶음(= 한 줄의 숫자) 중 가장 큰 묶음을 고른다.
+  // 아이콘 그림은 보통 혼자 떨어져 있고 높이도 숫자와 다르다.
+  let best: { members: typeof pool; score: number } | null = null;
+  for (const a of pool) {
+    const members = pool.filter((b) => Math.abs(b.c.h - a.c.h) <= Math.max(2, a.c.h * 0.2) && Math.abs(b.cy - a.cy) <= a.c.h * 0.35);
+    const meanDark = members.reduce((s, m) => s + m.dark, 0) / members.length;
+    const score = members.length * 10 + meanDark * 5 - Math.abs(a.cy - H / 2) / H;
+    if (!best || score > best.score) best = { members, score };
+  }
+  const line = best!.members.map((m) => m.c);
+  const maxH = Math.max(...line.map((c) => c.h));
 
   // 붙어버린 두 글자 나누기
   const parts: Comp[] = [];
@@ -294,7 +349,11 @@ export function readDigits(seg: Segmented, templates: DigitTemplates, minScore =
       continue;
     }
     const c = classifyGlyph(tok.v, templates);
-    if (c.score < minScore || c.margin < minMargin) return null;
+    // 점수가 높거나(기본), 점수가 조금 낮아도 2등과 차이가 크면(확실한 1등) 받아들인다.
+    // 실제 게임에서 '227'의 7이 0.68·차이 0.26 으로 맞게 분류됐는데 기준 0.72 에 걸려 버려지던 문제
+    const clear = c.score >= minScore && c.margin >= minMargin;
+    const decisive = c.score >= 0.6 && c.margin >= 0.15;
+    if (!clear && !decisive) return null;
     conf = Math.min(conf, c.score);
     text += String(c.digit);
   }

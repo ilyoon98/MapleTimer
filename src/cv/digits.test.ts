@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CooldownSequenceRecorder } from "../detect/digitLearner";
-import { labelGlyphs, readDigits, segment, staticBrightMask, type DigitTemplates } from "./digits";
+import { classifyGlyph, labelGlyphs, readDigits, segment, staticBrightMask, type DigitTemplates } from "./digits";
 import type { Pixels } from "./image";
 
 // 테스트용 5×7 픽셀 글꼴 (실제 게임 글꼴과는 무관)
@@ -91,6 +91,17 @@ describe("숫자 읽기", () => {
     const seg = segment(img);
     expect(seg.glyphs).toHaveLength(2);
     expect(readDigits(seg, templatesFromFont())?.seconds).toBe(48);
+  });
+  it("점수가 조금 낮아도 2등과 차이가 크면 읽고, 애매하면 버린다", () => {
+    const t = templatesFromFont();
+    const v = segment(render("7")).glyphs[0].v;
+    // 7 모양을 조금 망가뜨린 글자: 1등 점수는 떨어지지만 여전히 7이 확실한 1등
+    const noisy = Float32Array.from(v, (x, i) => (i % 7 === 0 ? 1 - x : x));
+    const c = classifyGlyph(noisy, t);
+    const seg = { tokens: [{ x: 0, y: 0, w: 1, h: 1, v: noisy }], glyphs: [{ x: 0, y: 0, w: 1, h: 1, v: noisy }], hasColon: false };
+    const r = readDigits(seg, t);
+    if (c.score >= 0.6 && c.margin >= 0.15) expect(r?.text).toBe("7");
+    else expect(r).toBeNull();
   });
   it("숫자가 없으면 null", () => {
     expect(readDigits(segment(render("")), templatesFromFont())).toBeNull();
