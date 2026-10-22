@@ -86,6 +86,8 @@ export interface LiveState {
   ringing: string[];
   /** 공유는 이어져 있지만 새 화면이 한동안 안 들어옴 (게임 창 최소화 등) */
   captureStale: boolean;
+  /** 공유 화면이 계속 새까맣게만 들어옴 (창 공유가 안 되는 그래픽 모드) */
+  captureBlack: boolean;
 }
 
 export const liveStore = createStore<LiveState>({
@@ -98,6 +100,7 @@ export const liveStore = createStore<LiveState>({
   log: [],
   ringing: [],
   captureStale: false,
+  captureBlack: false,
 });
 
 /** 진단 화면에서 보여줄 마지막 잘라낸 영역 이미지 */
@@ -751,6 +754,8 @@ export function stopRingingAlerts() {
 let lastSlow = 0;
 let lastBuff = 0;
 let prevCaptureState = screenCapture.state;
+let lastBlackCheck = 0;
+let blackSince: number | null = null;
 
 function checkShareEnded(p: Profile, now: number) {
   const st = screenCapture.state;
@@ -803,7 +808,15 @@ function tick(now: number) {
   // 게임 화면은 늘 조금씩 움직이므로 10초 넘게 새 프레임이 없으면 멈춘 것으로 본다
   const lf = screenCapture.lastFrameAt;
   const captureStale = screenCapture.state === "live" && lf != null && now - lf > 10_000;
-  liveStore.set({ now, skills, rune, stall, buffs, booster, ringing, captureStale });
+  // 2초마다 화면 전체 밝기를 보고, 4초 넘게 거의 새까맣고 무늬도 없으면 검은 화면으로 본다
+  if (live && now - lastBlackCheck >= 2000) {
+    lastBlackCheck = now;
+    const st = screenCapture.frameStats();
+    const black = !!st && st.mean < 4 && st.spread < 12;
+    blackSince = black ? (blackSince ?? now) : null;
+  } else if (!live) blackSince = null;
+  const captureBlack = blackSince != null && now - blackSince >= 4000;
+  liveStore.set({ now, skills, rune, stall, buffs, booster, ringing, captureStale, captureBlack });
 }
 
 function runnerLabel(key: string, p: Profile) {

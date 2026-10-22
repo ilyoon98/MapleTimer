@@ -17,6 +17,7 @@ export function SetupChecklist() {
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const live = liveStore.use(() => screenCapture.state === "live");
   const stale = liveStore.use((s) => s.captureStale);
+  const black = liveStore.use((s) => s.captureBlack);
   const hidden = profileStore.use((s) => s.collapsed.checklist ?? false);
   const w = screenCapture.width,
     h = screenCapture.height;
@@ -28,9 +29,19 @@ export function SetupChecklist() {
 
   const steps: Step[] = [
     {
-      done: live && !stale,
-      text: live ? (stale ? "화면 공유: 화면이 멈춰 있어요" : `화면 공유 중 (${w}×${h})`) : "화면 공유 시작",
-      hint: live ? "게임 창이 최소화되면 화면이 멈춰요" : "오른쪽 위 '화면 공유 시작' → 메이플스토리 창 선택",
+      done: live && !stale && !black,
+      text: live
+        ? black
+          ? "화면 공유: 화면이 검게 나와요"
+          : stale
+            ? "화면 공유: 화면이 멈춰 있어요"
+            : `화면 공유 중 (${w}×${h})`
+        : "화면 공유 시작",
+      hint: !live
+        ? "오른쪽 위 '화면 공유 시작' → 메이플스토리 창 선택"
+        : black
+          ? "'다른 창 선택' → '전체 화면' 탭에서 모니터를 골라 주세요"
+          : "게임 창이 최소화되면 화면이 멈춰요",
     },
     {
       done: skillsOn.length === 0 || skillsReady.length === skillsOn.length,

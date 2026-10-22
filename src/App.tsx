@@ -56,6 +56,7 @@ function saveFrame() {
 function ShareChip() {
   const cap = useCaptureState();
   const stale = liveStore.use((s) => s.captureStale);
+  const black = liveStore.use((s) => s.captureBlack);
   const [err, setErr] = useState<string | null>(null);
   const start = async () => {
     setErr(null);
@@ -69,8 +70,17 @@ function ShareChip() {
   };
   if (cap.state === "live")
     return (
-      <div className={`share-chip share-live ${stale ? "share-stale" : ""}`}>
-        <span className="dot" /> {stale ? "화면이 멈춤 (게임 창 최소화?)" : "화면 공유 중"}{" "}
+      <div className={`share-chip share-live ${stale || black ? "share-stale" : ""}`}>
+        <span className="dot" />{" "}
+        {black ? (
+          <span title="게임 창만 공유하면 검게 나오는 경우가 있어요. '다른 창 선택' → '전체 화면' 탭에서 모니터를 고르세요.">
+            화면이 검게 나와요 → '다른 창 선택'에서 전체 화면 선택
+          </span>
+        ) : stale ? (
+          "화면이 멈춤 (게임 창 최소화?)"
+        ) : (
+          "화면 공유 중"
+        )}{" "}
         {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
         <button title="지금 공유 중인 게임 화면을 PNG 로 저장 (감지 기준 조정용)" onClick={saveFrame}>
           화면 저장

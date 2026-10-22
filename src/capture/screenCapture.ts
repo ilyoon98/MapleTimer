@@ -145,6 +145,32 @@ export class ScreenCapture {
     return this.ctx.getImageData(x, y, w, h);
   }
 
+  private tiny = document.createElement("canvas");
+  /**
+   * 마지막으로 그린 화면 전체의 평균 밝기(0~255)와 밝기 편차.
+   * 게임 창 공유가 검은 화면으로만 들어오는지 확인하는 용도 (작게 줄여서 계산해 가볍다)
+   */
+  frameStats(): { mean: number; spread: number } | null {
+    if (!this.width) return null;
+    const w = 64,
+      h = 36;
+    this.tiny.width = w;
+    this.tiny.height = h;
+    const t = this.tiny.getContext("2d", { willReadFrequently: true })!;
+    t.drawImage(this.canvas, 0, 0, w, h);
+    const d = t.getImageData(0, 0, w, h).data;
+    let sum = 0,
+      min = 255,
+      max = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      sum += l;
+      if (l < min) min = l;
+      if (l > max) max = l;
+    }
+    return { mean: sum / (w * h), spread: max - min };
+  }
+
   /** 영역 선택 화면용 전체 프레임 스냅샷 */
   snapshot(): HTMLCanvasElement | null {
     if (!this.refresh()) return null;
