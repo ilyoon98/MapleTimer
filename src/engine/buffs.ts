@@ -158,6 +158,8 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
         rt.spokenSec = null;
         r.reset();
       }
+    } else if (rt.endsAt != null && rt.endsAt > now) {
+      // 깜빡이다 다시 보인 같은 버프: 알고 있던 종료 시각과 알림 여부를 그대로 둔다
     } else {
       rt.startedAt = now;
       rt.endsAt = b.durationSec ? now + b.durationSec * 1000 : null;

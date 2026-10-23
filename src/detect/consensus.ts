@@ -76,9 +76,14 @@ export function stepReadTimer(cur: ReadTimer, now: number, leadSec: number): { n
 
 /**
  * 버프 아이콘이 사라졌을 때 종료 시각을 남겨 둘지:
- * 예정대로(5초 안) 끝났는데 알림 시점이 종료 뒤(음수)라 아직 안 울렸으면 그때까지 남겨 둔다.
- * 일찍 끝냈거나(취소) 이미 울렸으면 치운다.
+ * - 예정대로(5초 안) 끝났는데 알림 시점이 종료 뒤(음수)라 아직 안 울렸으면 그때까지 남겨 둔다.
+ * - 알림 시점 5초 전부터는 아이콘이 깜빡이거나 잠깐 가려진 것으로 보고 남겨 둔다
+ *   (실제 게임: 야누스 11초 남았을 때 아이콘을 놓쳐 10초 전 알림이 안 울렸다).
+ * 그보다 일찍 끝냈거나(취소) 이미 울렸으면 치운다.
  */
 export function keepEndAfterVanish(endsAt: number | null, alerted: boolean, leadSec: number, now: number): boolean {
-  return !alerted && leadSec < 0 && endsAt != null && endsAt - now <= 5000;
+  if (alerted || endsAt == null) return false;
+  const left = endsAt - now;
+  if (leadSec < 0) return left <= 5000;
+  return left > 0 && left <= (leadSec + 5) * 1000;
 }
