@@ -2,6 +2,7 @@ import { useState } from "react";
 import { liveStore } from "../../engine/engine";
 import { STALL_DEFAULT_SEC, STALL_RANGE, profileStore, setRegion, type StallMode, type StallSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
+import { STALL_TEXT } from "../../alerts/speech";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { openPicker } from "../pickerStore";
 
@@ -130,7 +131,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
                   />
                   <span className="muted">작을수록 작은 변화도 '변화'로 봐요 (기본 14)</span>
                 </div>
-                <AlertSettings value={st.alert} onChange={(alert) => setStall({ alert })} />
+                <AlertSettings value={st.alert} onChange={(alert) => setStall({ alert })} speech={STALL_TEXT} />
               </div>
               <div className="diag">
                 <div className="diag-title">진단</div>

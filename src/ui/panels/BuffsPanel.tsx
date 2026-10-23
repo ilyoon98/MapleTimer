@@ -5,8 +5,10 @@ import { debugCrops, liveStore } from "../../engine/engine";
 import { teachDigits } from "../teachDigits";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
+import { doneText, leadText } from "../../alerts/speech";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
 import { openPicker } from "../pickerStore";
+import { BuffbarSteps } from "../guideArt";
 
 function TemplateThumb({ t }: { t: StoredTemplate | null }) {
   if (!t) return <span className="thumb thumb-empty">?</span>;
@@ -21,6 +23,8 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
   const buffs = profileStore.use((p) => p.buffs);
   const region = profileStore.use((p) => p.regions.buffbar);
   const add = (id: BuffPresetId) => profileStore.set((p) => ({ ...p, buffs: [...p.buffs, newBuffPreset(id)] }));
+  // 아직 아무것도 등록 안 했으면 설정 방법을 펼쳐서 보여 준다
+  const [howto, setHowto] = useState(buffs.length === 0);
 
   const pickRegion = () =>
     openPicker({
@@ -41,6 +45,7 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
       onToggleCollapse={onToggleCollapse}
       actions={
         <>
+          <button onClick={() => setHowto(!howto)}>{howto ? "설정 방법 닫기" : "설정 방법"}</button>
           <button onClick={pickRegion}>{region ? "버프칸 다시 선택" : "버프칸 선택"}</button>
           {BUFF_PRESETS.map((bp) => (
             <button key={bp.id} onClick={() => add(bp.id)}>
@@ -50,11 +55,19 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
         </>
       }
     >
-      <p className="panel-hint">
-        버프칸에서 직접 고른 아이콘을 테두리 모양으로 찾아요. 아이콘 위 <b>남은 시간 숫자</b>를 읽어서 끝나기 전에 알려주고(정밀 감지 — 야누스
-        자석펫 연장도 따라감), 숫자를 못 읽으면 <b>나타난 시점부터 지속시간</b>을 세거나 <b>사라질 때</b> 알려줘요. 숫자 읽기는 스킬 알림에서 숫자
-        학습을 마친 뒤에 정확해져요.
-      </p>
+      {howto ? (
+        <div className="howto-card">
+          <div className="howto-head">
+            <b>버프칸 감지 설정 방법</b>
+            <button onClick={() => setHowto(false)}>닫기</button>
+          </div>
+          <BuffbarSteps />
+        </div>
+      ) : (
+        <p className="panel-hint">
+          오른쪽 위 버프칸에서 등록한 아이콘을 찾아 <b>아이콘 위 남은 시간</b>을 읽고 끝나기 전에 알려요. 처음이면 <b>설정 방법</b>을 눌러 보세요.
+        </p>
+      )}
       {buffs.length === 0 && (
         <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 위의 '+ 버프 종료', '+ 솔 야누스 (정밀)', '+ 특수 코어' 등을 눌러 주세요.</div>
       )}
@@ -215,7 +228,11 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
               <span className="muted small">다른 버프와 헷갈리면 '아이콘 전체 (숫자 부분만 제외)'를 써 보세요.</span>
             </div>
           )}
-          <AlertSettings value={b.alert} onChange={(alert) => updateBuff(b.id, { alert })} />
+          <AlertSettings
+            value={b.alert}
+            onChange={(alert) => updateBuff(b.id, { alert })}
+            speech={isCore ? b.name : b.durationSec != null || b.readTime ? leadText(b.name, b.leadSec) : doneText(b.name)}
+          />
           <div className="field-row">
             <button
               className="danger"

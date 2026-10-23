@@ -56,10 +56,21 @@ export class AlertRunner {
   private acked = false;
   lastFiredAt: number | null = null;
 
+  /** 음성 읽기일 때 읽을 문장 (없으면 저장된 문장) */
+  private speak: (() => string) | null = null;
+
   constructor(
     private label: string,
     private getConfig: () => AlertConfig,
   ) {}
+
+  setSpeak(speak: (() => string) | null) {
+    this.speak = speak;
+  }
+
+  private soundOf(cfg: AlertConfig): SoundSpec {
+    return cfg.sound.kind === "tts" && this.speak ? { kind: "tts", text: this.speak() } : cfg.sound;
+  }
 
   get isActive() {
     return this.active;
@@ -110,7 +121,7 @@ export class AlertRunner {
     })();
     this.nextAt = null;
     audioEngine
-      .play(cfg.sound, cfg.volume)
+      .play(this.soundOf(cfg), cfg.volume)
       .catch((e) => console.warn("[alert] 재생 실패", e))
       .finally(() => {
         this.playing = false;
@@ -121,6 +132,6 @@ export class AlertRunner {
   /** 알림 테스트용: 설정된 소리를 바로 한 번 재생 */
   async preview() {
     const cfg = this.getConfig();
-    await audioEngine.play(cfg.sound, cfg.volume);
+    await audioEngine.play(this.soundOf(cfg), cfg.volume);
   }
 }

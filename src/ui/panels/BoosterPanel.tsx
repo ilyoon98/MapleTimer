@@ -3,6 +3,7 @@ import { lastBoosterSegment, liveStore } from "../../engine/engine";
 import { teachDigits } from "../teachDigits";
 import { profileStore, setRegion, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
+import { leadText } from "../../alerts/speech";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtClock, fmtRemaining, leadLabel } from "../common";
 import { openPicker } from "../pickerStore";
 
@@ -82,7 +83,7 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
                   <span className="field-label">알림 시점</span>
                   <NumberInput value={b.leadSec} min={-5} max={60} suffix="초 전" onChange={(v) => setBooster({ leadSec: v })} />
                 </div>
-                <AlertSettings value={b.alert} onChange={(alert) => setBooster({ alert })} />
+                <AlertSettings value={b.alert} onChange={(alert) => setBooster({ alert })} speech={leadText("부스터", b.leadSec)} />
               </div>
               <div className="diag">
                 <div className="diag-title">진단</div>

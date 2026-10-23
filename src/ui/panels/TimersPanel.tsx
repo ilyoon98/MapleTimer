@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { liveStore, resetTimerAlert } from "../../engine/engine";
-import { TIMER_PRESETS, TIMER_QUICK_SECS, newTimer, profileStore, updateTimer, type TimerEntry } from "../../state/profile";
+import { leadText } from "../../alerts/speech";
+import { TIMER_PRESETS, TIMER_QUICK_SECS, newTimer, profileStore, shortName, updateTimer, type TimerEntry } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining, leadLabel } from "../common";
 
@@ -168,7 +169,7 @@ function TimerRow({ t }: { t: TimerEntry }) {
               />
             )}
           </div>
-          <AlertSettings value={t.alert} onChange={(alert) => updateTimer(t.id, { alert })} />
+          <AlertSettings value={t.alert} onChange={(alert) => updateTimer(t.id, { alert })} speech={leadText(shortName(t.name), t.leadSec)} />
           <div className="field-row">
             <button
               className="danger"

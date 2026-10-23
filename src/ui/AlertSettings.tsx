@@ -32,8 +32,11 @@ function useCustomSounds() {
   return soundsCache ?? [];
 }
 
-/** 알림 소리·볼륨·반복 설정 */
-export function AlertSettings({ value, onChange }: { value: AlertConfig; onChange: (v: AlertConfig) => void }) {
+/**
+ * 알림 소리·볼륨·반복 설정.
+ * speech: 음성 읽기일 때 읽을 문장 (항목 이름으로 알아서 만든 것이라 사용자가 쓰지 않는다)
+ */
+export function AlertSettings({ value, onChange, speech }: { value: AlertConfig; onChange: (v: AlertConfig) => void; speech: string }) {
   const sounds = useCustomSounds();
   const s = value.sound;
   const setSound = (sound: SoundSpec) => onChange({ ...value, sound });
@@ -47,7 +50,7 @@ export function AlertSettings({ value, onChange }: { value: AlertConfig; onChang
           value={s.kind}
           onChange={(e) => {
             const k = e.target.value as SoundSpec["kind"];
-            if (k === "tts") setSound({ kind: "tts", text: s.kind === "tts" ? s.text : "알림" });
+            if (k === "tts") setSound({ kind: "tts", text: speech });
             if (k === "beep") setSound({ kind: "beep", pattern: "double" });
             if (k === "custom") setSound({ kind: "custom", soundId: sounds[0]?.id ?? "" });
           }}
@@ -56,9 +59,7 @@ export function AlertSettings({ value, onChange }: { value: AlertConfig; onChang
           <option value="beep">비프음</option>
           <option value="custom">내 소리 파일</option>
         </select>
-        {s.kind === "tts" && (
-          <input className="grow" value={s.text} onChange={(e) => setSound({ kind: "tts", text: e.target.value })} placeholder="읽어줄 문장" />
-        )}
+        {s.kind === "tts" && <span className="muted">"{speech}" 라고 읽어요</span>}
         {s.kind === "beep" && (
           <select value={s.pattern} onChange={(e) => setSound({ kind: "beep", pattern: e.target.value as BeepPattern })}>
             {BEEPS.map(([id, name]) => (
@@ -80,7 +81,7 @@ export function AlertSettings({ value, onChange }: { value: AlertConfig; onChang
           ) : (
             <span className="muted">설정 &gt; 내 소리 파일에서 먼저 추가해 주세요</span>
           ))}
-        <button onClick={() => audioEngine.play(value.sound, value.volume)}>미리 듣기</button>
+        <button onClick={() => audioEngine.play(s.kind === "tts" ? { kind: "tts", text: speech } : value.sound, value.volume)}>미리 듣기</button>
       </div>
       <div className="field-row">
         <span className="field-label">볼륨</span>

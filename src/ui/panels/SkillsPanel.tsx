@@ -19,6 +19,7 @@ import {
   type SkillEntry,
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
+import { leadText } from "../../alerts/speech";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
 import { openPicker } from "../pickerStore";
 
@@ -179,7 +180,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
                 <NumberInput value={s.leadSec} min={leadMin} max={LEAD_MAX} suffix="초 전" onChange={(v) => updateSkill(s.id, { leadSec: v })} />
                 <span className="muted">음수면 종료 후 (예: -3 → 3초 후)</span>
               </div>
-              <AlertSettings value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} />
+              <AlertSettings value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} speech={leadText(shortName(s.name), s.leadSec)} />
               <div className="field-row">
                 <button onClick={() => clearSkill(s.id)}>타이머 초기화</button>
                 <button

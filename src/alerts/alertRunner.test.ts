@@ -19,6 +19,17 @@ describe("AlertRunner", () => {
     randomDelaySetting.enabled = false;
   });
 
+  it("음성 읽기는 저장된 문장이 아니라 항목 이름으로 만든 문장을 읽는다 (이름을 바꾸면 따라 바뀜)", async () => {
+    const r = new AlertRunner("t", () => ({ sound: { kind: "tts" as const, text: "예전 문장" }, volume: 1, repeat: { enabled: false, intervalSec: 2, maxCount: null } }));
+    let name = "솔 야누스";
+    r.setSpeak(() => `${name} 곧 끝나요`);
+    name = "야누스";
+    r.trigger(0);
+    r.tick(0);
+    await flush();
+    expect(play).toHaveBeenCalledWith({ kind: "tts", text: "야누스 곧 끝나요" }, 1);
+  });
+
   it("반복이 꺼져 있으면 한 번만 울린다", async () => {
     const r = new AlertRunner("t", cfg(false, null));
     r.trigger(0);

@@ -7,6 +7,7 @@ import {
   type AlertLogEntry,
 } from "../alerts/alertRunner";
 import { audioEngine } from "../alerts/audio";
+import { RUNE_TEXT, STALL_TEXT, endingText, leadText } from "../alerts/speech";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { cropPixels, toGray, type Pixels } from "../cv/image";
@@ -112,13 +113,15 @@ onAlertLog((e) => liveStore.set((s) => ({ ...s, log: [e, ...s.log].slice(0, 30) 
 
 /* ───────── 알림 실행기 ───────── */
 const runners = new Map<string, AlertRunner>();
-function runner(key: string, label: string, getCfg: () => AlertConfig) {
+/** speak: 음성 읽기일 때 읽을 문장 (항목 이름·상황으로 알아서 만든다) */
+function runner(key: string, label: string, getCfg: () => AlertConfig, speak: () => string) {
   let r = runners.get(key);
   if (!r) {
     r = new AlertRunner(label, getCfg);
     runners.set(key, r);
   }
   r.setLabel(label);
+  r.setSpeak(speak);
   return r;
 }
 export function getRunner(key: string) {
@@ -229,7 +232,12 @@ function tickSkills(p: Profile, now: number, live: boolean) {
   const out: Record<string, SkillLive> = {};
   for (const s of p.skills) {
     const rt = skillRuntime(s);
-    const r = runner(`skill:${s.id}`, shortName(s.name), () => profileStore.get().skills.find((x) => x.id === s.id)?.alert ?? s.alert);
+    const r = runner(
+      `skill:${s.id}`,
+      shortName(s.name),
+      () => profileStore.get().skills.find((x) => x.id === s.id)?.alert ?? s.alert,
+      () => endingText(shortName(s.name), rt.expiresAt),
+    );
     const region = p.regions[`skill:${s.id}`];
     const regionOk = live && regionValidFor(region, screenCapture.width, screenCapture.height);
     if (!s.enabled) {
@@ -361,7 +369,7 @@ function tickSkills(p: Profile, now: number, live: boolean) {
 const runeTracker = new RuneTracker();
 let runeRegionKey = "";
 function tickRune(p: Profile, now: number, live: boolean, prev: RuneLive): RuneLive {
-  const r = runner("rune", "룬", () => profileStore.get().rune.alert);
+  const r = runner("rune", "룬", () => profileStore.get().rune.alert, () => RUNE_TEXT);
   const base = { boxes: [] as RuneBox[], lastAlertAt: r.lastFiredAt };
   if (!p.rune.enabled) {
     r.reset();
@@ -396,7 +404,7 @@ function tickRune(p: Profile, now: number, live: boolean, prev: RuneLive): RuneL
 const stallMonitor = new ChangeMonitor();
 let stallKey = "";
 function tickStall(p: Profile, now: number, live: boolean, buffPresent: (id: string) => boolean): StallLive {
-  const r = runner("stall", "사냥 멈춤", () => profileStore.get().stall.alert);
+  const r = runner("stall", "사냥 멈춤", () => profileStore.get().stall.alert, () => STALL_TEXT);
   const st = p.stall;
   const base = { idleMs: 0, changedCells: 0, totalCells: 0, lastAlertAt: r.lastFiredAt };
   if (!st.enabled) {
@@ -584,8 +592,18 @@ function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, 
   rt.endsAt = endsAt;
 }
 
+/** 특수 코어는 이름만, 버프는 남았으면 '곧 끝나요' / 사라졌으면 '끝났어요' */
+function buffRunner(b: BuffEntry, rt: BuffRuntime) {
+  return runner(
+    `buff:${b.id}`,
+    b.name,
+    () => profileStore.get().buffs.find((x) => x.id === b.id)?.alert ?? b.alert,
+    () => (b.kind === "cooldown" ? b.name : endingText(b.name, rt.endsAt)),
+  );
+}
+
 function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeared" | null, now: number) {
-  const r = runner(`buff:${b.id}`, b.name, () => profileStore.get().buffs.find((x) => x.id === b.id)?.alert ?? b.alert);
+  const r = buffRunner(b, rt);
   if (ev === "appeared") {
     if (b.kind === "cooldown") {
       // 쿨타임 진행 중엔 재감지를 무시: 끝나기 4초 전 이후이고, 시작 후 10초가 지나야 새 발동으로 본다.
@@ -627,7 +645,7 @@ function tickBuffTimers(p: Profile, now: number) {
   const regionOk = live && regionValidFor(p.regions.buffbar, screenCapture.width, screenCapture.height);
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
-    const r = runner(`buff:${b.id}`, b.name, () => profileStore.get().buffs.find((x) => x.id === b.id)?.alert ?? b.alert);
+    const r = buffRunner(b, rt);
     if (!b.enabled) {
       r.reset();
       rt.presence.reset();
@@ -689,7 +707,7 @@ export let lastBoosterSegment: ReturnType<typeof segment> | null = null;
  * 3번 연달아 1.5초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용) 새 주기로 본다.
  */
 function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
-  const r = runner("booster", "부스터", () => profileStore.get().booster.alert);
+  const r = runner("booster", "부스터", () => profileStore.get().booster.alert, () => endingText("부스터", boosterRt.endsAt));
   const b = p.booster;
   const rt = boosterRt;
   const base = { readText: null, lastAlertAt: r.lastFiredAt };
@@ -740,7 +758,13 @@ export function resetTimerAlert(id: string) {
 }
 function tickTimers(p: Profile, now: number) {
   for (const t of p.timers) {
-    const r = runner(`timer:${t.id}`, shortName(t.name), () => profileStore.get().timers.find((x) => x.id === t.id)?.alert ?? t.alert);
+    const r = runner(
+      `timer:${t.id}`,
+      shortName(t.name),
+      () => profileStore.get().timers.find((x) => x.id === t.id)?.alert ?? t.alert,
+      // 자동 재시작이면 울릴 때 이미 다음 주기로 넘어가 있으므로 알림 시점으로 정한다
+      () => leadText(shortName(t.name), t.leadSec),
+    );
     if (!t.enabled) {
       r.reset();
       timerAlerted.delete(t.id);

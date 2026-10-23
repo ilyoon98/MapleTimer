@@ -4,6 +4,7 @@ import { DEFAULT_RUNE_COLOR, colorRangeFromTemplate } from "../../detect/rune";
 import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
+import { RUNE_TEXT } from "../../alerts/speech";
 import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { openPicker } from "../pickerStore";
 
@@ -133,7 +134,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
                     </p>
                   </>
                 )}
-                <AlertSettings value={rune.alert} onChange={(alert) => setRune({ alert })} />
+                <AlertSettings value={rune.alert} onChange={(alert) => setRune({ alert })} speech={RUNE_TEXT} />
               </div>
               <div className="diag">
                 <div className="diag-title">진단 (초록 상자 = 후보)</div>

@@ -3,7 +3,7 @@ import { audioEngine } from "./alerts/audio";
 import { screenCapture } from "./capture/screenCapture";
 import { liveStore, startEngine, stopRingingAlerts } from "./engine/engine";
 import { profileStore, type PanelId } from "./state/profile";
-import { fmtClock, Toggle } from "./ui/common";
+import { fmtClock } from "./ui/common";
 import { closePicker, pickerStore } from "./ui/pickerStore";
 import { BoosterPanel } from "./ui/panels/BoosterPanel";
 import { BuffsPanel } from "./ui/panels/BuffsPanel";
@@ -13,7 +13,8 @@ import { StallPanel } from "./ui/panels/StallPanel";
 import { TimersPanel } from "./ui/panels/TimersPanel";
 import { closePip, openPip, pipStore, pipSupported } from "./ui/Pip";
 import { RegionPicker } from "./ui/RegionPicker";
-import { GuideModal, SettingsModal } from "./ui/SettingsModal";
+import { GuideModal } from "./ui/Guide";
+import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
 
 const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => void }) => React.ReactNode> = {
@@ -119,7 +120,6 @@ export function App() {
   const order = profileStore.use((p) => p.panelOrder);
   const collapsed = profileStore.use((p) => p.collapsed);
   const masterVolume = profileStore.use((p) => p.masterVolume);
-  const randomDelay = profileStore.use((p) => p.randomDelay);
   const muted = profileStore.use((p) => p.muted);
   const theme = profileStore.use((p) => p.theme);
   const ringing = liveStore.use((s) => s.ringing);
@@ -156,7 +156,7 @@ export function App() {
         <h1>메이플 타이머</h1>
         <span className="badge">개인용</span>
         <span className="spacer" />
-        <button onClick={() => setModal("guide")}>사용 방법</button>
+        <button onClick={() => setModal("guide")}>사용 가이드</button>
         {pipSupported() && (
           <button onClick={() => (pipOpen ? closePip() : openPip())}>{pipOpen ? "PIP 닫기" : "PIP 타이머"}</button>
         )}
@@ -176,9 +176,20 @@ export function App() {
             onChange={(e) => profileStore.set({ masterVolume: Number(e.target.value) / 100 })}
           />
           <span className="mono">{Math.round(masterVolume * 100)}%</span>
+          <button
+            className={`icon-btn ${muted ? "mute-on" : ""}`}
+            onClick={(e) => {
+              e.preventDefault(); // label 안이라 슬라이더로 클릭이 넘어가지 않게
+              profileStore.set({ muted: !muted });
+            }}
+            title={muted ? "알림 소리 다시 켜기" : "모든 알림 소리 끄기"}
+            aria-label={muted ? "알림 소리 다시 켜기" : "모든 알림 소리 끄기"}
+            aria-pressed={muted}
+          >
+            {muted ? "🔇" : "🔊"}
+          </button>
+          {muted && <span className="mute-note">소리 꺼짐</span>}
         </label>
-        <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="랜덤 지연 (첫 알림 0~2초)" />
-        <Toggle checked={muted} onChange={(v) => profileStore.set({ muted: v })} label="모든 알림 소리 끄기" />
         {ringing.length > 0 && (
           <button className="ringing-btn" onClick={stopRingingAlerts} title="지금 울리는 알림과 남은 반복을 멈춰요">
             🔕 알림 멈춤 ({ringing.join(", ")})

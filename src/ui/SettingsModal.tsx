@@ -20,7 +20,7 @@ import { deletePreset, loadPreset, presetStore, savePreset } from "../state/pres
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
 
-function useEscape(onClose: () => void) {
+export function useEscape(onClose: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -35,6 +35,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const pipSize = profileStore.use((p) => p.pipSize);
   const pipShow = profileStore.use((p) => p.pipShow);
+  const randomDelay = profileStore.use((p) => p.randomDelay);
   const pipEmphasis = profileStore.use((p) => p.pipEmphasis);
   const perf = liveStore.use((s) => s.perf);
   const presets = presetStore.use((s) => s.presets);
@@ -213,6 +214,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <span className="muted small">알림이 울릴 때 PIP 창 모양</span>
           </div>
           <div className="field-row">
+            <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="랜덤 지연: 첫 알림을 0~2초 사이로 무작위로 늦추기" />
+          </div>
+          <div className="field-row">
             <Toggle
               checked={alertOnShareEnd}
               onChange={(v) => profileStore.set({ alertOnShareEnd: v })}
@@ -325,69 +329,6 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </section>
-      </div>
-    </div>
-  );
-}
-
-export function GuideModal({ onClose }: { onClose: () => void }) {
-  useEscape(onClose);
-  return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <header className="modal-head">
-          <h3>사용 방법</h3>
-          <button className="icon-btn" onClick={onClose} aria-label="닫기">
-            ✕
-          </button>
-        </header>
-        <section className="modal-section">
-          <h4>1. 인게임 설정</h4>
-          <ul className="guide-list">
-            <li>UI &gt; UI 크기 옵션: <b>최적 비율</b></li>
-            <li>UI &gt; 퀵슬롯&amp;버프 시간표시: <b>중앙, 크게</b> / 표시 방식: <b>분 + 초</b></li>
-            <li>UI &gt; 버프 정렬 옵션: <b>모두 켜기</b></li>
-          </ul>
-        </section>
-        <section className="modal-section">
-          <h4>2. 화면 공유</h4>
-          <ul className="guide-list">
-            <li>오른쪽 위 <b>화면 공유 시작</b> → 메이플스토리 <b>창</b>을 선택하세요. (창 모드가 안 되면 전체 화면 선택)</li>
-            <li>이 탭은 열어 둔 채로 게임을 하면 돼요. 다른 창에 가려져도 감지는 계속돼요.</li>
-            <li>해상도를 바꾸면 영역을 다시 선택해야 해요.</li>
-          </ul>
-        </section>
-        <section className="modal-section">
-          <h4>3. 기능별 영역 선택</h4>
-          <ul className="guide-list">
-            <li><b>스킬</b>: 퀵슬롯 아이콘(쿨타임 숫자 포함)을 스킬이 준비된 상태에서 선택 → 스킬을 쓰면 자동으로 타이머 시작</li>
-            <li><b>룬</b>: 미니맵 안쪽 지도 영역 선택 → 룬이 떴을 때 '룬 아이콘 등록'을 하면 더 정확해요</li>
-            <li><b>사냥 멈춤</b>: 경험치 숫자 영역(또는 자주 쓰는 스킬 아이콘, MP 숫자) 선택</li>
-            <li><b>버프칸</b>: 우상단 버프칸 전체 선택 → 감지할 버프/특수 코어 아이콘 등록</li>
-          </ul>
-        </section>
-        <section className="modal-section">
-          <h4>4. 숫자 학습 (처음 한 번)</h4>
-          <ul className="guide-list">
-            <li>쿨타임 10초 이상 스킬의 퀵슬롯 영역을 잡고, 스킬을 쓴 뒤 <b>숫자가 한 자리(9 이하)가 될 때까지</b> 두면 0~9 숫자 모양을 자동으로 배워요.</li>
-            <li>숫자를 배우면 쿨타임 도중에 켜도 남은 시간을 맞추고, 버프 아이콘의 남은 시간(야누스·파운틴 정밀)과 부스터 타이머도 읽어요.</li>
-            <li>잘 안 배워지면 진단의 <b>숫자 직접 가르치기</b>로 화면 숫자를 입력해 주세요.</li>
-          </ul>
-        </section>
-        <section className="modal-section">
-          <h4>5. 잘 안 될 때</h4>
-          <ul className="guide-list">
-            <li>맨 위 <b>준비 체크리스트</b>에서 빠진 단계를 확인하세요.</li>
-            <li>각 항목의 ▾ 를 눌러 <b>진단</b> 화면에서 실제로 잘린 영역과 수치를 확인하고 기준값을 조절하세요.</li>
-            <li>설정 &gt; <b>진단 파일 저장</b>으로 그 순간의 화면·설정을 저장해 두면 원인을 찾기 쉬워요.</li>
-            <li>소리가 안 나면: 페이지를 한 번 클릭했는지, 탭 음소거·시스템 볼륨을 확인하세요.</li>
-            <li>PIP 타이머를 켜 두면 게임 위에 남은 시간이 항상 보여요.</li>
-          </ul>
-        </section>
-        <p className="muted small">
-          이 도구는 공유한 화면을 이 브라우저 안에서만 분석하며 게임 입력·메모리·파일에는 접근하지 않습니다. 그래도 비공식 도구이므로 사용에
-          따른 책임은 본인에게 있어요.
-        </p>
       </div>
     </div>
   );
