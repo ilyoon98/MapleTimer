@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
-import { liveStore } from "../engine/engine";
+import { clipSnapshot, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
 import {
@@ -99,6 +99,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         screenTransition: live.screenTransition,
       },
       framePng: frame ? frame.toDataURL("image/png") : null,
+      // 최근 30초 동안 선택한 영역만 0.25초마다 (개발 모드에서 재생해 문제를 그대로 재현)
+      clip: clipSnapshot(profileStore.get()),
     };
     const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
     const a = document.createElement("a");
@@ -327,8 +329,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <section className="modal-section">
           <h4>진단</h4>
           <p className="muted small">
-            감지가 잘 안 될 때, 문제가 보이는 순간에 눌러 주세요. 지금 게임 화면·선택한 영역·학습한 숫자·감지 수치가 파일 하나로 저장돼요 (다운로드
-            폴더). 이 파일을 보면 기준값을 정확히 맞출 수 있어요.
+            감지가 잘 안 될 때, 문제가 생긴 직후에 눌러 주세요. 지금 게임 화면, <b>최근 30초 동안의 감지 영역</b>, 설정, 학습한 숫자, 감지 수치가 파일
+            하나로 저장돼요 (다운로드 폴더). 이 파일로 그 30초를 그대로 다시 돌려 보며 고칠 수 있어요.
           </p>
           <div className="field-row">
             <button onClick={exportDiagnostics} disabled={screenCapture.state !== "live"}>

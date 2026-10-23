@@ -50,16 +50,20 @@ export class ScreenCapture {
     this.state = "starting";
     this.emit();
     try {
-      const demo = import.meta.env.DEV && new URLSearchParams(location.search).has("demo");
+      const params = new URLSearchParams(location.search);
+      const demo = import.meta.env.DEV && params.has("demo");
+      const replay = import.meta.env.DEV && params.has("replay");
       const stream = demo
         ? (await import("../dev/demoStream")).createDemoStream()
-        : await navigator.mediaDevices.getDisplayMedia({
-            video: { frameRate: { ideal: 10, max: 15 } },
-            audio: false,
-            // @ts-expect-error Chrome 전용 옵션
-            selfBrowserSurface: "exclude",
-            surfaceSwitching: "include",
-          });
+        : replay
+          ? (await import("../dev/replayStream")).createReplayStream()
+          : await navigator.mediaDevices.getDisplayMedia({
+              video: { frameRate: { ideal: 10, max: 15 } },
+              audio: false,
+              // @ts-expect-error Chrome 전용 옵션
+              selfBrowserSurface: "exclude",
+              surfaceSwitching: "include",
+            });
       this.stream = stream;
       const track = stream.getVideoTracks()[0];
       // 게임 창이 닫히거나 브라우저의 '공유 중지'로 끊긴 경우

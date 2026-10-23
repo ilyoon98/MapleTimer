@@ -10,6 +10,7 @@ import { ScreenTransitionDetector } from "../detect/screenTransition";
 import { profileStore, tts, type Profile } from "../state/profile";
 import { detectBuffs, isBuffPresent, tickBuffTimers, trackBuffIcons } from "./buffs";
 import { tickBooster } from "./booster";
+import { recordClip } from "./clip";
 import { debugCrops, liveStore } from "./live";
 import { tickRune, tickStall } from "./runeStall";
 import { pruneRunners, runnerLabel, runners } from "./shared";
@@ -22,6 +23,7 @@ export { clearSkill, manualSkillCast } from "./skills";
 export { isBuffPresent } from "./buffs";
 export { lastBoosterSegment } from "./booster";
 export { resetTimerAlert } from "./timers";
+export { clipSnapshot, type ClipData } from "./clip";
 
 /* ───────── 메인 루프 ───────── */
 let lastSlow = 0;
@@ -67,6 +69,7 @@ function tickInner(now: number) {
   const live = screenCapture.state === "live" && screenCapture.refresh();
   const prev = liveStore.get();
   const stats = live ? screenCapture.frameStats() : null;
+  recordClip(p, now, live, stats?.mean ?? null);
 
   // 화면 전환 중(맵 이동·로딩으로 화면 전체가 어두워짐)에는 퀵슬롯·버프칸·부스터를 보지 않는다.
   // 실제 게임에서 화면이 어두워질 때 모든 퀵슬롯이 '스킬 사용'으로, 버프가 '사라짐'으로 잘못 잡혔다.

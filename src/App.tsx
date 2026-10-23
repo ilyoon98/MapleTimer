@@ -13,6 +13,7 @@ import { StallPanel } from "./ui/panels/StallPanel";
 import { TimersPanel } from "./ui/panels/TimersPanel";
 import { closePip, openPip, pipStore, pipSupported } from "./ui/Pip";
 import { RegionPicker } from "./ui/RegionPicker";
+import { ReplayLoader } from "./dev/ReplayLoader";
 import { GuideModal } from "./ui/Guide";
 import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
@@ -237,6 +238,7 @@ export function App() {
           }}
         />
       )}
+      {import.meta.env.DEV && new URLSearchParams(location.search).has("replay") && <ReplayLoader />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} />}
       {modal === "guide" && <GuideModal onClose={() => setModal(null)} />}
     </div>
