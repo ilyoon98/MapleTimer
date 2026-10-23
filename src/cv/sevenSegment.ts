@@ -84,7 +84,11 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
     mask[i] = 1;
     if (d[p] - d[p + 2] >= 80) warm[i] = 1;
   }
-  const comps = components8(mask, W, H).filter((c) => c.pixels.length >= 4);
+  // 숫자 막대는 4픽셀 넘게 두껍다. 1~2픽셀 가는 선(상자 뒤로 비치는 'MULTIKILL' 그림 등)과
+  // 영역 가장자리에 걸린 덩어리는 숫자가 아닌데, 숫자 칸에 붙으면 칸 너비가 틀어진다
+  const comps = components8(mask, W, H).filter(
+    (c) => c.pixels.length >= 4 && Math.min(c.w, c.h) >= 3 && c.x > 0 && c.y > 0 && c.x + c.w < W && c.y + c.h < H,
+  );
   // 가로로 겹치는 덩어리끼리 한 칸으로 (막대가 검은 줄로 끊겨 있어도 한 글자로 모인다)
   comps.sort((a, b) => a.x - b.x);
   const cols: Column[] = [];
