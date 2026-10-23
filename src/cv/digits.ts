@@ -195,8 +195,9 @@ export function segment(img: Pixels, o: TextMaskOptions = DEFAULT_TEXT_MASK, sta
       return overlap <= c.pixels.length * 0.5;
     });
   }
-  // 숫자 높이 후보: 영역 높이의 22%~90%
-  const tall = comps.filter((c) => c.h >= Math.max(5, H * 0.22) && c.h <= H * 0.9 && c.w <= c.h * 1.6 + 2 && c.pixels.length >= 6);
+  // 숫자 높이 후보: 영역 높이의 22%~90%. 단 실제 게임 숫자는 12~13px 라서, 아이콘을 여백 있게 잡아
+  // 영역이 커져도(61×62) 8px 이상이면 후보로 둔다 (그대로면 13.6px 미만이라 숫자를 다 버렸다)
+  const tall = comps.filter((c) => c.h >= Math.max(5, Math.min(H * 0.22, 8)) && c.h <= H * 0.9 && c.w <= c.h * 1.6 + 2 && c.pixels.length >= 6);
   if (!tall.length) return { tokens: [], glyphs: [], hasColon: false };
 
   // 게임 숫자는 검은 테두리가 있다: 1~2픽셀 둘레에 어두운 픽셀이 많은 덩어리를 우선한다
@@ -321,9 +322,27 @@ export interface DigitRead {
   confidence: number;
 }
 
+/** 글자를 가로로 sx 배 늘이거나 줄인 모양 (왼쪽 기준) */
+function scaleX(v: Float32Array, sx: number): Float32Array {
+  const o = new Float32Array(GW * GH);
+  for (let y = 0; y < GH; y++)
+    for (let x = 0; x < GW; x++) {
+      const fx = x / sx,
+        x0 = Math.floor(fx),
+        f = fx - x0;
+      if (x0 >= GW) continue;
+      o[y * GW + x] = v[y * GW + x0] * (1 - f) + (x0 + 1 < GW ? v[y * GW + x0 + 1] * f : 0);
+    }
+  return o;
+}
+
 export function classifyGlyph(v: Float32Array, templates: DigitTemplates): { digit: number; score: number; margin: number } {
+  // 같은 게임 숫자도 아이콘에 따라 1px 넓거나 좁게 찍힌다 (야누스 아이콘의 '8' 이 9px → 0.67 로 못 읽음).
+  // 원래 모양과 가로로 한 칸 줄이고 늘인 모양 중 가장 닮은 것으로 비교한다
+  const variants = [v, scaleX(v, 0.9), scaleX(v, 1.1)];
   const best = new Array(10).fill(-1);
-  for (let d = 0; d < 10; d++) for (const t of templates[d] ?? []) best[d] = Math.max(best[d], glyphSimilarity(v, t));
+  for (let d = 0; d < 10; d++)
+    for (const t of templates[d] ?? []) for (const w of variants) best[d] = Math.max(best[d], glyphSimilarity(w, t));
   let d1 = -1,
     s1 = -2,
     s2 = -2;

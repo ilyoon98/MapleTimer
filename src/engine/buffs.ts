@@ -26,6 +26,8 @@ interface BuffRuntime {
   readEsts: EstimateConsensus;
   /** 버프칸 안에서 마지막으로 찾은 아이콘 위치 (버프칸 영역 기준) */
   lastPos: { x: number; y: number } | null;
+  /** 마지막 위치 주변에서 아이콘을 다시 찾은 시각 (이때는 버프칸 전체를 다시 훑지 않는다) */
+  localHitAt: number;
   /** 버프가 끝날 때까지 숫자를 지켜보며 학습 */
   recorder: CooldownSequenceRecorder;
 }
@@ -44,6 +46,7 @@ function buffRuntime(id: string) {
       readText: null,
       readEsts: new EstimateConsensus(2000),
       lastPos: null,
+      localHitAt: 0,
       recorder: new CooldownSequenceRecorder(90, false),
     };
     buffRt.set(id, rt);
@@ -57,18 +60,30 @@ export function isBuffPresent(id: string) {
 export function detectBuffs(p: Profile, now: number, live: boolean) {
   const region = p.regions.buffbar;
   const regionOk = live && regionValidFor(region, screenCapture.width, screenCapture.height);
+  // 버프칸 전체 탐색은 무겁다(화면 오른쪽 절반이면 0.1초). 필요한 버프가 있을 때만 잘라 낸다
   let img: ImageData | null = null;
   let gray: ReturnType<typeof toGray> | null = null;
-  if (regionOk && region) {
-    img = screenCapture.crop(region);
-    if (img) {
-      debugCrops.set("buffbar", img);
-      gray = toGray(img);
+  const fullImage = () => {
+    if (!img && regionOk && region) {
+      img = screenCapture.crop(region);
+      if (img) {
+        debugCrops.set("buffbar", img);
+        gray = toGray(img);
+      }
     }
-  }
+    return img && gray ? { img, gray } : null;
+  };
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
-    if (!b.enabled || !b.template || !img || !gray) continue;
+    if (!b.enabled || !b.template || !regionOk) continue;
+    // 마지막 위치 주변에서 방금(1초 안) 다시 찾은 아이콘은 그대로 있는 것으로 본다 (위치가 바뀌면 놓치고 다시 전체 탐색)
+    if (rt.presence.present && now - rt.localHitAt < 1000) {
+      onBuffEvent(b, rt, rt.presence.observe(true, now), now);
+      continue;
+    }
+    const full = fullImage();
+    if (!full) continue;
+    const { img, gray } = full;
     const t = prepared(b.template);
     const m = findTemplate(img, gray, t, 1)[0];
     rt.score = m?.score ?? 0;
@@ -101,6 +116,9 @@ export function trackBuffIcons(p: Profile, now: number, live: boolean) {
     const m = findTemplate(img, toGray(img), t, 1)[0];
     if (!m || m.score < b.minScore || m.colorDist > 60) continue;
     rt.lastPos = { x: wx + m.x - region.x, y: wy + m.y - region.y };
+    rt.localHitAt = now;
+    rt.score = m.score;
+    rt.colorDist = m.colorDist;
     const icon = cropPixels(img, m.x, m.y, t.gray.width, t.gray.height);
     debugCrops.set(`buff:${b.id}`, new ImageData(new Uint8ClampedArray(icon.data), icon.width, icon.height));
     const seg = segment(icon);

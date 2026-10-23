@@ -79,7 +79,46 @@ function textPixelsDilated(px: Pixels): Uint8Array {
   return m;
 }
 
-export function prepareTemplate(t: StoredTemplate): PreparedTemplate {
+/**
+ * 아이콘을 여백 있게 잡은 템플릿을 검은 테두리 사각형까지만 남기고 자른다.
+ * 실제 게임: 야누스 아이콘을 61×62 로 잡아 바깥 배경이 들어가서, 맵을 옮기니(보라 → 하늘색)
+ * 색 차이가 81 로 기준(60)을 넘어 아이콘이 있는데도 '없음'이 됐다.
+ * 테두리 = 가로·세로로 절반 넘게 이어진 어두운 줄 중 가장 바깥 것. 못 찾으면 그대로 둔다.
+ */
+export function trimToIconBorder(t: StoredTemplate): StoredTemplate {
+  const W = t.width,
+    H = t.height,
+    d = t.rgba;
+  if (W < 30 || H < 30) return t;
+  const dark = (x: number, y: number) => {
+    const p = (y * W + x) * 4;
+    return 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2] < 60;
+  };
+  const longestRun = (n: number, at: (i: number) => boolean) => {
+    let best = 0,
+      cur = 0;
+    for (let i = 0; i < n; i++) best = Math.max(best, (cur = at(i) ? cur + 1 : 0));
+    return best;
+  };
+  const rows: number[] = [],
+    cols: number[] = [];
+  for (let y = 0; y < H; y++) if (longestRun(W, (x) => dark(x, y)) >= W * 0.5) rows.push(y);
+  for (let x = 0; x < W; x++) if (longestRun(H, (y) => dark(x, y)) >= H * 0.5) cols.push(x);
+  if (!rows.length || !cols.length) return t;
+  const top = rows[0],
+    bottom = rows[rows.length - 1],
+    left = cols[0],
+    right = cols[cols.length - 1];
+  const w = right - left + 1,
+    h = bottom - top + 1;
+  if (w < Math.max(24, W * 0.6) || h < Math.max(24, H * 0.6) || (w === W && h === H)) return t;
+  const rgba: number[] = [];
+  for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) rgba.push(...d.slice((y * W + x) * 4, (y * W + x) * 4 + 4));
+  return { ...t, width: w, height: h, rgba };
+}
+
+export function prepareTemplate(stored: StoredTemplate): PreparedTemplate {
+  const t = trimToIconBorder(stored);
   const px: Pixels = { data: Uint8ClampedArray.from(t.rgba), width: t.width, height: t.height };
   const gray = toGray(px);
   const mode = templateMode(t);
