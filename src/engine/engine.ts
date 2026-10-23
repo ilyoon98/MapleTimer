@@ -12,10 +12,11 @@ import { regionValidFor } from "../capture/types";
 import { cropPixels, toGray, type Pixels } from "../cv/image";
 import { findTemplate, prepareTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
 import { ChangeMonitor } from "../detect/changeMonitor";
-import { EstimateConsensus, applyExpiry } from "../detect/consensus";
+import { EstimateConsensus, applyBoosterReading, applyExpiry, keepEndAfterVanish, stepReadTimer } from "../detect/consensus";
 import { PresenceTracker } from "../detect/presence";
 import { QuickslotCastDetector, ReferenceHealer, referenceToPixels, type IconState } from "../detect/quickslotCast";
 import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
+import { ScreenTransitionDetector } from "../detect/screenTransition";
 import { appTicker } from "../core/ticker";
 import { readDigits, segment, staticBrightMask, textMask } from "../cv/digits";
 import { readSevenSegment } from "../cv/sevenSegment";
@@ -611,9 +612,7 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
     const res = rt.recorder.finishNow();
     if (res && b.readTime) learnFrom(res, b.name, now);
     rt.readEsts.reset();
-    // 예정대로 끝났는데 알림 시점이 종료 뒤(음수)라 아직 안 울렸으면 그때까지 종료 시각을 남겨 둔다
-    const pendingAfterEnd = !rt.alerted && b.leadSec < 0 && rt.endsAt != null && rt.endsAt - now <= 5000;
-    if (!pendingAfterEnd) rt.endsAt = null;
+    if (!keepEndAfterVanish(rt.endsAt, rt.alerted, b.leadSec, now)) rt.endsAt = null;
     pauseLinkedTimers(b.id, now);
     if (b.alertOnDisappear) {
       r.reset();
@@ -713,29 +712,21 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
     if (read && read.seconds > 0 && read.seconds < 3600) {
       const agreed = rt.ests.add(frameTime(now) + read.seconds * 1000);
       if (agreed != null) {
-        if (rt.endsAt == null || agreed - rt.endsAt > 5000) {
-          // 새로 확인한 주기: 이미 알림 시점이 지났으면 이번 주기는 조용히 넘긴다
-          rt.endsAt = agreed;
-          rt.alerted = agreed - now <= b.leadSec * 1000;
-          r.reset();
-        } else if (Math.abs(agreed - rt.endsAt) <= 1500) {
-          rt.endsAt = (rt.endsAt + agreed) / 2;
-        } else {
-          // 앞서 잘못 읽은 값으로 잡은 종료 시각을 바로잡는다 (알림 시점이 이미 지났으면 바로 울린다)
-          rt.endsAt = agreed;
-        }
+        const { next, newCycle } = applyBoosterReading(rt, agreed, now, b.leadSec);
+        rt.endsAt = next.endsAt;
+        rt.alerted = next.alerted;
+        if (newCycle) r.reset();
       }
     } else if (!read) {
       rt.ests.reset();
     }
   }
-  if (rt.endsAt != null && !rt.alerted && rt.endsAt - now <= b.leadSec * 1000) {
-    rt.alerted = true;
-    r.trigger(now);
-  }
-  // 끝나는 시각이 3초(알림 시점이 종료 뒤면 그 뒤 1초) 넘게 지났으면 끝난 것으로 본다. 아직 숫자가 보이면 새로 3번 맞춰 다시 잡는다
-  // (예전엔 '20초 동안 못 읽으면'이었는데, 가끔 잘못 읽은 값이 그 시간을 계속 늘려서 '진행 중'에 멈춰 있었다)
-  if (rt.endsAt != null && now > rt.endsAt + Math.max(3000, -b.leadSec * 1000 + 1000)) rt.endsAt = null;
+  // 끝난 뒤 아직 숫자가 보이면 새로 3번 맞춰 다시 잡는다
+  // (예전엔 '20초 동안 못 읽으면' 끝으로 봤는데, 가끔 잘못 읽은 값이 그 시간을 계속 늘려서 '진행 중'에 멈춰 있었다)
+  const step = stepReadTimer(rt, now, b.leadSec);
+  rt.endsAt = step.next.endsAt;
+  rt.alerted = step.next.alerted;
+  if (step.fire) r.trigger(now);
   r.tick(now);
   const status: BoosterLive["status"] = rt.endsAt != null ? "running" : rt.readText ? "reading" : "searching";
   return { readText: rt.readText, lastAlertAt: r.lastFiredAt, status, endsAt: rt.endsAt };
@@ -842,7 +833,7 @@ function tickInner(now: number) {
 
   // 화면 전환 중(맵 이동·로딩으로 화면 전체가 어두워짐)에는 퀵슬롯·버프칸·부스터를 보지 않는다.
   // 실제 게임에서 화면이 어두워질 때 모든 퀵슬롯이 '스킬 사용'으로, 버프가 '사라짐'으로 잘못 잡혔다.
-  const transition = updateScreenTransition(stats, now);
+  const transition = screenTransition.update(stats, now);
   if (transition && !wasTransition) for (const rt of skillRt.values()) rt.detector.interrupt();
   wasTransition = transition;
   const watch = live && !transition;
@@ -891,38 +882,9 @@ function tickInner(now: number) {
   liveStore.set({ now, skills, rune, stall, buffs, booster, ringing, captureStale, captureBlack, screenTransition: transition });
 }
 
-/**
- * 화면 전체 밝기가 평소의 55% 아래로 떨어지면 화면 전환으로 보고, 밝기가 돌아온 뒤 1.5초까지 전환 중으로 친다.
- * 평소 밝기는 전환이 아닐 때만 천천히 따라간다.
- * 밝은 맵에서 어두운 맵으로 오면 계속 '평소보다 어두움'이라 전환이 끝나지 않으므로,
- * 검은 화면은 아닌 채로 3초 넘게 그대로면 그 밝기를 새 평소 밝기로 삼는다.
- */
-let screenBase = 0;
-let transitionUntil = 0;
-let dimSince: number | null = null;
+const screenTransition = new ScreenTransitionDetector();
 let wasTransition = false;
 let wasWatching = false;
-function updateScreenTransition(stats: { mean: number } | null, now: number): boolean {
-  if (!stats) {
-    // 공유가 끊기면 평소 밝기를 새로 잰다 (다시 켠 화면은 전혀 다른 장면일 수 있다)
-    screenBase = 0;
-    transitionUntil = 0;
-    dimSince = null;
-    return false;
-  }
-  if (screenBase > 20 && stats.mean < screenBase * 0.55) {
-    dimSince = stats.mean < 20 ? null : (dimSince ?? now); // 로딩 중 검은 화면은 기다린다
-    if (dimSince != null && now - dimSince >= 3000) {
-      screenBase = stats.mean;
-      dimSince = null;
-      transitionUntil = now;
-    } else transitionUntil = now + 1500;
-  } else {
-    dimSince = null;
-    if (now >= transitionUntil) screenBase = screenBase ? screenBase * 0.9 + stats.mean * 0.1 : stats.mean;
-  }
-  return now < transitionUntil;
-}
 
 /** 감지를 쉬었다가(화면 전환·공유 끊김) 다시 볼 때: 그 사이 바뀐 아이콘을 '방금 사용'으로 보지 않고 숫자로 다시 맞춘다 */
 function resumeSkillWatch() {
