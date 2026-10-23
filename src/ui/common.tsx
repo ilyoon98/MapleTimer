@@ -18,6 +18,14 @@ export function fmtClock(at: number | null | undefined): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
 }
 
+/** 1800 → "30분", 7200 → "2시간", 90 → "1분 30초" */
+export function durationLabel(sec: number) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return [h && `${h}시간`, m && `${m}분`, s && `${s}초`].filter(Boolean).join(" ") || "0초";
+}
+
 export function leadLabel(sec: number) {
   return sec < 0 ? `${-sec}초 후` : `${sec}초 전`;
 }

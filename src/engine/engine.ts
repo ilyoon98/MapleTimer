@@ -461,7 +461,7 @@ export function isBuffPresent(id: string) {
 
 function startLinkedTimers(buffId: string, now: number) {
   for (const t of profileStore.get().timers)
-    if (t.linkedBuffId === buffId) {
+    if (t.enabled && t.linkedBuffId === buffId) {
       if (t.pauseWithoutBuff && t.pausedRemainingMs != null && t.pausedRemainingMs > 0) {
         // 일시정지돼 있던 타이머는 이어서 진행
         updateTimer(t.id, { endsAt: now + t.pausedRemainingMs, pausedRemainingMs: null });
@@ -724,6 +724,11 @@ export function resetTimerAlert(id: string) {
 function tickTimers(p: Profile, now: number) {
   for (const t of p.timers) {
     const r = runner(`timer:${t.id}`, shortName(t.name), () => profileStore.get().timers.find((x) => x.id === t.id)?.alert ?? t.alert);
+    if (!t.enabled) {
+      r.reset();
+      timerAlerted.delete(t.id);
+      continue;
+    }
     if (t.endsAt != null) {
       const remaining = t.endsAt - now;
       if (!timerAlerted.has(t.id) && remaining <= t.leadSec * 1000) {

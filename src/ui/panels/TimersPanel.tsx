@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { liveStore, resetTimerAlert } from "../../engine/engine";
-import { TIMER_PRESETS, newTimer, profileStore, updateTimer, type TimerEntry } from "../../state/profile";
+import { TIMER_PRESETS, TIMER_QUICK_SECS, newTimer, profileStore, updateTimer, type TimerEntry } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
-import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining, leadLabel } from "../common";
 
 export function startTimer(t: TimerEntry, now = Date.now()) {
+  if (!t.enabled) return;
   const remaining = t.pausedRemainingMs ?? t.durationSec * 1000;
   updateTimer(t.id, { endsAt: now + remaining, pausedRemainingMs: null });
   if (t.pausedRemainingMs == null) resetTimerAlert(t.id);
@@ -70,29 +71,50 @@ function TimerRow({ t }: { t: TimerEntry }) {
   const urgent = running && remaining <= t.leadSec * 1000;
   const minutes = Math.floor(t.durationSec / 60);
   const seconds = t.durationSec % 60;
+  const quick = TIMER_QUICK_SECS.includes(t.durationSec);
+  const setEnabled = (v: boolean) => {
+    if (!v) resetTimer(t);
+    updateTimer(t.id, { enabled: v });
+  };
 
   return (
-    <div className="row">
+    <div className={`row ${t.enabled ? "" : "row-off"}`}>
       <div className="row-main">
+        <Toggle checked={t.enabled} onChange={setEnabled} />
         <div className="row-title">
           <div className="name">{t.name}</div>
           <div className="sub">
-            {fmtRemaining(t.durationSec * 1000)} · {leadLabel(t.leadSec)} 알림{t.autoRestart ? " · 자동 반복" : ""}
+            {leadLabel(t.leadSec)} 알림{t.autoRestart ? " · 자동 반복" : ""}
             {t.linkedBuffId ? " · 버프 연계" : ""}
           </div>
         </div>
+        <select
+          aria-label="타이머 시간"
+          value={quick ? t.durationSec : "custom"}
+          onChange={(e) => {
+            if (e.target.value === "custom") setOpen(true);
+            else updateTimer(t.id, { durationSec: Number(e.target.value) });
+          }}
+        >
+          {TIMER_QUICK_SECS.map((sec) => (
+            <option key={sec} value={sec}>
+              {durationLabel(sec)}
+            </option>
+          ))}
+          <option value="custom">{quick ? "직접 입력" : `직접 (${durationLabel(t.durationSec)})`}</option>
+        </select>
         <div className="cell">
           <div className="cell-label">남은 시간</div>
           <div className={`cell-value huge mono ${urgent ? "urgent" : ""}`}>{fmtRemaining(remaining)}</div>
         </div>
-        <StatusDot tone={running ? (urgent ? "alert" : "ok") : paused ? "warn" : "idle"}>
-          {running ? "진행 중" : paused ? "일시정지" : "대기"}
+        <StatusDot tone={!t.enabled ? "idle" : running ? (urgent ? "alert" : "ok") : paused ? "warn" : "idle"}>
+          {!t.enabled ? "꺼짐" : running ? "진행 중" : paused ? "일시정지" : "대기"}
         </StatusDot>
         <div className="row-buttons">
           {running ? (
             <button onClick={() => pauseTimer(t)}>⏸ 일시정지</button>
           ) : (
-            <button className="primary" onClick={() => startTimer(t)}>
+            <button className="primary" disabled={!t.enabled} onClick={() => startTimer(t)}>
               ▶ {paused ? "재개" : "시작"}
             </button>
           )}

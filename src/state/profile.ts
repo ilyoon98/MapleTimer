@@ -199,9 +199,13 @@ export const TIMER_PRESETS: TimerPreset[] = [
   { name: "유니온의 행운 (10분)", sec: 600 },
   { name: "유니온의 행운 (20분)", sec: 1200 },
 ];
+/** 타이머 줄에서 바로 고르는 시간 */
+export const TIMER_QUICK_SECS = [1800, 1200, 600, 7200];
 
 export interface TimerEntry {
   id: string;
+  /** 꺼 두면 시작·알림·버프 연계·PIP 에서 빠진다 */
+  enabled: boolean;
   name: string;
   durationSec: number;
   leadSec: number;
@@ -223,6 +227,7 @@ export interface TimerEntry {
 export function newTimer(preset: TimerPreset): TimerEntry {
   return {
     id: uid(),
+    enabled: true,
     name: preset.name,
     durationSec: preset.sec,
     leadSec: 10,
@@ -342,6 +347,7 @@ export function migrate(raw: unknown): Profile {
     stall: { ...d.stall, ...p.stall, sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity } },
     // 예전 버전에서 저장한 항목엔 새 필드가 없을 수 있음
     buffs: (p.buffs ?? []).map((b) => ({ readTime: b.kind === "expiry", ...(b as Partial<BuffEntry>) }) as BuffEntry),
+    timers: (p.timers ?? d.timers).map((t) => ({ enabled: true, ...(t as Partial<TimerEntry>) }) as TimerEntry),
     regions: { ...p.regions },
     panelOrder: order,
   } as Profile;
