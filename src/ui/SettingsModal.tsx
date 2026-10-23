@@ -5,6 +5,8 @@ import { liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
 import {
+  PIP_ALERT_COLORS,
+  type PipAlertColor,
   PIP_EMPHASIS,
   PIP_ITEMS,
   PIP_SIZES,
@@ -36,6 +38,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const pipSize = profileStore.use((p) => p.pipSize);
   const pipShow = profileStore.use((p) => p.pipShow);
   const randomDelay = profileStore.use((p) => p.randomDelay);
+  const pipAlertColor = profileStore.use((p) => p.pipAlertColor);
+  const pipBackground = profileStore.use((p) => p.pipBackground);
   const pipEmphasis = profileStore.use((p) => p.pipEmphasis);
   const perf = liveStore.use((s) => s.perf);
   const presets = presetStore.use((s) => s.presets);
@@ -212,6 +216,30 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
             <span className="muted small">알림이 울릴 때 PIP 창 모양</span>
+          </div>
+          <div className="field-row">
+            <span className="field-label">PIP 알림색</span>
+            {(Object.keys(PIP_ALERT_COLORS) as PipAlertColor[]).map((k) => {
+              const c = PIP_ALERT_COLORS[k];
+              return (
+                <button
+                  key={k}
+                  className={`color-chip ${pipAlertColor === k ? "color-chip-on" : ""}`}
+                  style={{ "--chip": c.color ?? "var(--alert)" } as React.CSSProperties}
+                  aria-pressed={pipAlertColor === k}
+                  onClick={() => profileStore.set({ pipAlertColor: k })}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="field-row">
+            <Toggle
+              checked={pipBackground}
+              onChange={(v) => profileStore.set({ pipBackground: v })}
+              label="PIP 배경에 공유 중인 게임 화면 깔기 (화면을 공유하면 보여요)"
+            />
           </div>
           <div className="field-row">
             <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="랜덤 지연: 첫 알림을 0~2초 사이로 무작위로 늦추기" />

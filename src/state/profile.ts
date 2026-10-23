@@ -260,6 +260,16 @@ export const PIP_ITEMS: Array<{ id: PipItemKind; label: string }> = [
   { id: "booster", label: "부스터" },
   { id: "timers", label: "일반 타이머" },
 ];
+/** PIP 알림색 (기본은 테마의 빨강) */
+export type PipAlertColor = "theme" | "orange" | "yellow" | "green" | "blue" | "purple";
+export const PIP_ALERT_COLORS: Record<PipAlertColor, { label: string; color: string | null }> = {
+  theme: { label: "빨강 (기본)", color: null },
+  orange: { label: "주황", color: "#f76b15" },
+  yellow: { label: "노랑", color: "#e5b400" },
+  green: { label: "초록", color: "#2f9e5a" },
+  blue: { label: "파랑", color: "#3e63dd" },
+  purple: { label: "보라", color: "#8e4ec6" },
+};
 /** 알림이 울릴 때 PIP 창을 얼마나 눈에 띄게 할지 */
 export type PipEmphasis = "subtle" | "normal" | "strong" | "flash";
 export const PIP_EMPHASIS: Record<PipEmphasis, string> = {
@@ -282,6 +292,9 @@ export interface Profile {
   pipMode: "hunting" | "core";
   pipShow: Record<PipItemKind, boolean>;
   pipEmphasis: PipEmphasis;
+  pipAlertColor: PipAlertColor;
+  /** PIP 배경에 공유 중인 게임 화면 깔기 */
+  pipBackground: boolean;
   /** 음성 읽기 목소리(voiceURI)와 속도 */
   ttsVoice: string | null;
   ttsRate: number;
@@ -311,6 +324,8 @@ export function defaultProfile(): Profile {
     pipMode: "hunting",
     pipShow: { next: true, skills: true, rune: true, stall: true, buffs: true, booster: true, timers: true },
     pipEmphasis: "normal",
+    pipAlertColor: "theme",
+    pipBackground: false,
     ttsVoice: null,
     ttsRate: 1.1,
     randomDelay: false,

@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { screenCapture } from "../capture/screenCapture";
 import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
-import { PIP_SIZES, profileStore, shortName } from "../state/profile";
+import { PIP_ALERT_COLORS, PIP_SIZES, profileStore, shortName, type PipAlertColor } from "../state/profile";
 import { fmtRemaining } from "./common";
 import { pauseTimer, startTimer } from "./panels/TimersPanel";
 
@@ -57,6 +59,35 @@ export function closePip() {
   window.documentPictureInPicture?.window?.close();
 }
 
+/** 고른 알림색으로 PIP 의 알림색 변수를 바꾼다 (기본은 테마 색 그대로) */
+function alertColorStyle(key: PipAlertColor): React.CSSProperties | undefined {
+  const c = PIP_ALERT_COLORS[key]?.color;
+  return c ? ({ "--alert": c, "--alert-soft": `color-mix(in srgb, ${c} 28%, var(--bg))` } as React.CSSProperties) : undefined;
+}
+
+/** 공유 중인 게임 화면을 PIP 배경에 깐다 (설정에서 켰을 때만). 글자가 보이게 어둡게 덮는다 */
+function PipBackground() {
+  const on = profileStore.use((p) => p.pipBackground);
+  const [, force] = useState(0);
+  useEffect(() => screenCapture.onChange(() => force((n) => n + 1)) as () => void, []);
+  const stream = screenCapture.state === "live" ? screenCapture.mediaStream : null;
+  if (!on || !stream) return null;
+  return (
+    <>
+      <video
+        className="pip-bg"
+        autoPlay
+        muted
+        playsInline
+        ref={(v) => {
+          if (v && v.srcObject !== stream) v.srcObject = stream;
+        }}
+      />
+      <div className="pip-bg-shade" />
+    </>
+  );
+}
+
 interface Item {
   key: string;
   name: string;
@@ -81,7 +112,8 @@ function CorePipView() {
   const soon = core != null && rem != null && rem > 0 && rem <= core.leadSec * 1000;
   const ready = rem == null || rem <= 0;
   return (
-    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis}`}>
+    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={alertColorStyle(p.pipAlertColor)}>
+      <PipBackground />
       <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
       <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
       <div className="pip-core-state muted">{!core ? "버프칸 감지에서 '+ 특수 코어'를 추가하세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
@@ -182,7 +214,8 @@ function PipView() {
           : "—";
 
   return (
-    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis}`}>
+    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={alertColorStyle(p.pipAlertColor)}>
+      <PipBackground />
       {next && (
         <div className="pip-next">
           <span className="pip-next-label">다음 알림</span>

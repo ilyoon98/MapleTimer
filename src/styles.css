@@ -1075,3 +1075,70 @@ input[type="text"] {
   font-weight: 700;
   color: var(--alert);
 }
+/* PIP 배경에 공유 화면 */
+.pip {
+  position: relative;
+}
+.pip-bg,
+.pip-bg-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.pip-bg {
+  object-fit: cover;
+}
+.pip-bg-shade {
+  background: rgba(0, 0, 0, 0.35);
+}
+.pip > :not(.pip-bg):not(.pip-bg-shade) {
+  position: relative;
+}
+.pip-with-bg .pip-item,
+.pip-with-bg .pip-chip,
+.pip-with-bg .pip-next {
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  backdrop-filter: blur(2px);
+}
+.pip-with-bg .pip-alert {
+  background: color-mix(in srgb, var(--alert-soft) 85%, transparent);
+}
+.pip-with-bg .pip-foot,
+.pip-with-bg .pip-core-name,
+.pip-with-bg .pip-core-time,
+.pip-with-bg .pip-core-state {
+  color: #fff;
+  text-shadow: 0 1px 3px #000;
+}
+/* 배경 화면을 깔아도 강조가 보이게: 덮개를 알림색으로 */
+.pip-ringing.pip-emph-normal .pip-bg-shade {
+  animation: pip-shade-ring 0.7s infinite alternate;
+}
+.pip-ringing.pip-emph-strong .pip-bg-shade {
+  background: color-mix(in srgb, var(--alert) 65%, transparent);
+}
+.pip-ringing.pip-emph-flash .pip-bg-shade {
+  animation: pip-shade-blink 0.5s steps(1) infinite;
+}
+@keyframes pip-shade-ring {
+  to {
+    background: color-mix(in srgb, var(--alert) 40%, transparent);
+  }
+}
+@keyframes pip-shade-blink {
+  0% {
+    background: color-mix(in srgb, var(--alert) 75%, transparent);
+  }
+  50% {
+    background: rgba(0, 0, 0, 0.35);
+  }
+}
+.color-chip {
+  border-left: 10px solid var(--chip);
+}
+.color-chip-on {
+  outline: 2px solid var(--chip);
+  font-weight: 700;
+}
