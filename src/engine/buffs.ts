@@ -23,6 +23,8 @@ interface BuffRuntime {
   score: number;
   colorDist: number;
   readText: string | null;
+  /** 남은 시간 숫자를 마지막으로 읽은 시각 */
+  lastReadAt: number;
   readEsts: EstimateConsensus;
   /** 버프칸 안에서 마지막으로 찾은 아이콘 위치 (버프칸 영역 기준) */
   lastPos: { x: number; y: number } | null;
@@ -44,6 +46,7 @@ function buffRuntime(id: string) {
       score: 0,
       colorDist: 0,
       readText: null,
+      lastReadAt: 0,
       readEsts: new EstimateConsensus(2000),
       lastPos: null,
       localHitAt: 0,
@@ -139,6 +142,7 @@ function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, 
     rt.readEsts.reset();
     return;
   }
+  rt.lastReadAt = now;
   const agreed = rt.readEsts.add(frameTime(now) + read.seconds * 1000 + 500);
   if (agreed == null) return;
   const { endsAt, change } = applyExpiry(rt.endsAt, agreed, 2500);
@@ -234,7 +238,9 @@ export function tickBuffTimers(p: Profile, now: number) {
         });
         if (!merged) r.trigger(now);
       }
-      if (remaining < -60000 || (b.kind === "expiry" && rt.alerted && !rt.presence.present)) rt.endsAt = null;
+      // 남은 시간을 읽는 버프가 끝나고 3초가 지나도록 숫자가 안 읽히면 끝난 것 (비슷한 아이콘이 잡혀 '있음'으로 남아도)
+      const readEnded = b.readTime && remaining < -3000 && now - rt.lastReadAt > 3000;
+      if (remaining < -60000 || readEnded || (b.kind === "expiry" && rt.alerted && !rt.presence.present)) rt.endsAt = null;
     }
     r.tick(now);
     out[b.id] = {

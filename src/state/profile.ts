@@ -166,7 +166,8 @@ export function newBuff(kind: BuffKind): BuffEntry {
         name: "버프",
         kind,
         template: null,
-        minScore: 0.8,
+        // 실제 게임: 진짜 야누스 아이콘은 0.97~0.99, 퀵슬롯의 다른 스킬 아이콘이 0.83 으로 잡혀 엉뚱한 알림이 울렸다
+        minScore: 0.9,
         durationSec: null,
         leadSec: 20,
         alertOnDisappear: true,
