@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CooldownSequenceRecorder } from "../detect/digitLearner";
-import { classifyGlyph, labelGlyphs, readDigits, segment, staticBrightMask, type DigitTemplates } from "./digits";
+import { GH, GW, classifyGlyph, labelGlyphs, readDigits, segment, staticBrightMask, type DigitTemplates } from "./digits";
+import { gameDigitTemplates } from "./gameDigits";
 import type { Pixels } from "./image";
 
 // 테스트용 5×7 픽셀 글꼴 (실제 게임 글꼴과는 무관)
@@ -108,6 +109,37 @@ describe("숫자 읽기", () => {
   });
 });
 
+/** 기본 숫자 모양(실제 게임에서 모은 평균)을 높이 h 로 키워 노란 글자 + 검은 테두리로 아이콘 위에 그린다 */
+function renderGame(text: string, h: number): Pixels {
+  const w = 48,
+    H = 40;
+  const data = new Uint8ClampedArray(w * H * 4);
+  for (let i = 0; i < w * H; i++) data.set([40 + (i % 7) * 6, 60, 90 + (i % 5) * 8, 255], i * 4); // 무늬 있는 아이콘 배경
+  const T = gameDigitTemplates();
+  const bw = Math.round((h * GW) / GH);
+  const lit: Array<[number, number]> = [];
+  const widths = [...text].map((ch) => (ch === ":" ? 2 : bw));
+  let x = Math.floor((w - widths.reduce((a, b) => a + b + 1, -1)) / 2);
+  const y0 = Math.floor((H - h) / 2);
+  [...text].forEach((ch, i) => {
+    if (ch === ":") for (const dy of [Math.round(h * 0.25), Math.round(h * 0.65)]) lit.push([x, y0 + dy], [x + 1, y0 + dy], [x, y0 + dy + 1], [x + 1, y0 + dy + 1]);
+    else
+      for (let y = 0; y < h; y++)
+        for (let xx = 0; xx < bw; xx++) if (T[Number(ch)][0][Math.floor((y / h) * GH) * GW + Math.floor((xx / bw) * GW)] >= 0.25) lit.push([x + xx, y0 + y]);
+    x += widths[i] + 1;
+  });
+  for (const [px, py] of lit) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) data.set([0, 0, 0, 255], ((py + dy) * w + px + dx) * 4);
+  for (const [px, py] of lit) data.set([216, 211, 62, 255], (py * w + px) * 4);
+  return { data, width: w, height: H };
+}
+
+describe("기본 숫자 모양으로 학습 없이 읽기", () => {
+  // 10px 이하는 10×14 평균 모양을 줄여 그리는 과정에서 모양이 뭉개져 이 테스트 방식으로는 맞지 않는다 (실제 화면은 그 크기로 그려진 숫자)
+  it.each([12, 14])("높이 %ipx 의 게임 모양 숫자를 읽는다", (h) => {
+    for (const text of ["15", "9", "58", "30", "1:07", "2:46"]) expect(readDigits(segment(renderGame(text, h)), gameDigitTemplates())?.text).toBe(text);
+  });
+});
+
 describe("쿨타임 한 바퀴로 숫자 학습", () => {
   it("56 → 1 로 줄어드는 숫자를 끝에서부터 세어 0~9 를 모두 배운다", () => {
     const rec = new CooldownSequenceRecorder();
@@ -155,5 +187,34 @@ describe("쿨타임 한 바퀴로 숫자 학습", () => {
     const r = runSeq(30, 12);
     expect(r?.ok).toBe(false);
     expect(r?.reason).toContain("기준점");
+  });
+
+  /** 맵 이동처럼 감지를 쉬는 동안(from 아래로 skip 초)은 숫자를 못 본 채로 끝까지 */
+  const runWithGap = (from: number, gapAt: number, skip: number, to: number) => {
+    const rec = new CooldownSequenceRecorder();
+    let t = 0;
+    let result = null;
+    for (let v = from; v >= to; v--) {
+      if (v < gapAt && v >= gapAt - skip) {
+        t += 1000; // 이 1초 동안은 감지를 쉬어서 feed 가 없다
+        continue;
+      }
+      for (let k = 0; k < 4; k++, t += 250) result = rec.feed(segment(render(String(v))), t) ?? result;
+    }
+    for (let k = 0; k < 8; k++, t += 250) result = rec.feed(segment(render("")), t) ?? result;
+    return result;
+  };
+  it("중간에 값을 못 본 곳(25..21, 3초 쉼, 17..5)이 있으면 기준점과 이어진 구간만 배운다", () => {
+    const r = runWithGap(25, 21, 3, 5);
+    expect(r?.ok).toBe(true);
+    // 21 의 '2' 를 '1' 로 배우는 식으로 어긋난 이름이 하나도 없어야 한다
+    const truth = segment(render("21")).glyphs.map((g) => g.v);
+    const wrong = r!.samples.filter((s) => truth.some((v, k) => s.v.every((x, i) => x === v[i]) && s.digit !== [2, 1][k]));
+    expect(wrong).toHaveLength(0);
+    expect(r?.reason).toContain("13개 값"); // 17..5
+  });
+  it("10→9 바뀌는 순간을 건너뛰었으면(11 → 8) 기준점으로 쓰지 않는다", () => {
+    const r = runWithGap(30, 10, 2, 1);
+    expect(r?.ok).toBe(false);
   });
 });

@@ -63,6 +63,8 @@ interface Item {
   remaining: number | null;
   urgent: boolean;
   tone: "alert" | "running" | "waiting";
+  /** 알림이 울리기까지 남은 시간(ms). 진행 중이 아니면 null */
+  alertIn?: number | null;
   text?: string;
   /** 누르면 실행할 동작 (스킬: 지금 사용한 것으로 타이머 시작) */
   onClick?: () => void;
@@ -79,7 +81,7 @@ function CorePipView() {
   const soon = core != null && rem != null && rem > 0 && rem <= core.leadSec * 1000;
   const ready = rem == null || rem <= 0;
   return (
-    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize}`}>
+    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis}`}>
       <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
       <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
       <div className="pip-core-state muted">{!core ? "버프칸 감지에서 '+ 특수 코어'를 추가하세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
@@ -106,50 +108,67 @@ function PipView() {
   const live = liveStore.use((s) => s);
   const p = profileStore.use((s) => s);
   const now = live.now;
+  const show = p.pipShow;
   const items: Item[] = [];
 
-  for (const s of p.skills) {
-    if (!s.enabled) continue;
-    const l = live.skills[s.id];
-    const rem = l?.expiresAt != null ? l.expiresAt - now : null;
-    const urgent = rem != null && rem <= s.leadSec * 1000;
-    items.push({
-      key: s.id,
-      name: shortName(s.name),
-      remaining: rem,
-      urgent,
-      tone: urgent ? "alert" : rem != null ? "running" : "waiting",
-      onClick: () => manualSkillCast(s.id),
-      title: "누르면 지금 스킬을 쓴 것으로 타이머를 시작해요",
-    });
-  }
-  for (const b of p.buffs) {
-    if (!b.enabled) continue;
-    const l = live.buffs[b.id];
-    const rem = l?.endsAt != null ? l.endsAt - now : null;
-    const urgent = rem != null && rem <= b.leadSec * 1000;
-    items.push({
-      key: b.id,
-      name: b.name,
-      remaining: rem,
-      urgent,
-      tone: urgent ? "alert" : rem != null || l?.present ? "running" : "waiting",
-      text: rem == null ? (b.kind === "cooldown" ? "사용 가능" : l?.present ? "있음" : "없음") : undefined,
-    });
-  }
-  if (p.booster.enabled && live.booster.endsAt != null) {
+  if (show.skills)
+    for (const s of p.skills) {
+      if (!s.enabled) continue;
+      const l = live.skills[s.id];
+      const rem = l?.expiresAt != null ? l.expiresAt - now : null;
+      const urgent = rem != null && rem <= s.leadSec * 1000;
+      items.push({
+        key: s.id,
+        name: shortName(s.name),
+        remaining: rem,
+        urgent,
+        tone: urgent ? "alert" : rem != null ? "running" : "waiting",
+        alertIn: rem != null ? rem - s.leadSec * 1000 : null,
+        onClick: () => manualSkillCast(s.id),
+        title: "누르면 지금 스킬을 쓴 것으로 타이머를 시작해요",
+      });
+    }
+  if (show.buffs)
+    for (const b of p.buffs) {
+      if (!b.enabled) continue;
+      const l = live.buffs[b.id];
+      const rem = l?.endsAt != null ? l.endsAt - now : null;
+      const urgent = rem != null && rem <= b.leadSec * 1000;
+      items.push({
+        key: b.id,
+        name: b.name,
+        remaining: rem,
+        urgent,
+        tone: urgent ? "alert" : rem != null || l?.present ? "running" : "waiting",
+        alertIn: rem != null ? rem - b.leadSec * 1000 : null,
+        text: rem == null ? (b.kind === "cooldown" ? "사용 가능" : l?.present ? "있음" : "없음") : undefined,
+      });
+    }
+  if (show.booster && p.booster.enabled && live.booster.endsAt != null) {
     const rem = live.booster.endsAt - now;
     const urgent = rem <= p.booster.leadSec * 1000;
-    items.push({ key: "booster", name: "부스터", remaining: rem, urgent, tone: urgent ? "alert" : "running" });
+    items.push({ key: "booster", name: "부스터", remaining: rem, urgent, tone: urgent ? "alert" : "running", alertIn: rem - p.booster.leadSec * 1000 });
   }
-  for (const t of p.timers) {
-    if (!t.enabled) continue;
-    const rem = t.endsAt != null ? t.endsAt - now : t.pausedRemainingMs;
-    const urgent = t.endsAt != null && rem != null && rem <= t.leadSec * 1000;
-    items.push({ key: t.id, name: shortName(t.name), remaining: rem, urgent, tone: urgent ? "alert" : t.endsAt != null ? "running" : "waiting" });
-  }
+  if (show.timers)
+    for (const t of p.timers) {
+      if (!t.enabled) continue;
+      const rem = t.endsAt != null ? t.endsAt - now : t.pausedRemainingMs;
+      const urgent = t.endsAt != null && rem != null && rem <= t.leadSec * 1000;
+      items.push({
+        key: t.id,
+        name: shortName(t.name),
+        remaining: rem,
+        urgent,
+        tone: urgent ? "alert" : t.endsAt != null ? "running" : "waiting",
+        alertIn: t.endsAt != null && rem != null ? rem - t.leadSec * 1000 : null,
+      });
+    }
   const order = { alert: 0, running: 1, waiting: 2 };
   items.sort((a, b) => order[a.tone] - order[b.tone] || (a.remaining ?? Infinity) - (b.remaining ?? Infinity));
+  // 아직 안 울린 알림 중 가장 먼저 울릴 것
+  const next = show.next
+    ? items.filter((it) => it.alertIn != null && it.alertIn > 0).sort((a, b) => a.alertIn! - b.alertIn!)[0]
+    : undefined;
 
   const runeText =
     live.rune.status === "present" ? "룬 있음!" : live.rune.status === "off" ? "꺼짐" : live.rune.status === "searching" ? "찾는 중" : "—";
@@ -163,11 +182,20 @@ function PipView() {
           : "—";
 
   return (
-    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize}`}>
-      <div className="pip-status">
-        <span className={`pip-chip ${live.rune.status === "present" ? "pip-chip-alert" : ""}`}>룬 · {runeText}</span>
-        <span className={`pip-chip ${live.stall.status === "stalled" ? "pip-chip-alert" : ""}`}>사냥 · {stallText}</span>
-      </div>
+    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis}`}>
+      {next && (
+        <div className="pip-next">
+          <span className="pip-next-label">다음 알림</span>
+          <span className="pip-next-name">{next.name}</span>
+          <span className="pip-next-time mono">{fmtRemaining(next.alertIn)}</span>
+        </div>
+      )}
+      {(show.rune || show.stall) && (
+        <div className="pip-status">
+          {show.rune && <span className={`pip-chip ${live.rune.status === "present" ? "pip-chip-alert" : ""}`}>룬 · {runeText}</span>}
+          {show.stall && <span className={`pip-chip ${live.stall.status === "stalled" ? "pip-chip-alert" : ""}`}>사냥 · {stallText}</span>}
+        </div>
+      )}
       <div className="pip-list">
         {items.map((it) => (
           <div

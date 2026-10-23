@@ -249,6 +249,25 @@ export const PIP_SIZES: Record<PipSize, { label: string; width: number; height: 
   medium: { label: "보통", width: 360, height: 320 },
   large: { label: "크게", width: 520, height: 420 },
 };
+/** PIP 에 보여 줄 항목 ('next' = 가장 먼저 울릴 알림을 맨 위에 크게) */
+export type PipItemKind = "next" | "skills" | "rune" | "stall" | "buffs" | "booster" | "timers";
+export const PIP_ITEMS: Array<{ id: PipItemKind; label: string }> = [
+  { id: "next", label: "다음 알림 크게" },
+  { id: "skills", label: "스킬" },
+  { id: "rune", label: "룬" },
+  { id: "stall", label: "사냥 멈춤" },
+  { id: "buffs", label: "버프칸" },
+  { id: "booster", label: "부스터" },
+  { id: "timers", label: "일반 타이머" },
+];
+/** 알림이 울릴 때 PIP 창을 얼마나 눈에 띄게 할지 */
+export type PipEmphasis = "subtle" | "normal" | "strong" | "flash";
+export const PIP_EMPHASIS: Record<PipEmphasis, string> = {
+  subtle: "은은하게 (울리는 항목만 표시)",
+  normal: "보통 (창 테두리 깜빡임)",
+  strong: "강하게 (창 전체를 알림색으로)",
+  flash: "점멸 (창 전체가 깜빡임)",
+};
 
 export interface Profile {
   v: 1;
@@ -261,6 +280,8 @@ export interface Profile {
   pipSize: PipSize;
   /** PIP 표시: 사냥(전체 목록) / 특수 코어(크게 하나) */
   pipMode: "hunting" | "core";
+  pipShow: Record<PipItemKind, boolean>;
+  pipEmphasis: PipEmphasis;
   /** 음성 읽기 목소리(voiceURI)와 속도 */
   ttsVoice: string | null;
   ttsRate: number;
@@ -288,6 +309,8 @@ export function defaultProfile(): Profile {
     alertOnShareEnd: true,
     pipSize: "medium",
     pipMode: "hunting",
+    pipShow: { next: true, skills: true, rune: true, stall: true, buffs: true, booster: true, timers: true },
+    pipEmphasis: "normal",
     ttsVoice: null,
     ttsRate: 1.1,
     randomDelay: false,
@@ -344,6 +367,7 @@ export function migrate(raw: unknown): Profile {
       color: sameColor(p.rune?.color, OLD_DEFAULT_RUNE_COLOR) ? { ...d.rune.color } : { ...d.rune.color, ...p.rune?.color },
     },
     booster: { ...d.booster, ...p.booster },
+    pipShow: { ...d.pipShow, ...p.pipShow },
     stall: { ...d.stall, ...p.stall, sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity } },
     // 예전 버전에서 저장한 항목엔 새 필드가 없을 수 있음
     buffs: (p.buffs ?? []).map((b) => ({ readTime: b.kind === "expiry", ...(b as Partial<BuffEntry>) }) as BuffEntry),

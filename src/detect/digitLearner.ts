@@ -193,21 +193,26 @@ export class CooldownSequenceRecorder {
     const med = durs[Math.floor(durs.length / 2)] ?? 1000;
     if (med < 700 || med > 1400) return { ok: false, reason: `숫자가 1초마다 바뀌지 않아요 (${Math.round(med)}ms)`, samples: [], observed: n };
 
+    // 다음 값까지 1초보다 훨씬 오래 걸린 곳 = 중간 값을 못 본 곳 (맵 이동으로 감지를 쉬었거나 화면이 멈춤).
+    // 그 너머는 1초에 1씩 세면 값이 어긋나서(21 을 18 로) 잘못된 이름으로 배우게 된다
+    const gapAfter = (i: number) => clean[i + 1].first - clean[i].first > med * 1.5;
+
     // 기준점 찾기: 마지막 값은 1이 아닐 수 있다 (실제 게임은 5초 미만이면 숫자를 안 보여줌).
     //  1) 두 자리 → 한 자리로 바뀌는 순간 = 10 → 9
     //  2) 없으면 m:ss → 두 자리로 바뀌는 순간 = 1:00 → 59
+    // 바뀌는 사이에 끊긴 곳은 기준점이 아니다 (11 → 8 처럼 건너뛴 것)
     const plain = (s: SeqState) => !s.colon;
     let anchorIdx = -1,
       anchorValue = 0;
     for (let i = 1; i < n; i++)
-      if (plain(clean[i]) && plain(clean[i - 1]) && clean[i - 1].glyphs.length === 2 && clean[i].glyphs.length === 1) {
+      if (plain(clean[i]) && plain(clean[i - 1]) && clean[i - 1].glyphs.length === 2 && clean[i].glyphs.length === 1 && !gapAfter(i - 1)) {
         anchorIdx = i;
         anchorValue = 9;
         break;
       }
     if (anchorIdx < 0)
       for (let i = 1; i < n; i++)
-        if (clean[i - 1].colon && plain(clean[i]) && clean[i].glyphs.length === 2) {
+        if (clean[i - 1].colon && plain(clean[i]) && clean[i].glyphs.length === 2 && !gapAfter(i - 1)) {
           anchorIdx = i;
           anchorValue = 59;
           break;
@@ -215,9 +220,17 @@ export class CooldownSequenceRecorder {
     if (anchorIdx < 0)
       return { ok: false, reason: "기준점(10→9 또는 1:00→59)을 못 찾았어요. 숫자가 한 자리까지 내려가는 걸 끝까지 보여 주세요", samples: [], observed: n };
 
+    // 기준점에서 끊기지 않고 이어진 구간만 배운다
+    let lo = anchorIdx - 1,
+      hi = anchorIdx;
+    while (lo > 0 && !gapAfter(lo - 1)) lo--;
+    while (hi < n - 1 && !gapAfter(hi)) hi++;
+    if (hi - lo + 1 < 8)
+      return { ok: false, reason: `중간에 끊긴 곳이 있어서 이어서 본 값이 너무 적어요 (${hi - lo + 1}개)`, samples: [], observed: n };
+
     const samples: LearnResult["samples"] = [];
     let mismatch = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = lo; i <= hi; i++) {
       const value = anchorValue + (anchorIdx - i); // 기준점에서 1초에 1씩
       if (value < 1) {
         mismatch++;
@@ -231,7 +244,7 @@ export class CooldownSequenceRecorder {
       clean[i].glyphs.forEach((g, k) => samples.push({ digit: Number(text[k]), v: g.v, h: g.h }));
     }
     if (mismatch > 1) return { ok: false, reason: `글자 수가 안 맞는 값이 ${mismatch}개 있어요`, samples: [], observed: n };
-    const lastValue = anchorValue + (anchorIdx - (n - 1));
-    return { ok: true, reason: `${n}개 값에서 숫자 ${samples.length}개 학습 (마지막으로 보인 값 ${lastValue})`, samples, observed: n };
+    const lastValue = anchorValue + (anchorIdx - hi);
+    return { ok: true, reason: `${hi - lo + 1}개 값에서 숫자 ${samples.length}개 학습 (마지막으로 보인 값 ${lastValue})`, samples, observed: n };
   }
 }

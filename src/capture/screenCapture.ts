@@ -27,6 +27,8 @@ export class ScreenCapture {
   private drawnStamp = -1;
   /** 마지막으로 새 프레임이 들어온 시각 (Date.now). video 대체 경로에서는 알 수 없어 null */
   lastFrameAt: number | null = null;
+  /** 내부 캔버스에 마지막으로 그린 프레임이 들어온 시각 */
+  drawnAt: number | null = null;
   private listeners = new Set<() => void>();
 
   onChange(l: () => void) {
@@ -44,6 +46,7 @@ export class ScreenCapture {
   async start() {
     this.stop("user");
     this.lastFrameAt = null;
+    this.drawnAt = null;
     this.state = "starting";
     this.emit();
     try {
@@ -129,6 +132,7 @@ export class ScreenCapture {
       this.height = h;
       this.ctx.drawImage(src, 0, 0);
       this.drawnStamp = this.frameStamp;
+      this.drawnAt = src instanceof HTMLVideoElement ? Date.now() : this.lastFrameAt;
       if (sizeChanged) this.emit();
     }
     return true;

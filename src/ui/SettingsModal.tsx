@@ -4,7 +4,18 @@ import { screenCapture } from "../capture/screenCapture";
 import { liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
-import { PIP_SIZES, defaultProfile, migrate, profileStore, uid, type PipSize, type ThemeMode } from "../state/profile";
+import {
+  PIP_EMPHASIS,
+  PIP_ITEMS,
+  PIP_SIZES,
+  defaultProfile,
+  migrate,
+  profileStore,
+  uid,
+  type PipEmphasis,
+  type PipSize,
+  type ThemeMode,
+} from "../state/profile";
 import { deletePreset, loadPreset, presetStore, savePreset } from "../state/presets";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
@@ -23,6 +34,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const pipSize = profileStore.use((p) => p.pipSize);
+  const pipShow = profileStore.use((p) => p.pipShow);
+  const pipEmphasis = profileStore.use((p) => p.pipEmphasis);
   const perf = liveStore.use((s) => s.perf);
   const presets = presetStore.use((s) => s.presets);
   const [presetName, setPresetName] = useState("");
@@ -176,6 +189,28 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
             <span className="muted small">다음에 PIP 를 열 때 적용돼요</span>
+          </div>
+          <div className="field-row">
+            <span className="field-label">PIP 표시</span>
+            {PIP_ITEMS.map((it) => (
+              <Toggle
+                key={it.id}
+                checked={pipShow[it.id]}
+                onChange={(v) => profileStore.set((p) => ({ ...p, pipShow: { ...p.pipShow, [it.id]: v } }))}
+                label={it.label}
+              />
+            ))}
+          </div>
+          <div className="field-row">
+            <span className="field-label">PIP 강조</span>
+            <select value={pipEmphasis} onChange={(e) => profileStore.set({ pipEmphasis: e.target.value as PipEmphasis })}>
+              {(Object.keys(PIP_EMPHASIS) as PipEmphasis[]).map((k) => (
+                <option key={k} value={k}>
+                  {PIP_EMPHASIS[k]}
+                </option>
+              ))}
+            </select>
+            <span className="muted small">알림이 울릴 때 PIP 창 모양</span>
           </div>
           <div className="field-row">
             <Toggle

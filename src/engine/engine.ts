@@ -124,6 +124,14 @@ export function getRunner(key: string) {
   return runners.get(key);
 }
 
+/**
+ * 지금 분석 중인 화면이 찍힌 시각. 숫자로 계산하는 종료·사용 시각은 이걸 기준으로 한다.
+ * (게임 창을 내려서 화면이 멈추면 같은 숫자를 계속 읽는데, 지금 시각 기준이면 종료 시각이 계속 늦춰진다)
+ */
+function frameTime(now: number) {
+  return screenCapture.drawnAt ?? now;
+}
+
 /* ───────── 템플릿 캐시 ───────── */
 const templateCache = new WeakMap<StoredTemplate, PreparedTemplate>();
 function prepared(t: StoredTemplate) {
@@ -152,6 +160,8 @@ interface SkillRuntime {
   /** 이번 쿨타임 숫자가 처음 나타난 시각 */
   cycleStart: number | null;
   cycleUsed: boolean;
+  /** 감지를 쉬었다가 다시 보는 중: 그 사이 다시 쓴 스킬이면 숫자로 사용 시각을 다시 맞춘다 */
+  resync: boolean;
   staticKey: unknown;
   staticMask: Uint8Array | null;
   /** 기준 이미지에 숫자가 찍혀 있음 (쿨타임 중에 저장한 듯) */
@@ -177,6 +187,7 @@ function skillRuntime(s: SkillEntry): SkillRuntime {
       digitsAbsentSince: null,
       cycleStart: null,
       cycleUsed: true,
+      resync: false,
       staticKey: undefined,
       staticMask: null,
       refSuspicious: false,
@@ -246,6 +257,7 @@ function tickSkills(p: Profile, now: number, live: boolean) {
           rt.castAt = castAt;
           rt.expiresAt = castAt + s.durationSec * 1000;
           rt.alerted = false;
+          rt.resync = false;
           r.reset();
         };
         // 기준 이미지(사용 가능 상태)에도 있는 밝은 글자(키 이름 등)는 쿨타임 숫자가 아니다
@@ -291,16 +303,21 @@ function tickSkills(p: Profile, now: number, live: boolean) {
           rt.digitsAbsentSince = null;
         } else if (rt.digitsAbsentSince == null) {
           rt.digitsAbsentSince = now;
+        } else if (now - rt.digitsAbsentSince >= 1500) {
+          rt.resync = false; // 스킬이 준비됨: 다음 사용은 평소처럼 잡힌다
         }
 
         const trusted = read && read.seconds >= 2;
+        // 지금 보이는 쿨타임이 알고 있던 사용의 쿨타임일 수 없음 (이전 쿨타임이 이미 끝났어야 함)
+        const unknownCast = rt.castAt == null || (rt.resync && now - rt.castAt >= s.cooldownSec * 1000 - 1000);
         if (trusted && rt.cycleStart != null && !rt.cycleUsed && now - rt.cycleStart <= 3000) {
           // 숫자가 실제로 읽혀야 진짜 쿨타임 시작으로 인정 (아이콘 그림의 밝은 부분 오인 방지)
           rt.cycleUsed = true;
           if (rt.castAt == null || rt.cycleStart - rt.castAt > 3000) startCycle(rt.cycleStart);
-        } else if (trusted && rt.castAt == null && rt.cycleStart == null && read.seconds <= s.cooldownSec + 1) {
-          // 앱을 쿨타임 도중에 켠 경우: 설정한 쿨타임으로 사용 시각을 거꾸로 추정 (3번 일치해야 인정)
-          const agreed = rt.readCasts.add(now - (s.cooldownSec - read.seconds) * 1000 - 500);
+        } else if (trusted && unknownCast && rt.cycleStart == null && read.seconds <= s.cooldownSec + 1) {
+          // 앱을 쿨타임 도중에 켰거나, 공유가 끊긴 사이 스킬을 쓴 경우:
+          // 설정한 쿨타임으로 사용 시각을 거꾸로 추정 (3번 일치해야 인정. 시각은 그 화면이 찍힌 때 기준)
+          const agreed = rt.readCasts.add(frameTime(now) - (s.cooldownSec - read.seconds) * 1000 - 500);
           if (agreed != null) startCycle(agreed);
         } else if (!read) {
           rt.readCasts.reset();
@@ -467,6 +484,8 @@ function startLinkedTimers(buffId: string, now: number) {
         updateTimer(t.id, { endsAt: now + t.pausedRemainingMs, pausedRemainingMs: null });
         continue;
       }
+      // 아이콘이 잠깐 가려졌다 다시 보인 것: 한창 진행 중인 타이머는 처음부터 다시 시작하지 않는다
+      if (t.endsAt != null && t.endsAt - now > 30_000) continue;
       updateTimer(t.id, { endsAt: now + t.durationSec * 1000, pausedRemainingMs: null });
       runners.get(`timer:${t.id}`)?.reset();
       timerAlerted.delete(t.id);
@@ -552,13 +571,15 @@ function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, 
     rt.readEsts.reset();
     return;
   }
-  const agreed = rt.readEsts.add(now + read.seconds * 1000 + 500);
+  const agreed = rt.readEsts.add(frameTime(now) + read.seconds * 1000 + 500);
   if (agreed == null) return;
   const { endsAt, change } = applyExpiry(rt.endsAt, agreed, 2500);
   if (change === "new" || change === "extended") {
     rt.alerted = false;
     runners.get(`buff:${b.id}`)?.reset();
   }
+  // 다시 쓰거나 연장된 버프: 그 전 숫자와 이어서 세면 숫자 이름이 어긋나므로 학습 기록을 새로 시작
+  if (change === "extended") rt.recorder.reset();
   rt.endsAt = endsAt;
 }
 
@@ -590,7 +611,9 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
     const res = rt.recorder.finishNow();
     if (res && b.readTime) learnFrom(res, b.name, now);
     rt.readEsts.reset();
-    rt.endsAt = null;
+    // 예정대로 끝났는데 알림 시점이 종료 뒤(음수)라 아직 안 울렸으면 그때까지 종료 시각을 남겨 둔다
+    const pendingAfterEnd = !rt.alerted && b.leadSec < 0 && rt.endsAt != null && rt.endsAt - now <= 5000;
+    if (!pendingAfterEnd) rt.endsAt = null;
     pauseLinkedTimers(b.id, now);
     if (b.alertOnDisappear) {
       r.reset();
@@ -633,7 +656,7 @@ function tickBuffTimers(p: Profile, now: number) {
         });
         if (!merged) r.trigger(now);
       }
-      if (remaining < -60000) rt.endsAt = null;
+      if (remaining < -60000 || (b.kind === "expiry" && rt.alerted && !rt.presence.present)) rt.endsAt = null;
     }
     r.tick(now);
     out[b.id] = {
@@ -688,7 +711,7 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
     const read = readSevenSegment(img) ?? readDigits(seg, activeTemplates());
     rt.readText = read?.text ?? null;
     if (read && read.seconds > 0 && read.seconds < 3600) {
-      const agreed = rt.ests.add(now + read.seconds * 1000);
+      const agreed = rt.ests.add(frameTime(now) + read.seconds * 1000);
       if (agreed != null) {
         if (rt.endsAt == null || agreed - rt.endsAt > 5000) {
           // 새로 확인한 주기: 이미 알림 시점이 지났으면 이번 주기는 조용히 넘긴다
@@ -697,19 +720,22 @@ function tickBooster(p: Profile, now: number, live: boolean): BoosterLive {
           r.reset();
         } else if (Math.abs(agreed - rt.endsAt) <= 1500) {
           rt.endsAt = (rt.endsAt + agreed) / 2;
+        } else {
+          // 앞서 잘못 읽은 값으로 잡은 종료 시각을 바로잡는다 (알림 시점이 이미 지났으면 바로 울린다)
+          rt.endsAt = agreed;
         }
       }
     } else if (!read) {
       rt.ests.reset();
     }
   }
-  // 끝나는 시각이 3초 넘게 지났으면 끝난 것으로 본다. 아직 숫자가 보이면 새로 3번 맞춰 다시 잡는다
-  // (예전엔 '20초 동안 못 읽으면'이었는데, 가끔 잘못 읽은 값이 그 시간을 계속 늘려서 '진행 중'에 멈춰 있었다)
-  if (rt.endsAt != null && now > rt.endsAt + 3000) rt.endsAt = null;
   if (rt.endsAt != null && !rt.alerted && rt.endsAt - now <= b.leadSec * 1000) {
     rt.alerted = true;
     r.trigger(now);
   }
+  // 끝나는 시각이 3초(알림 시점이 종료 뒤면 그 뒤 1초) 넘게 지났으면 끝난 것으로 본다. 아직 숫자가 보이면 새로 3번 맞춰 다시 잡는다
+  // (예전엔 '20초 동안 못 읽으면'이었는데, 가끔 잘못 읽은 값이 그 시간을 계속 늘려서 '진행 중'에 멈춰 있었다)
+  if (rt.endsAt != null && now > rt.endsAt + Math.max(3000, -b.leadSec * 1000 + 1000)) rt.endsAt = null;
   r.tick(now);
   const status: BoosterLive["status"] = rt.endsAt != null ? "running" : rt.readText ? "reading" : "searching";
   return { readText: rt.readText, lastAlertAt: r.lastFiredAt, status, endsAt: rt.endsAt };
@@ -733,6 +759,8 @@ function tickTimers(p: Profile, now: number) {
       const remaining = t.endsAt - now;
       if (!timerAlerted.has(t.id) && remaining <= t.leadSec * 1000) {
         timerAlerted.add(t.id);
+        // 자동 재시작으로 다시 도는 주기에도 울리도록 지난 주기의 알림 상태를 지운다
+        r.reset();
         r.trigger(now);
       }
       if (remaining <= 0 && remaining <= t.leadSec * 1000) {
@@ -747,6 +775,17 @@ function tickTimers(p: Profile, now: number) {
       }
     }
     r.tick(now);
+  }
+}
+
+/** 지운 스킬·버프·타이머의 알림이 '울리는 중'으로 계속 남지 않게 정리 */
+function pruneRunners(p: Profile) {
+  for (const [key, r] of runners) {
+    const [kind, id] = key.split(":");
+    const list = kind === "skill" ? p.skills : kind === "buff" ? p.buffs : kind === "timer" ? p.timers : null;
+    if (id == null || !list || list.some((x) => x.id === id)) continue;
+    r.reset();
+    runners.delete(key);
   }
 }
 
@@ -803,10 +842,12 @@ function tickInner(now: number) {
 
   // 화면 전환 중(맵 이동·로딩으로 화면 전체가 어두워짐)에는 퀵슬롯·버프칸·부스터를 보지 않는다.
   // 실제 게임에서 화면이 어두워질 때 모든 퀵슬롯이 '스킬 사용'으로, 버프가 '사라짐'으로 잘못 잡혔다.
-  const transition = live && updateScreenTransition(stats, now);
+  const transition = updateScreenTransition(stats, now);
   if (transition && !wasTransition) for (const rt of skillRt.values()) rt.detector.interrupt();
   wasTransition = transition;
   const watch = live && !transition;
+  if (watch && !wasWatching) resumeSkillWatch();
+  wasWatching = watch;
 
   const skills = tickSkills(p, now, watch);
 
@@ -834,6 +875,7 @@ function tickInner(now: number) {
   }
 
   tickTimers(p, now);
+  pruneRunners(p);
   let ringing: string[] = [];
   for (const [key, r] of runners) if (r.isRinging) ringing.push(runnerLabel(key, p));
   if (ringing.join("|") === prev.ringing.join("|")) ringing = prev.ringing; // 바뀐 게 없으면 같은 배열 유지 (불필요한 다시 그리기 방지)
@@ -852,15 +894,45 @@ function tickInner(now: number) {
 /**
  * 화면 전체 밝기가 평소의 55% 아래로 떨어지면 화면 전환으로 보고, 밝기가 돌아온 뒤 1.5초까지 전환 중으로 친다.
  * 평소 밝기는 전환이 아닐 때만 천천히 따라간다.
+ * 밝은 맵에서 어두운 맵으로 오면 계속 '평소보다 어두움'이라 전환이 끝나지 않으므로,
+ * 검은 화면은 아닌 채로 3초 넘게 그대로면 그 밝기를 새 평소 밝기로 삼는다.
  */
 let screenBase = 0;
 let transitionUntil = 0;
+let dimSince: number | null = null;
 let wasTransition = false;
+let wasWatching = false;
 function updateScreenTransition(stats: { mean: number } | null, now: number): boolean {
-  if (!stats) return false;
-  if (screenBase > 20 && stats.mean < screenBase * 0.55) transitionUntil = now + 1500;
-  else if (now >= transitionUntil) screenBase = screenBase ? screenBase * 0.9 + stats.mean * 0.1 : stats.mean;
+  if (!stats) {
+    // 공유가 끊기면 평소 밝기를 새로 잰다 (다시 켠 화면은 전혀 다른 장면일 수 있다)
+    screenBase = 0;
+    transitionUntil = 0;
+    dimSince = null;
+    return false;
+  }
+  if (screenBase > 20 && stats.mean < screenBase * 0.55) {
+    dimSince = stats.mean < 20 ? null : (dimSince ?? now); // 로딩 중 검은 화면은 기다린다
+    if (dimSince != null && now - dimSince >= 3000) {
+      screenBase = stats.mean;
+      dimSince = null;
+      transitionUntil = now;
+    } else transitionUntil = now + 1500;
+  } else {
+    dimSince = null;
+    if (now >= transitionUntil) screenBase = screenBase ? screenBase * 0.9 + stats.mean * 0.1 : stats.mean;
+  }
   return now < transitionUntil;
+}
+
+/** 감지를 쉬었다가(화면 전환·공유 끊김) 다시 볼 때: 그 사이 바뀐 아이콘을 '방금 사용'으로 보지 않고 숫자로 다시 맞춘다 */
+function resumeSkillWatch() {
+  for (const rt of skillRt.values()) {
+    rt.detector.interrupt();
+    rt.digitsAbsentSince = null;
+    rt.cycleStart = null;
+    rt.readCasts.reset();
+    rt.resync = true;
+  }
 }
 
 function runnerLabel(key: string, p: Profile) {
