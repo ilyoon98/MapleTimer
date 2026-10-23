@@ -89,12 +89,13 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
   const comps = components8(mask, W, H).filter(
     (c) => c.pixels.length >= 4 && Math.min(c.w, c.h) >= 3 && c.x > 0 && c.y > 0 && c.x + c.w < W && c.y + c.h < H,
   );
-  // 가로로 겹치는 덩어리끼리 한 칸으로 (막대가 검은 줄로 끊겨 있어도 한 글자로 모인다)
+  // 가로로 겹치거나 2픽셀 안으로 붙은 덩어리끼리 한 칸으로 (막대가 검은 줄로 끊겨 있어도 한 글자로 모인다).
+  // '4' 는 가운데 막대 끝과 오른쪽 막대 사이가 1~2픽셀 떨어져 있어 겹침만 보면 오른쪽만 남아 '1' 이 된다 (54 → 51)
   comps.sort((a, b) => a.x - b.x);
   const cols: Column[] = [];
   for (const c of comps) {
     const last = cols[cols.length - 1];
-    if (last && c.x <= last.x1) {
+    if (last && c.x <= last.x1 + 3) {
       last.x1 = Math.max(last.x1, c.x + c.w - 1);
       last.y0 = Math.min(last.y0, c.y);
       last.y1 = Math.max(last.y1, c.y + c.h - 1);
@@ -210,7 +211,8 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
   // 부스터는 1분이 넘어도 언제나 '초.소수 두 자리'(78.20, 9.54). 이 모양이 아니면 데미지 숫자 같은 잡음.
   // 소수 두 자리는 자리만 있으면 되고(못 읽어도 '?'), 초는 모두 읽혀야 한다
   const m = /^(\d{1,3})\.[\d?]{2}$/.exec(used.map((t) => t.ch).join(""));
-  if (!m) return null;
+  // 부스터는 100초 동안 지속된다
+  if (!m || Number(m[1]) > 100) return null;
   const worst = Math.max(...used.slice(0, m[1].length).map((t) => t.cost));
   // 화면이 36.xx 면 남은 시간은 36~37초 사이 → 가운데 36.5초로 본다
   return { text: m[1], seconds: Number(m[1]) + 0.5, confidence: 1 - worst / 7 };
