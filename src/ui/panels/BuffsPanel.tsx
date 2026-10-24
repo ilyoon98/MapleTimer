@@ -4,8 +4,8 @@ import { liveStore } from "../../engine/engine";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
-import { ItemIcon, LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
-import { templateUrl } from "../gameArt";
+import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 import { BuffbarSteps } from "../guideArt";
 
@@ -37,6 +37,8 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
   return (
     <Panel
       title={isCore ? "특수 코어 알림" : "버프 종료 알림"}
+      icon={isCore ? "💠" : gameIconUrl("fountain")}
+      badge={isCore ? <span className="badge badge-beta">개발 중</span> : undefined}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       actions={
@@ -131,7 +133,6 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
     <div className={`row ${b.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={b.enabled} onChange={(v) => updateBuff(b.id, { enabled: v })} />
-        <ItemIcon src={b.template ? templateUrl(b.template) : null} fallback={isCore ? "💠" : "✨"} />
         <div className="row-title">
           <input className="name-input" value={b.name} aria-label="이름" onChange={(e) => updateBuff(b.id, { name: e.target.value })} />
           <div className="sub">{b.slot ? "버프 즐겨찾기 칸" : "위쪽 버프칸"}</div>

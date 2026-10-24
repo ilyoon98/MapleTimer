@@ -1273,3 +1273,12 @@ input[type="text"] {
 .panel-head .panel-actions {
   cursor: default;
 }
+/* 아직 만드는 중인 칸 */
+.badge-beta {
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: var(--warn);
+}
+.panel-head .item-icon {
+  width: 26px;
+  height: 26px;
+}

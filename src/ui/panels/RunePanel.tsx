@@ -2,7 +2,7 @@ import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { RUNE_TEXT } from "../../alerts/speech";
-import { DebugCrop, ItemIcon, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { DebugCrop, Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { RUNE_ICON } from "../gameArt";
 import { openPicker } from "../pickerStore";
 
@@ -38,11 +38,10 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
     });
 
   return (
-    <Panel title="룬 알림" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <Panel title="룬 알림" icon={RUNE_ICON} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div className={`row ${rune.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={rune.enabled} onChange={(v) => setRune({ enabled: v })} />
-          <ItemIcon src={RUNE_ICON} />
           <div className="row-title">
             <div className="name">룬 감지</div>
             <div className="sub">미니맵에 룬이 뜨면 알려요</div>

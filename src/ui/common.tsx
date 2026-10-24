@@ -87,6 +87,7 @@ export function NumberInput({
 
 export function Panel({
   title,
+  icon,
   badge,
   actions,
   collapsed,
@@ -94,6 +95,8 @@ export function Panel({
   children,
 }: {
   title: string;
+  /** 제목 앞 아이콘 (게임 아이콘 그림 주소 또는 그림 문자) */
+  icon?: string;
   badge?: ReactNode;
   actions?: ReactNode;
   collapsed?: boolean;
@@ -112,6 +115,7 @@ export function Panel({
         <button className="collapse-btn" onClick={onToggleCollapse} aria-label={collapsed ? "펼치기" : "접기"}>
           {collapsed ? "▸" : "▾"}
         </button>
+        {icon && <ItemIcon src={icon.startsWith("data:") ? icon : null} fallback={icon} />}
         <h2>{title}</h2>
         {badge}
         <div className="panel-actions">{actions}</div>

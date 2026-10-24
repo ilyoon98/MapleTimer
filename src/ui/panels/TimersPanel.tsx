@@ -3,7 +3,7 @@ import { liveStore, resetTimerAlert } from "../../engine/engine";
 import { leadText } from "../../alerts/speech";
 import { TIMER_PRESETS, TIMER_QUICK_SECS, newTimer, profileStore, shortName, updateTimer, type TimerEntry } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
-import { ItemIcon, LeadSelect, NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining } from "../common";
+import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining } from "../common";
 
 export function startTimer(t: TimerEntry, now = Date.now()) {
   if (!t.enabled) return;
@@ -26,6 +26,7 @@ export function TimersPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   return (
     <Panel
       title="일반 타이머"
+      icon="⏰"
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       actions={
@@ -86,7 +87,6 @@ function TimerRow({ t }: { t: TimerEntry }) {
     <div className={`row ${t.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={t.enabled} onChange={setEnabled} />
-        <ItemIcon fallback="⏰" />
         <div className="row-title">
           <input className="name-input" value={t.name} aria-label="타이머 이름" onChange={(e) => updateTimer(t.id, { name: e.target.value })} />
         </div>

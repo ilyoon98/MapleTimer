@@ -16,7 +16,7 @@ import {
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { ItemIcon, LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 
@@ -28,6 +28,7 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   return (
     <Panel
       title="스킬 알림"
+      icon={gameIconUrl("janus")}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       actions={
@@ -117,7 +118,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
     <div className={`row ${s.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={s.enabled} onChange={(v) => updateSkill(s.id, { enabled: v })} />
-        <ItemIcon src={precise ? gameIconUrl(preciseIcon(s)!) : s.iconUrl} fallback="⚔" />
         <div className="row-title">
           <select value={s.presetId} onChange={(e) => changePreset(e.target.value)}>
             {SKILL_PRESETS.map((p) => (
