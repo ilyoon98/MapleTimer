@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { storeTemplate, templateMode, type StoredTemplate } from "../../cv/match";
+import { storeTemplate, templateMode, trimToIconBorder, type StoredTemplate } from "../../cv/match";
 import { segment } from "../../cv/digits";
 import { debugCrops, liveStore } from "../../engine/engine";
 import { teachDigits } from "../teachDigits";
@@ -84,11 +84,14 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
   );
 }
 
-function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }) {
+function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: boolean }) {
   const [open, setOpen] = useState(false);
   const live = liveStore.use((l) => l.buffs[b.id]);
   const now = liveStore.use((l) => l.now);
-  const region = profileStore.use((p) => p.regions.buffbar);
+  const barRegion = profileStore.use((p) => p.regions.buffbar);
+  // 정한 자리(버프 즐겨찾기 칸)가 있으면 그 자리만, 없으면 위쪽 버프칸에서 찾는다
+  const region = b.slot ?? barRegion;
+  const hasRegion = b.slot ? true : hasBar;
   const remaining = live?.endsAt != null ? live.endsAt - now : null;
   const isCore = b.kind === "cooldown";
 
@@ -103,6 +106,23 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
       ],
       within: region,
       onConfirm: ({ pixels }) => updateBuff(b.id, { template: storeTemplate(pixels, true) }),
+    });
+
+  const pickSlot = () =>
+    openPicker({
+      title: `'${b.name}' 자리 선택`,
+      guide: [
+        "버프 즐겨찾기로 옮겨 둔 칸을 선택하세요. 이 버프는 이제 그 자리만 확인해요 (빠르고 다른 아이콘과 헷갈리지 않아요).",
+        "아이콘보다 조금 넉넉하게 잡아 주세요. 버프가 걸려 있을 때 잡으면 아이콘도 같이 등록돼요.",
+        "게임에서 칸 위치를 바꾸면 여기서도 다시 선택해 주세요.",
+      ],
+      initial: b.slot ?? null,
+      onConfirm: ({ region: slot, pixels }) => {
+        // 아이콘이 보이는 채로 잡았으면(검은 테두리가 있으면) 아이콘이 없을 때 같이 등록
+        const t = storeTemplate(pixels, true);
+        const withIcon = !b.template && trimToIconBorder(t) !== t;
+        updateBuff(b.id, withIcon ? { slot, template: t } : { slot });
+      },
     });
 
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
@@ -121,7 +141,10 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
         <TemplateThumb t={b.template} />
         <div className="row-title">
           <div className="name">{b.name}</div>
-          <div className="sub">{isCore ? `쿨타임 ${b.durationSec ?? "-"}초 · 카운트다운 ${b.leadSec}초 전부터` : b.durationSec ? `지속 ${Math.round(b.durationSec / 60)}분` : "사라지면 알림"}</div>
+          <div className="sub">
+            {isCore ? `쿨타임 ${b.durationSec ?? "-"}초 · 카운트다운 ${b.leadSec}초 전부터` : b.durationSec ? `지속 ${Math.round(b.durationSec / 60)}분` : "사라지면 알림"}
+            {b.slot ? " · 정한 자리" : ""}
+          </div>
         </div>
         <div className="cell">
           <div className="cell-label">{isCore ? "남은 쿨타임" : "남은 시간"}</div>
@@ -154,6 +177,15 @@ function BuffRow({ buff: b, hasRegion }: { buff: BuffEntry; hasRegion: boolean }
           <div className="field-row">
             <span className="field-label">이름</span>
             <input value={b.name} onChange={(e) => updateBuff(b.id, { name: e.target.value })} />
+          </div>
+          <div className="field-row">
+            <span className="field-label">찾는 곳</span>
+            <select value={b.slot ? "slot" : "bar"} onChange={(e) => (e.target.value === "bar" ? updateBuff(b.id, { slot: null }) : pickSlot())}>
+              <option value="bar">위쪽 버프칸에서 자동으로 찾기</option>
+              <option value="slot">정한 자리만 보기 (버프 즐겨찾기 칸)</option>
+            </select>
+            {b.slot && <button onClick={pickSlot}>자리 다시 선택</button>}
+            {b.slot && <DebugCrop cropKey={`slot:${b.id}`} maxWidth={96} />}
           </div>
           {isCore ? (
             <div className="field-row">

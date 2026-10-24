@@ -84,13 +84,14 @@ describe("부스터 종료 시각 (숫자로 맞추는 타이머)", () => {
 describe("버프 아이콘이 사라질 때 종료 시각 남기기", () => {
   it("예정대로 끝났고 종료 뒤 알림이 남아 있을 때만 남긴다", () => {
     expect(keepEndAfterVanish(60_000, false, -3, 61_000)).toBe(true);
-    expect(keepEndAfterVanish(60_000, true, -3, 61_000)).toBe(false); // 이미 울림
+    expect(keepEndAfterVanish(60_000, true, -3, 61_000)).toBe(false); // 이미 울렸고 끝남
     expect(keepEndAfterVanish(60_000, false, 10, 61_000)).toBe(false); // 종료 전 알림
     expect(keepEndAfterVanish(60_000, false, -3, 30_000)).toBe(false); // 30초 일찍 끝냄(취소)
     expect(keepEndAfterVanish(null, false, -3, 61_000)).toBe(false);
     // 10초 전 알림인데 11초 남기고 아이콘을 놓침(깜빡임) → 알림이 울리도록 남겨 둔다
     expect(keepEndAfterVanish(60_000, false, 10, 49_000)).toBe(true);
     expect(keepEndAfterVanish(60_000, false, 10, 40_000)).toBe(false); // 20초 일찍 사라짐(취소)
-    expect(keepEndAfterVanish(60_000, true, 10, 52_000)).toBe(false); // 이미 울림
+    expect(keepEndAfterVanish(60_000, true, 10, 52_000)).toBe(true); // 이미 울렸어도 끝날 때까지(8초) 남은 시간 표시
+    expect(keepEndAfterVanish(60_000, true, 10, 30_000)).toBe(false); // 30초 일찍 사라짐(취소)
   });
 });

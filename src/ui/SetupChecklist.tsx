@@ -26,6 +26,7 @@ export function SetupChecklist() {
   const skillsOn = p.skills.filter((s) => s.enabled);
   const skillsReady = skillsOn.filter((s) => live && regionValidFor(p.regions[`skill:${s.id}`], w, h) && s.readyRef);
   const buffsOn = p.buffs.filter((b) => b.enabled);
+  const onBar = buffsOn.filter((b) => !b.slot);
 
   const steps: Step[] = [
     {
@@ -67,11 +68,12 @@ export function SetupChecklist() {
       optional: !p.stall.enabled,
     },
     {
-      done: buffsOn.length === 0 || (ok("buffbar") && buffsOn.every((b) => b.template)),
+      // 정한 자리(버프 즐겨찾기 칸)를 쓰는 버프는 위쪽 버프칸이 없어도 된다
+      done: buffsOn.length === 0 || ((onBar.length === 0 || ok("buffbar")) && buffsOn.every((b) => b.template)),
       text:
         buffsOn.length === 0
           ? "버프칸 감지 항목 없음"
-          : `버프칸: ${ok("buffbar") ? "선택됨" : "영역 선택"} · 아이콘 ${buffsOn.filter((b) => b.template).length}/${buffsOn.length}`,
+          : `버프칸: ${onBar.length === 0 ? "정한 자리만 사용" : ok("buffbar") ? "선택됨" : "영역 선택"} · 아이콘 ${buffsOn.filter((b) => b.template).length}/${buffsOn.length}`,
       optional: buffsOn.length === 0,
     },
     {

@@ -8,6 +8,7 @@ import { findTemplate } from "../cv/match";
 import { EstimateConsensus, applyExpiry, keepEndAfterVanish } from "../detect/consensus";
 import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearner";
 import { PresenceTracker } from "../detect/presence";
+import type { SavedRegion } from "../capture/types";
 import { profileStore, tts, type BuffEntry, type Profile } from "../state/profile";
 import { debugCrops, type BuffLive } from "./live";
 import { frameTime, learnFrom, prepared, runner, runners } from "./shared";
@@ -26,7 +27,7 @@ interface BuffRuntime {
   /** 남은 시간 숫자를 마지막으로 읽은 시각 */
   lastReadAt: number;
   readEsts: EstimateConsensus;
-  /** 버프칸 안에서 마지막으로 찾은 아이콘 위치 (버프칸 영역 기준) */
+  /** 마지막으로 찾은 아이콘 위치 (화면 기준) */
   lastPos: { x: number; y: number } | null;
   /** 마지막 위치 주변에서 아이콘을 다시 찾은 시각 (이때는 버프칸 전체를 다시 훑지 않는다) */
   localHitAt: number;
@@ -60,39 +61,53 @@ export function isBuffPresent(id: string) {
   return buffRt.get(id)?.presence.present ?? false;
 }
 
+/**
+ * 일치 기준. 정한 자리는 그 칸만 보므로 다른 아이콘과 헷갈릴 일이 적어 0.85 까지 받아 준다
+ * (실제 게임: 즐겨찾기 칸의 야누스가 0.90~0.92, 끝나기 직전 깜빡일 때 0.87)
+ */
+function minScoreOf(b: BuffEntry): number {
+  return b.slot ? Math.min(b.minScore, 0.85) : b.minScore;
+}
+
+/** 이 버프를 찾을 영역: 정한 자리(버프 즐겨찾기 칸)가 있으면 그 자리만, 없으면 위쪽 버프칸 */
+export function buffRegion(p: Profile, b: BuffEntry): SavedRegion | undefined {
+  return b.slot ?? p.regions.buffbar;
+}
+
+export function buffRegionOk(p: Profile, b: BuffEntry): boolean {
+  return screenCapture.state === "live" && regionValidFor(buffRegion(p, b), screenCapture.width, screenCapture.height);
+}
+
 export function detectBuffs(p: Profile, now: number, live: boolean) {
-  const region = p.regions.buffbar;
-  const regionOk = live && regionValidFor(region, screenCapture.width, screenCapture.height);
-  // 버프칸 전체 탐색은 무겁다(화면 오른쪽 절반이면 0.1초). 필요한 버프가 있을 때만 잘라 낸다
-  let img: ImageData | null = null;
-  let gray: ReturnType<typeof toGray> | null = null;
-  const fullImage = () => {
-    if (!img && regionOk && region) {
-      img = screenCapture.crop(region);
-      if (img) {
-        debugCrops.set("buffbar", img);
-        gray = toGray(img);
-      }
+  // 영역 탐색은 무겁다(버프칸이 넓으면 0.1초). 필요한 버프가 있을 때만, 영역마다 한 번만 잘라 낸다
+  const crops = new Map<string, { img: ImageData; gray: ReturnType<typeof toGray> } | null>();
+  const regionImage = (b: BuffEntry, region: SavedRegion) => {
+    const key = b.slot ? `slot:${b.id}` : "buffbar";
+    if (!crops.has(key)) {
+      const img = screenCapture.crop(region);
+      if (img) debugCrops.set(b.slot ? `slot:${b.id}` : "buffbar", img);
+      crops.set(key, img ? { img, gray: toGray(img) } : null);
     }
-    return img && gray ? { img, gray } : null;
+    return crops.get(key) ?? null;
   };
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
-    if (!b.enabled || !b.template || !regionOk) continue;
+    const region = buffRegion(p, b);
+    if (!b.enabled || !b.template || !live || !region || !regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
     // 마지막 위치 주변에서 방금(1초 안) 다시 찾은 아이콘은 그대로 있는 것으로 본다 (위치가 바뀌면 놓치고 다시 전체 탐색)
     if (rt.presence.present && now - rt.localHitAt < 1000) {
       onBuffEvent(b, rt, rt.presence.observe(true, now), now);
       continue;
     }
-    const full = fullImage();
+    const full = regionImage(b, region);
     if (!full) continue;
     const { img, gray } = full;
     const t = prepared(b.template);
     const m = findTemplate(img, gray, t, 1)[0];
     rt.score = m?.score ?? 0;
     rt.colorDist = m?.colorDist ?? 0;
-    const hit = !!m && m.score >= b.minScore && m.colorDist <= 60;
-    if (hit && m) rt.lastPos = { x: m.x, y: m.y };
+    const hit = !!m && m.score >= minScoreOf(b) && m.colorDist <= 60;
+    if (hit && m) rt.lastPos = { x: region.x + m.x, y: region.y + m.y };
     const ev = rt.presence.observe(hit, now);
     onBuffEvent(b, rt, ev, now);
     if (!hit) rt.readText = null;
@@ -104,21 +119,21 @@ export function detectBuffs(p: Profile, now: number, live: boolean) {
  * (버프칸 전체 탐색은 0.5초마다, 이건 작은 창이라 가볍다)
  */
 export function trackBuffIcons(p: Profile, now: number, live: boolean) {
-  const region = p.regions.buffbar;
-  if (!live || !regionValidFor(region, screenCapture.width, screenCapture.height)) return;
+  if (!live) return;
   for (const b of p.buffs) {
     if (!b.enabled || !b.template || !b.readTime || b.kind !== "expiry") continue;
+    if (!regionValidFor(buffRegion(p, b), screenCapture.width, screenCapture.height)) continue;
     const rt = buffRuntime(b.id);
     if (!rt.presence.present || !rt.lastPos) continue;
     const t = prepared(b.template);
     const pad = 4;
-    const wx = Math.max(0, region.x + rt.lastPos.x - pad);
-    const wy = Math.max(0, region.y + rt.lastPos.y - pad);
+    const wx = Math.max(0, rt.lastPos.x - pad);
+    const wy = Math.max(0, rt.lastPos.y - pad);
     const img = screenCapture.crop({ x: wx, y: wy, w: t.gray.width + pad * 2, h: t.gray.height + pad * 2 });
     if (!img) continue;
     const m = findTemplate(img, toGray(img), t, 1)[0];
-    if (!m || m.score < b.minScore || m.colorDist > 60) continue;
-    rt.lastPos = { x: wx + m.x - region.x, y: wy + m.y - region.y };
+    if (!m || m.score < minScoreOf(b) || m.colorDist > 60) continue;
+    rt.lastPos = { x: wx + m.x, y: wy + m.y };
     rt.localHitAt = now;
     rt.score = m.score;
     rt.colorDist = m.colorDist;
@@ -206,8 +221,6 @@ function onBuffEvent(b: BuffEntry, rt: BuffRuntime, ev: "appeared" | "disappeare
 
 export function tickBuffTimers(p: Profile, now: number) {
   const out: Record<string, BuffLive> = {};
-  const live = screenCapture.state === "live";
-  const regionOk = live && regionValidFor(p.regions.buffbar, screenCapture.width, screenCapture.height);
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
     const r = buffRunner(b, rt);
@@ -240,11 +253,11 @@ export function tickBuffTimers(p: Profile, now: number) {
       }
       // 남은 시간을 읽는 버프가 끝나고 3초가 지나도록 숫자가 안 읽히면 끝난 것 (비슷한 아이콘이 잡혀 '있음'으로 남아도)
       const readEnded = b.readTime && remaining < -3000 && now - rt.lastReadAt > 3000;
-      if (remaining < -60000 || readEnded || (b.kind === "expiry" && rt.alerted && !rt.presence.present)) rt.endsAt = null;
+      if (remaining < -60000 || readEnded || (b.kind === "expiry" && rt.alerted && !rt.presence.present && remaining <= 0)) rt.endsAt = null;
     }
     r.tick(now);
     out[b.id] = {
-      regionOk,
+      regionOk: buffRegionOk(p, b),
       present: rt.presence.present,
       score: rt.score,
       colorDist: rt.colorDist,

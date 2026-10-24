@@ -123,6 +123,11 @@ export interface BuffEntry {
   countdownVoice: boolean;
   /** 아이콘 위 남은 시간 숫자를 읽어 종료 시각을 맞춤 (정밀 감지) */
   readTime: boolean;
+  /**
+   * 정한 자리: 버프 즐겨찾기로 옮겨 둔 칸처럼 사용자가 직접 정한 위치. 있으면 그 자리만 확인하고,
+   * 없으면 위쪽 버프칸 안에서 자동으로 찾는다 (원래 사이트 방식)
+   */
+  slot?: SavedRegion | null;
   alert: AlertConfig;
 }
 

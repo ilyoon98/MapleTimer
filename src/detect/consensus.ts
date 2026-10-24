@@ -82,8 +82,10 @@ export function stepReadTimer(cur: ReadTimer, now: number, leadSec: number): { n
  * 그보다 일찍 끝냈거나(취소) 이미 울렸으면 치운다.
  */
 export function keepEndAfterVanish(endsAt: number | null, alerted: boolean, leadSec: number, now: number): boolean {
-  if (alerted || endsAt == null) return false;
+  if (endsAt == null) return false;
   const left = endsAt - now;
+  // 이미 울렸어도 끝날 때까지 남은 시간은 계속 보여 준다 (끝나기 직전 아이콘이 깜빡여 9초에서 사라지던 문제)
+  if (alerted) return left > 0 && left <= (Math.max(leadSec, 0) + 5) * 1000;
   if (leadSec < 0) return left <= 5000;
   return left > 0 && left <= (leadSec + 5) * 1000;
 }

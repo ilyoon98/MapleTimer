@@ -68,7 +68,7 @@ const SECTIONS: Array<{ id: string; title: string; body: ReactNode }> = [
             버프 정렬 옵션: <b>모두 켜기</b>
           </li>
           <li>
-            버프칸에서 감지할 버프는 <b>버프 즐겨찾기에서 빼기</b>
+            버프 즐겨찾기로 옮긴 버프는 항목의 <b>찾는 곳 → 정한 자리만 보기</b>로 그 칸을 직접 선택
           </li>
         </ul>
         <p>해상도나 UI 크기를 바꾸면 영역을 다시 골라야 해요.</p>
