@@ -28,6 +28,18 @@ const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => 
   timers: (p) => <TimersPanel {...p} />,
 };
 
+/** 화면 테마: 자동(윈도우 설정 따라가기) → 어둡게 → 밝게 순서로 바꾼다 */
+function ThemeButton() {
+  const theme = profileStore.use((p) => p.theme);
+  const next = theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
+  const label = theme === "system" ? "🖥 자동" : theme === "dark" ? "🌙 어둡게" : "☀ 밝게";
+  return (
+    <button title="화면 테마 바꾸기 (자동 = 윈도우 설정 따라가기)" onClick={() => profileStore.set({ theme: next })}>
+      {label}
+    </button>
+  );
+}
+
 function useCaptureState() {
   const [, force] = useState(0);
   useEffect(() => {
@@ -142,6 +154,7 @@ export function App() {
         {pipSupported() && (
           <button onClick={() => (pipOpen ? closePip() : openPip())}>{pipOpen ? "PIP 닫기" : "PIP 타이머"}</button>
         )}
+        <ThemeButton />
         <button onClick={() => setModal("settings")}>설정</button>
         <ShareChip />
       </header>

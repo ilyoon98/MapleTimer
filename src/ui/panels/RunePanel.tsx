@@ -2,7 +2,8 @@ import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { RUNE_TEXT } from "../../alerts/speech";
-import { Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { DebugCrop, ItemIcon, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { RUNE_ICON } from "../gameArt";
 import { openPicker } from "../pickerStore";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
@@ -41,6 +42,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
       <div className={`row ${rune.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={rune.enabled} onChange={(v) => setRune({ enabled: v })} />
+          <ItemIcon src={RUNE_ICON} />
           <div className="row-title">
             <div className="name">룬 감지</div>
             <div className="sub">미니맵에 룬이 뜨면 알려요</div>
@@ -60,6 +62,13 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
         </div>
         <div className="row-sub">
           <AlertSettings value={rune.alert} onChange={(alert) => setRune({ alert })} speech={RUNE_TEXT} />
+          {region && (
+            <div className="field-row">
+              <span className="field-label">지금 미니맵</span>
+              <DebugCrop cropKey="minimap" boxes={live.boxes} maxWidth={240} />
+              <span className="muted small">초록 상자 = 찾은 룬</span>
+            </div>
+          )}
         </div>
       </div>
     </Panel>

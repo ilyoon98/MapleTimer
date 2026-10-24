@@ -2,7 +2,7 @@ import { liveStore } from "../../engine/engine";
 import { STALL_DEFAULT_SEC, STALL_RANGE, profileStore, setRegion, type StallMode, type StallSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { STALL_TEXT } from "../../alerts/speech";
-import { NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { ItemIcon, NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { openPicker } from "../pickerStore";
 
 const MODES: Record<StallMode, { label: string; guide: string[] }> = {
@@ -64,6 +64,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
       <div className={`row ${st.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={st.enabled} onChange={(v) => setStall({ enabled: v })} />
+          <ItemIcon fallback="🐾" />
           <div className="row-title">
             <select
               value={st.mode}

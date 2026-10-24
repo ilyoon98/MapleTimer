@@ -63,6 +63,8 @@ export interface SkillEntry {
   alert: AlertConfig;
   readyRef: ReadyReference | null;
   options: QuickslotOptions;
+  /** 영역을 고를 때 화면에서 따 둔 스킬 아이콘 (항목 앞에 보여 줌) */
+  iconUrl?: string;
   /** (정밀) 스킬의 감지 위치: 위쪽 기본 버프칸(자동) 또는 버프 즐겨찾기(위치를 한 번 정해 모든 정밀 스킬이 같이 씀) */
   where?: "bar" | "favorites";
 }

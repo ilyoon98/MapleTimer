@@ -2,7 +2,7 @@ import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { LeadSelect, Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
+import { ItemIcon, LeadSelect, Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
@@ -42,6 +42,7 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
       <div className={`row ${b.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={b.enabled} onChange={(v) => setBooster({ enabled: v })} />
+          <ItemIcon fallback="🚀" />
           <div className="row-title">
             <div className="name">부스터 타이머</div>
             <div className="sub">화면 위쪽 남은 시간 숫자를 읽어요</div>

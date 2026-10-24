@@ -16,7 +16,8 @@ import {
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { ItemIcon, LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 
 const STATE_LABEL = { ready: "사용 가능", cooling: "쿨타임", unknown: "판별 불가" } as const;
@@ -86,7 +87,12 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
       initial: region,
       onConfirm: ({ region, pixels }) => {
         setRegion(`skill:${s.id}`, region);
-        updateSkill(s.id, { readyRef: makeReference(pixels) });
+        // 고른 칸의 모습을 항목 앞 아이콘으로도 쓴다 (사용자 화면의 실제 스킬 아이콘)
+        const c = document.createElement("canvas");
+        c.width = pixels.width;
+        c.height = pixels.height;
+        c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height), 0, 0);
+        updateSkill(s.id, { readyRef: makeReference(pixels), iconUrl: c.toDataURL() });
         if (segment(pixels).glyphs.length > 0)
           alert("선택한 칸에 쿨타임 숫자가 보이는 것 같아요.\n스킬이 준비된(숫자 없는 밝은) 모습이 3초쯤 보이면 자동으로 다시 맞출게요.");
       },
@@ -111,6 +117,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
     <div className={`row ${s.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={s.enabled} onChange={(v) => updateSkill(s.id, { enabled: v })} />
+        <ItemIcon src={precise ? gameIconUrl(preciseIcon(s)!) : s.iconUrl} fallback="⚔" />
         <div className="row-title">
           <select value={s.presetId} onChange={(e) => changePreset(e.target.value)}>
             {SKILL_PRESETS.map((p) => (

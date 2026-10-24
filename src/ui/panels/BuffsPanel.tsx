@@ -1,21 +1,14 @@
 import { useState } from "react";
-import { storeTemplate, trimToIconBorder, type StoredTemplate } from "../../cv/match";
+import { storeTemplate, trimToIconBorder } from "../../cv/match";
 import { liveStore } from "../../engine/engine";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
-import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { ItemIcon, LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { templateUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 import { BuffbarSteps } from "../guideArt";
 
-function TemplateThumb({ t }: { t: StoredTemplate | null }) {
-  if (!t) return <span className="thumb thumb-empty">?</span>;
-  const c = document.createElement("canvas");
-  c.width = t.width;
-  c.height = t.height;
-  c.getContext("2d")!.putImageData(new ImageData(Uint8ClampedArray.from(t.rgba), t.width, t.height), 0, 0);
-  return <img className="thumb" src={c.toDataURL()} width={32} height={32} alt="" />;
-}
 
 /**
  * 원래 사이트처럼 두 칸으로 나눈다: '버프 종료 알림'(kind expiry)과 '특수 코어 알림'(kind cooldown).
@@ -138,7 +131,7 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
     <div className={`row ${b.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={b.enabled} onChange={(v) => updateBuff(b.id, { enabled: v })} />
-        <TemplateThumb t={b.template} />
+        <ItemIcon src={b.template ? templateUrl(b.template) : null} fallback={isCore ? "💠" : "✨"} />
         <div className="row-title">
           <input className="name-input" value={b.name} aria-label="이름" onChange={(e) => updateBuff(b.id, { name: e.target.value })} />
           <div className="sub">{b.slot ? "버프 즐겨찾기 칸" : "위쪽 버프칸"}</div>

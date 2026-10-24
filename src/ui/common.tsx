@@ -102,7 +102,13 @@ export function Panel({
 }) {
   return (
     <section className="panel">
-      <header className="panel-head">
+      <header
+        className="panel-head"
+        onClick={(e) => {
+          // 제목줄 아무 데나 누르면 접고 펼친다 (오른쪽 버튼·목록을 누른 건 빼고)
+          if (!(e.target as HTMLElement).closest(".panel-actions, .collapse-btn")) onToggleCollapse?.();
+        }}
+      >
         <button className="collapse-btn" onClick={onToggleCollapse} aria-label={collapsed ? "펼치기" : "접기"}>
           {collapsed ? "▸" : "▾"}
         </button>
@@ -129,6 +135,11 @@ export function LeadSelect({ value, onChange, options = LEADS }: { value: number
       ))}
     </select>
   );
+}
+
+/** 항목 앞 아이콘: 게임 아이콘 그림이 있으면 그것, 없으면 그림 문자 */
+export function ItemIcon({ src, fallback = "•" }: { src?: string | null; fallback?: string }) {
+  return <span className="item-icon">{src ? <img src={src} alt="" /> : <span>{fallback}</span>}</span>;
 }
 
 export function StatusDot({ tone, children }: { tone: "ok" | "warn" | "alert" | "idle" | "info"; children: ReactNode }) {
