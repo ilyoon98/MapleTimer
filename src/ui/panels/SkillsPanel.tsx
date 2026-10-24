@@ -3,11 +3,8 @@ import { screenCapture } from "../../capture/screenCapture";
 import { regionValidFor } from "../../capture/types";
 import { segment } from "../../cv/digits";
 import { makeReference } from "../../detect/quickslotCast";
-import { clearSkill, liveStore, manualSkillCast } from "../../engine/engine";
+import { liveStore } from "../../engine/engine";
 import {
-  LEAD_MAX,
-  LEAD_MIN,
-  LEAD_MIN_INSTALL,
   SKILL_PRESETS,
   newSkill,
   preciseIcon,
@@ -19,7 +16,7 @@ import {
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATE_LABEL = { ready: "사용 가능", cooling: "쿨타임", unknown: "판별 불가" } as const;
@@ -30,7 +27,6 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   return (
     <Panel
       title="스킬 알림"
-      badge={<span className="badge">퀵슬롯 감지</span>}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       actions={
@@ -47,11 +43,8 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
       }
     >
       <p className="panel-hint">
-        우하단 퀵슬롯의 스킬 아이콘을 <b>쿨타임 숫자까지 포함해서</b> 선택하면, 아이콘이 어두워지는 순간을 스킬 사용 시점으로 보고
-        지속시간이 끝나기 전에 알려줘요. 영역은 <b>스킬을 쓸 수 있는 상태(밝은 아이콘)</b>일 때 선택해 주세요.
-        <br />
-        처음 한 번은 스킬을 쓰고 <b>숫자가 한 자리가 될 때까지</b> 두세요. 쿨타임 숫자 모양을 자동으로 배워서, 그다음부터는 숫자로도 사용 시점을
-        맞춰요.
+        <b>(정밀)</b> 스킬은 버프 아이콘의 남은 시간을 읽어요. 감지 위치만 고르면 돼요. 설치기 스킬은 오른쪽 아래 퀵슬롯에서 그 스킬 칸을{" "}
+        <b>쓸 수 있는 상태(밝은 아이콘)</b>일 때 '영역 선택'으로 골라 주세요.
       </p>
       {skills.length === 0 && <div className="empty">등록된 스킬이 없어요.</div>}
       {skills.map((s) => (
@@ -61,15 +54,17 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   );
 }
 
+/** 알림 시점: 고르기만 하게 단순하게 */
+const LEADS = [0, 3, 5, 10, 15, 20, 30];
+
 function SkillRow({ skill: s }: { skill: SkillEntry }) {
-  const [open, setOpen] = useState(false);
   const live = liveStore.use((l) => l.skills[s.id]);
   const now = liveStore.use((l) => l.now);
   const region = profileStore.use((p) => p.regions[`skill:${s.id}`]);
   const sharing = liveStore.use(() => screenCapture.state === "live");
   const regionOk = sharing && regionValidFor(region, screenCapture.width, screenCapture.height);
   const remaining = live?.expiresAt != null ? live.expiresAt - now : null;
-  const leadMin = s.presetId === "class-install" ? LEAD_MIN_INSTALL : LEAD_MIN;
+  const preset = SKILL_PRESETS.find((x) => x.id === s.presetId);
   // (정밀): 퀵슬롯 대신 버프 아이콘의 남은 시간을 읽는다. 감지 위치만 고르면 된다
   const precise = !!preciseIcon(s);
   const onFavorites = s.where === "favorites";
@@ -89,133 +84,115 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
 
   const pickRegion = () =>
     openPicker({
-      title: `${shortName(s.name)} 퀵슬롯 아이콘 선택`,
-      guide: [
-        "우하단 퀵슬롯에서 이 스킬 아이콘을 쿨타임 숫자까지 들어가게 선택하세요.",
-        "스킬을 쓸 수 있는 상태(밝은 아이콘)에서 선택해야 해요. 이 모습을 '사용 가능' 기준으로 저장합니다.",
-        "노란색 스킬 아이콘은 판별이 불안정할 수 있어요.",
-      ],
+      title: `${shortName(s.name)} 퀵슬롯 칸 선택`,
+      guide: ["오른쪽 아래 퀵슬롯에서 이 스킬 칸을 쿨타임 숫자까지 들어가게 선택하세요.", "스킬을 쓸 수 있는 상태(밝은 아이콘)에서 선택해 주세요."],
       initial: region,
       onConfirm: ({ region, pixels }) => {
         setRegion(`skill:${s.id}`, region);
         updateSkill(s.id, { readyRef: makeReference(pixels) });
         if (segment(pixels).glyphs.length > 0)
-          alert(
-            "선택한 아이콘에 쿨타임 숫자가 보이는 것 같아요.\n'사용 가능' 기준은 스킬이 준비된(숫자 없는 밝은) 모습이어야 해요.\n\n일단 저장해 두고, 스킬이 준비된 모습이 3초쯤 보이면 자동으로 다시 맞출게요.",
-          );
+          alert("선택한 칸에 쿨타임 숫자가 보이는 것 같아요.\n스킬이 준비된(숫자 없는 밝은) 모습이 3초쯤 보이면 자동으로 다시 맞출게요.");
       },
     });
 
+  const changePreset = (id: string) => {
+    const p = SKILL_PRESETS.find((x) => x.id === id);
+    if (p) updateSkill(s.id, { presetId: p.id, name: p.name, durationSec: p.durationSec, cooldownSec: p.cooldownSec });
+  };
+
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
   if (!s.enabled) status = { tone: "idle", text: "꺼짐" };
-  else if (precise && remaining != null) status = { tone: "ok", text: "지속 중" };
-  else if (precise && !sharing) status = { tone: "warn", text: "화면 공유 필요" };
-  else if (precise && onFavorites && !favOk) status = { tone: "warn", text: "즐겨찾기 위치 선택 필요" };
-  else if (precise) status = { tone: "info", text: live?.iconState === "ready" ? "아이콘 찾음" : "감지 대기" };
   else if (remaining != null && remaining <= s.leadSec * 1000) status = { tone: "alert", text: remaining > 0 ? "곧 종료" : "종료됨" };
   else if (remaining != null) status = { tone: "ok", text: "지속 중" };
   else if (!sharing) status = { tone: "warn", text: "화면 공유 필요" };
+  else if (precise && onFavorites && !favOk) status = { tone: "warn", text: "즐겨찾기 위치 선택 필요" };
+  else if (precise) status = { tone: "info", text: live?.iconState === "ready" ? "아이콘 찾음" : "감지 대기" };
   else if (!regionOk) status = { tone: "warn", text: "영역 선택 필요" };
-  else if (!s.readyRef) status = { tone: "warn", text: "기준 이미지 필요" };
-  else status = { tone: "info", text: `대기 · ${STATE_LABEL[live?.iconState ?? "unknown"]}` };
+  else status = { tone: "info", text: `감지 대기 · ${STATE_LABEL[live?.iconState ?? "unknown"]}` };
+
+  const leads = LEADS.includes(s.leadSec) ? LEADS : [...LEADS, s.leadSec].sort((x, y) => x - y);
 
   return (
     <div className={`row ${s.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={s.enabled} onChange={(v) => updateSkill(s.id, { enabled: v })} />
         <div className="row-title">
-          <div className="name">{s.name}</div>
-          <div className="sub">{precise ? (onFavorites ? "버프 즐겨찾기" : "기본 버프칸") : `지속 ${s.durationSec}초 · 쿨 ${s.cooldownSec}초`}</div>
+          <select value={s.presetId} onChange={(e) => changePreset(e.target.value)}>
+            {SKILL_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <div className="sub">{precise ? (onFavorites ? "버프 즐겨찾기" : "기본 버프칸") : `퀵슬롯 · 지속 ${s.durationSec}초`}</div>
         </div>
         <div className="cell">
           <div className="cell-label">알림 시점</div>
-          <div className="cell-value">{leadLabel(s.leadSec)}</div>
+          <select value={s.leadSec} onChange={(e) => updateSkill(s.id, { leadSec: Number(e.target.value) })}>
+            {leads.map((v) => (
+              <option key={v} value={v}>
+                {v === 0 ? "끝날 때" : v > 0 ? `${v}초 전` : `끝나고 ${-v}초 뒤`}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="cell">
           <div className="cell-label">남은 시간</div>
-          <div className={`cell-value big mono ${remaining != null && remaining <= s.leadSec * 1000 ? "urgent" : ""}`}>
-            {fmtRemaining(remaining)}
-          </div>
+          <div className={`cell-value big mono ${remaining != null && remaining <= s.leadSec * 1000 ? "urgent" : ""}`}>{fmtRemaining(remaining)}</div>
         </div>
         <StatusDot tone={status.tone}>{status.text}</StatusDot>
         <div className="row-buttons">
           {!precise && <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>}
-          {!precise && (
-            <button title="지금 스킬을 썼다고 보고 타이머 시작" onClick={() => manualSkillCast(s.id)}>
-              ▶ 수동 시작
-            </button>
-          )}
-          <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
-            {open ? "▴" : "▾"}
+          <button
+            className="icon-btn danger"
+            aria-label="삭제"
+            title="삭제"
+            onClick={() => {
+              if (!confirm(`'${s.name}' 항목을 삭제할까요?`)) return;
+              setRegion(`skill:${s.id}`, null);
+              profileStore.set((p) => ({ ...p, skills: p.skills.filter((x) => x.id !== s.id) }));
+            }}
+          >
+            🗑
           </button>
         </div>
       </div>
-      {precise && (
-        <div className="field-row precise-where">
-          <span className="field-label">감지 위치</span>
-          <div className="seg">
-            <button className={onFavorites ? "" : "on"} onClick={() => updateSkill(s.id, { where: "bar" })}>
-              기본 버프칸
-            </button>
-            <button
-              className={onFavorites ? "on" : ""}
-              onClick={() => {
-                updateSkill(s.id, { where: "favorites" });
-                if (!favRegion) pickFavorites();
-              }}
-            >
-              버프 즐겨찾기
-            </button>
-          </div>
-          {onFavorites ? (
-            <>
-              <button onClick={pickFavorites}>{favRegion ? "위치 변경" : "위치 선택"}</button>
-              <span className="muted small">즐겨찾기 위치는 이 방식을 쓰는 모든 정밀 스킬에 함께 적용돼요.</span>
-            </>
-          ) : (
-            <span className="muted small">게임 화면 오른쪽 위의 기본 버프칸에서 찾아요. 이 스킬은 버프 즐겨찾기에서 빼 주세요.</span>
-          )}
-        </div>
-      )}
-      {open && (
-        <div className="row-detail">
-          <div className="detail-grid">
-            <div>
-              <div className="field-row">
-                <span className="field-label">이름</span>
-                <input value={s.name} onChange={(e) => updateSkill(s.id, { name: e.target.value })} />
-              </div>
-              {!precise && (
-              <div className="field-row">
-                <span className="field-label">지속시간</span>
-                <NumberInput value={s.durationSec} min={1} max={3600} suffix="초" onChange={(v) => updateSkill(s.id, { durationSec: v })} />
-                <span className="field-label">쿨타임</span>
-                <NumberInput value={s.cooldownSec} min={1} max={3600} suffix="초" onChange={(v) => updateSkill(s.id, { cooldownSec: v })} />
-              </div>
-              )}
-              <div className="field-row">
-                <span className="field-label">알림 시점</span>
-                <NumberInput value={s.leadSec} min={leadMin} max={LEAD_MAX} suffix="초 전" onChange={(v) => updateSkill(s.id, { leadSec: v })} />
-                <span className="muted">음수면 종료 후 (예: -3 → 3초 후)</span>
-              </div>
-              <AlertSettings value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} speech={leadText(shortName(s.name), s.leadSec)} />
-              <div className="field-row">
-                <button onClick={() => clearSkill(s.id)}>타이머 초기화</button>
-                <button
-                  className="danger"
-                  onClick={() => {
-                    if (!confirm(`'${s.name}' 항목을 삭제할까요?`)) return;
-                    setRegion(`skill:${s.id}`, null);
-                    profileStore.set((p) => ({ ...p, skills: p.skills.filter((x) => x.id !== s.id) }));
-                  }}
-                >
-                  삭제
-                </button>
-              </div>
+      <div className="row-sub">
+        <AlertSettings value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} speech={leadText(shortName(s.name), s.leadSec)} />
+        {precise && (
+          <div className="field-row">
+            <span className="field-label">감지 위치</span>
+            <div className="seg">
+              <button className={onFavorites ? "" : "on"} onClick={() => updateSkill(s.id, { where: "bar" })}>
+                기본 버프칸
+              </button>
+              <button
+                className={onFavorites ? "on" : ""}
+                onClick={() => {
+                  updateSkill(s.id, { where: "favorites" });
+                  if (!favRegion) pickFavorites();
+                }}
+              >
+                버프 즐겨찾기
+              </button>
             </div>
+            {onFavorites ? (
+              <>
+                <button onClick={pickFavorites}>{favRegion ? "위치 변경" : "위치 선택"}</button>
+                <span className="muted small">즐겨찾기 위치는 이 방식을 쓰는 모든 정밀 스킬에 함께 적용돼요.</span>
+              </>
+            ) : (
+              <span className="muted small">게임 화면 오른쪽 위의 기본 버프칸에서 찾아요. 이 스킬은 버프 즐겨찾기에서 빼 주세요.</span>
+            )}
           </div>
-        </div>
-      )}
+        )}
+        {preset?.editable && (
+          <div className="field-row">
+            <span className="field-label">지속시간</span>
+            <NumberInput value={s.durationSec} min={1} max={3600} suffix="초" onChange={(v) => updateSkill(s.id, { durationSec: v })} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
