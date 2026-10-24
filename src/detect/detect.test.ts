@@ -166,7 +166,7 @@ const minimapBg = () => solid(160, 100, [60, 70, 60]);
 describe("룬 감지", () => {
   const minimap = minimapBg;
   // 실제 미니맵의 룬: 흰 테두리를 두른 보라 마름모
-  const ringed = (img: ReturnType<typeof minimapBg>, x: number, y: number, w: number, h: number, c: number[]) =>
+  const ringed = (img: ReturnType<typeof minimapBg>, x: number, y: number, w: number, h: number, c: [number, number, number]) =>
     paint(paint(img, x - 2, y - 2, w + 4, h + 4, [235, 235, 240]), x, y, w, h, c);
   const withRune = (x: number, y: number) => ringed(minimap(), x, y, 7, 7, [200, 60, 230]);
 

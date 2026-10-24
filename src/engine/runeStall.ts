@@ -2,10 +2,10 @@ import { RUNE_TEXT, STALL_TEXT } from "../alerts/speech";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { ChangeMonitor } from "../detect/changeMonitor";
-import { RuneTracker, detectRuneByColor, detectRuneByTemplate, type RuneBox } from "../detect/rune";
+import { DEFAULT_RUNE_COLOR, RuneTracker, detectRuneByColor, type RuneBox } from "../detect/rune";
 import { profileStore, type Profile } from "../state/profile";
 import { debugCrops, type RuneLive, type StallLive } from "./live";
-import { prepared, runner } from "./shared";
+import { runner } from "./shared";
 
 /* ───────── 룬 ───────── */
 const runeTracker = new RuneTracker();
@@ -32,9 +32,8 @@ export function tickRune(p: Profile, now: number, live: boolean, prev: RuneLive)
   if (!img) return { ...base, status: "no-region" };
   debugCrops.set("minimap", img);
   const boxes =
-    p.rune.mode === "template" && p.rune.template
-      ? detectRuneByTemplate(img, prepared(p.rune.template), p.rune.templateMinScore)
-      : detectRuneByColor(img, p.rune.color);
+    // 룬 모양은 프로그램에 들어 있다 (흰 테두리를 두른 보라 마름모). 사용자가 따로 등록하지 않는다
+    detectRuneByColor(img, DEFAULT_RUNE_COLOR);
   const obs = runeTracker.observe(img, boxes, now);
   if (obs.mapChange || !obs.present) r.reset();
   if (obs.newRune) r.trigger(now);

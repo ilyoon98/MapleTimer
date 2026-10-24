@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { screenCapture } from "../../capture/screenCapture";
 import { regionValidFor } from "../../capture/types";
-import { segment, staticBrightMask } from "../../cv/digits";
-import { digitStore, learnedDigitCount } from "../../detect/digitLearner";
-import { teachDigits } from "../teachDigits";
-import { makeReference, referenceToPixels } from "../../detect/quickslotCast";
-import { clearSkill, debugCrops, liveStore, manualSkillCast } from "../../engine/engine";
+import { segment } from "../../cv/digits";
+import { makeReference } from "../../detect/quickslotCast";
+import { clearSkill, liveStore, manualSkillCast } from "../../engine/engine";
 import {
   LEAD_MAX,
   LEAD_MIN,
@@ -20,7 +18,7 @@ import {
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATE_LABEL = { ready: "사용 가능", cooling: "쿨타임", unknown: "판별 불가" } as const;
@@ -62,30 +60,6 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   );
 }
 
-/** 저장된 '사용 가능' 기준 이미지(흑백)를 보여준다 */
-function RefThumb({ skill: s }: { skill: SkillEntry }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const r = s.readyRef;
-  useEffect(() => {
-    const c = ref.current;
-    if (!c || !r) return;
-    c.width = r.width;
-    c.height = r.height;
-    const img = new ImageData(r.width, r.height);
-    r.data.forEach((v, i) => img.data.set([v, v, v, 255], i * 4));
-    c.getContext("2d")!.putImageData(img, 0, 0);
-  }, [r]);
-  const suspicious = useMemo(() => !!r && segment(referenceToPixels(r)).glyphs.length > 0, [r]);
-  if (!r) return <div className="debug-empty">없음</div>;
-  const scale = Math.max(1, Math.min(6, Math.floor(160 / r.width)));
-  return (
-    <>
-      <canvas ref={ref} className="debug-crop" style={{ width: r.width * scale, height: r.height * scale }} />
-      {suspicious && <div className="small warn-text">⚠ 숫자가 찍혀 있어요 (준비된 모습이 보이면 자동으로 다시 맞춰요)</div>}
-    </>
-  );
-}
-
 function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const [open, setOpen] = useState(false);
   const live = liveStore.use((l) => l.skills[s.id]);
@@ -95,7 +69,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const regionOk = sharing && regionValidFor(region, screenCapture.width, screenCapture.height);
   const remaining = live?.expiresAt != null ? live.expiresAt - now : null;
   const leadMin = s.presetId === "class-install" ? LEAD_MIN_INSTALL : LEAD_MIN;
-  const learnedCount = digitStore.use((d) => learnedDigitCount(d));
 
   const pickRegion = () =>
     openPicker({
@@ -115,11 +88,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
           );
       },
     });
-
-  const saveReadyNow = () => {
-    const img = debugCrops.get(`skill:${s.id}`);
-    if (img) updateSkill(s.id, { readyRef: makeReference(img) });
-  };
 
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
   if (!s.enabled) status = { tone: "idle", text: "꺼짐" };
@@ -193,76 +161,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
                 >
                   삭제
                 </button>
-              </div>
-            </div>
-            <div className="diag">
-              <div className="diag-title">진단</div>
-              <div className="diag-pair">
-                <div>
-                  <div className="muted small">지금 화면</div>
-                  <DebugCrop cropKey={`skill:${s.id}`} maxWidth={160} />
-                </div>
-                <div>
-                  <div className="muted small">'사용 가능' 기준</div>
-                  <RefThumb skill={s} />
-                </div>
-              </div>
-              <p className="muted small">
-                기준 이미지는 쿨타임 숫자 없이 <b>밝은 아이콘</b>이어야 해요. 숫자가 찍혀 있으면 스킬이 준비됐을 때 아래 버튼으로 다시 저장하세요.
-              </p>
-              <div className="diag-values mono">
-                <div>
-                  상태: <b>{STATE_LABEL[live?.iconState ?? "unknown"]}</b>
-                </div>
-                <div>
-                  쿨타임 숫자: <b>{live?.digitText ?? "--"}</b>
-                  {live?.digitText && ` (일치 ${live.digitConf.toFixed(2)})`}
-                </div>
-                <div>
-                  추가 학습: {learnedCount}/10 자리
-                  {live?.learning ? ` · 관찰 중 (${live.learnObserved}개 값)` : ""}
-                  {live?.learnMessage && !live.learning ? ` · 마지막: ${live.learnMessage}` : ""}
-                </div>
-                <div>
-                  기준과 차이: {Number.isFinite(live?.diff) ? live!.diff.toFixed(1) : "--"} (≤ {s.options.readyMaxDiff} 이면 사용 가능)
-                </div>
-                <div>
-                  밝기 비율: {Number.isFinite(live?.lumaRatio) ? live!.lumaRatio.toFixed(2) : "--"} (≤ {s.options.coolingLumaRatio} 이면 쿨타임)
-                </div>
-              </div>
-              <div className="field-row">
-                <button onClick={saveReadyNow} disabled={!regionOk}>
-                  지금 모습을 '사용 가능' 기준으로 저장
-                </button>
-                <button
-                  disabled={!regionOk}
-                  title="자동 학습이 잘 안 될 때: 쿨타임 숫자가 보이는 순간 눌러서 직접 입력"
-                  onClick={() => {
-                    const img = debugCrops.get(`skill:${s.id}`);
-                    const r = s.readyRef;
-                    const staticMask = r && img && r.width === img.width && r.height === img.height ? staticBrightMask(r.data, r.width, r.height) : null;
-                    teachDigits(img ? segment(img, undefined, staticMask) : null, "퀵슬롯");
-                  }}
-                >
-                  숫자 직접 가르치기
-                </button>
-              </div>
-              <div className="field-row">
-                <span className="field-label">허용 차이</span>
-                <NumberInput
-                  value={s.options.readyMaxDiff}
-                  min={2}
-                  max={80}
-                  onChange={(v) => updateSkill(s.id, { options: { ...s.options, readyMaxDiff: v } })}
-                />
-                <span className="field-label">어두움 비율</span>
-                <NumberInput
-                  value={s.options.coolingLumaRatio}
-                  min={0.3}
-                  max={0.98}
-                  step={0.02}
-                  onChange={(v) => updateSkill(s.id, { options: { ...s.options, coolingLumaRatio: v } })}
-                />
               </div>
             </div>
           </div>

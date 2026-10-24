@@ -38,23 +38,6 @@ function useCaptureState() {
   return { state: screenCapture.state, w: screenCapture.width, h: screenCapture.height };
 }
 
-/** 공유 중인 화면 한 장을 PNG 로 내려받는다 (실제 게임 화면으로 기준값을 맞출 때 사용) */
-function saveFrame() {
-  const c = screenCapture.snapshot();
-  if (!c) return;
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  const name = `maple-frame-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`;
-  c.toBlob((blob) => {
-    if (!blob) return;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }, "image/png");
-}
-
 function ShareChip() {
   const cap = useCaptureState();
   const stale = liveStore.use((s) => s.captureStale);
@@ -84,9 +67,6 @@ function ShareChip() {
           "화면 공유 중"
         )}{" "}
         {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
-        <button title="지금 공유 중인 게임 화면을 PNG 로 저장 (감지 기준 조정용)" onClick={saveFrame}>
-          화면 저장
-        </button>
         <button onClick={start}>다른 창 선택</button>
         <button onClick={() => screenCapture.stop("user")}>중지</button>
       </div>

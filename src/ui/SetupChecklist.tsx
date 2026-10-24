@@ -59,7 +59,7 @@ export function SetupChecklist() {
     {
       done: !p.rune.enabled || ok("minimap"),
       text: p.rune.enabled ? (ok("minimap") ? "룬: 미니맵 선택됨" : "룬: 미니맵 영역 선택") : "룬 알림 꺼짐",
-      hint: "사냥터에서 미니맵 안쪽만 선택, 룬이 떴을 때 '룬 아이콘 등록' 하면 더 정확",
+      hint: "사냥터에서 미니맵 안쪽만 선택",
       optional: !p.rune.enabled,
     },
     {
