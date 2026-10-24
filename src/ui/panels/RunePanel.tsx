@@ -44,7 +44,6 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
           <Toggle checked={rune.enabled} onChange={(v) => setRune({ enabled: v })} />
           <div className="row-title">
             <div className="name">룬 감지</div>
-            <div className="sub">미니맵에 룬이 뜨면 알려요</div>
           </div>
           <div className="cell">
             <div className="cell-label">찾은 룬</div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { type AlertConfig } from "../alerts/alertRunner";
+import { LeadSelect } from "./common";
 import { type BeepPattern, type SoundSpec } from "../alerts/audio";
 import { listCustomSounds, type CustomSound } from "../alerts/customSounds";
 
@@ -37,7 +38,18 @@ function useCustomSounds() {
  * - 반복: 3초 간격 고정, '한 번만' 또는 '계속 반복'(멈출 때까지)
  * speech: 음성 읽기일 때 읽을 문장 (항목 이름으로 알아서 만든 것이라 사용자가 쓰지 않는다)
  */
-export function AlertSettings({ value, onChange, speech }: { value: AlertConfig; onChange: (v: AlertConfig) => void; speech: string }) {
+export function AlertSettings({
+  value,
+  onChange,
+  speech,
+  lead,
+}: {
+  value: AlertConfig;
+  onChange: (v: AlertConfig) => void;
+  speech: string;
+  /** 알림 시점도 이 줄에 같이 (반복 바로 앞) */
+  lead?: { value: number; onChange: (v: number) => void; options?: number[] };
+}) {
   const sounds = useCustomSounds();
   const s = value.sound;
   const key = s.kind === "tts" ? "tts" : s.kind === "beep" ? `beep:${s.pattern}` : `custom:${s.soundId}`;
@@ -54,7 +66,7 @@ export function AlertSettings({ value, onChange, speech }: { value: AlertConfig;
     <div className="field-row alert-settings">
       <span className="field-label">알림음</span>
       <select value={key} onChange={(e) => pick(e.target.value)}>
-        <option value="tts">음성 읽기 ("{speech}")</option>
+        <option value="tts">음성 읽기</option>
         {BEEPS.map(([id, name]) => (
           <option key={id} value={`beep:${id}`}>
             비프음 · {name}
@@ -69,6 +81,12 @@ export function AlertSettings({ value, onChange, speech }: { value: AlertConfig;
       <span className="field-label">볼륨</span>
       <input type="range" min={0} max={maxVol * 100} step={5} value={vol} onChange={(e) => onChange({ ...value, volume: Number(e.target.value) / 100 })} />
       <span className="mono">{vol}%</span>
+      {lead && (
+        <>
+          <span className="field-label">알림 시점</span>
+          <LeadSelect value={lead.value} onChange={lead.onChange} options={lead.options} />
+        </>
+      )}
       <span className="field-label">반복</span>
       <select
         value={value.repeat.enabled ? "loop" : "once"}

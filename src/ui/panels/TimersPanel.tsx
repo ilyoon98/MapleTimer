@@ -3,7 +3,7 @@ import { liveStore, resetTimerAlert } from "../../engine/engine";
 import { leadText } from "../../alerts/speech";
 import { TIMER_PRESETS, TIMER_QUICK_SECS, newTimer, profileStore, shortName, updateTimer, type TimerEntry } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
-import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining } from "../common";
 
 export function startTimer(t: TimerEntry, now = Date.now()) {
   if (!t.enabled) return;
@@ -141,10 +141,13 @@ function TimerRow({ t }: { t: TimerEntry }) {
         </div>
       </div>
       <div className="row-sub">
-        <AlertSettings value={t.alert} onChange={(alert) => updateTimer(t.id, { alert })} speech={leadText(shortName(t.name), t.leadSec)} />
+        <AlertSettings
+          value={t.alert}
+          onChange={(alert) => updateTimer(t.id, { alert })}
+          speech={leadText(shortName(t.name), t.leadSec)}
+          lead={{ value: t.leadSec, options: TIMER_LEADS, onChange: (leadSec) => updateTimer(t.id, { leadSec }) }}
+        />
         <div className="field-row">
-          <span className="field-label">알림 시점</span>
-          <LeadSelect value={t.leadSec} options={TIMER_LEADS} onChange={(leadSec) => updateTimer(t.id, { leadSec })} />
           {custom && (
             <>
               <span className="field-label">시간</span>

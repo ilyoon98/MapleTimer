@@ -16,7 +16,7 @@ import {
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 
@@ -44,10 +44,6 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
         </>
       }
     >
-      <p className="panel-hint">
-        <b>(정밀)</b> 스킬은 버프 아이콘의 남은 시간을 읽어요. 감지 위치만 고르면 돼요. 설치기 스킬은 오른쪽 아래 퀵슬롯에서 그 스킬 칸을{" "}
-        <b>쓸 수 있는 상태(밝은 아이콘)</b>일 때 '영역 선택'으로 골라 주세요.
-      </p>
       {skills.length === 0 && <div className="empty">등록된 스킬이 없어요.</div>}
       {skills.map((s) => (
         <SkillRow key={s.id} skill={s} />
@@ -126,11 +122,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
               </option>
             ))}
           </select>
-          <div className="sub">{precise ? (onFavorites ? "버프 즐겨찾기" : "기본 버프칸") : `퀵슬롯 · 지속 ${s.durationSec}초`}</div>
-        </div>
-        <div className="cell">
-          <div className="cell-label">알림 시점</div>
-          <LeadSelect value={s.leadSec} onChange={(leadSec) => updateSkill(s.id, { leadSec })} />
         </div>
         <div className="cell">
           <div className="cell-label">남은 시간</div>
@@ -154,7 +145,12 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
         </div>
       </div>
       <div className="row-sub">
-        <AlertSettings value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} speech={leadText(shortName(s.name), s.leadSec)} />
+        <AlertSettings
+          value={s.alert}
+          onChange={(alert) => updateSkill(s.id, { alert })}
+          speech={leadText(shortName(s.name), s.leadSec)}
+          lead={{ value: s.leadSec, onChange: (leadSec) => updateSkill(s.id, { leadSec }) }}
+        />
         {precise && (
           <div className="field-row">
             <span className="field-label">감지 위치</span>
@@ -172,14 +168,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
                 버프 즐겨찾기
               </button>
             </div>
-            {onFavorites ? (
-              <>
-                <button onClick={pickFavorites}>{favRegion ? "위치 변경" : "위치 선택"}</button>
-                <span className="muted small">즐겨찾기 위치는 이 방식을 쓰는 모든 정밀 스킬에 함께 적용돼요.</span>
-              </>
-            ) : (
-              <span className="muted small">게임 화면 오른쪽 위의 기본 버프칸에서 찾아요. 이 스킬은 버프 즐겨찾기에서 빼 주세요.</span>
-            )}
+            {onFavorites && <button onClick={pickFavorites}>{favRegion ? "위치 변경" : "위치 선택"}</button>}
           </div>
         )}
         {preset?.editable && (

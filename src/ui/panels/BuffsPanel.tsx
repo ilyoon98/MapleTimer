@@ -4,7 +4,7 @@ import { liveStore } from "../../engine/engine";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
-import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 import { BuffbarSteps } from "../guideArt";
@@ -53,7 +53,7 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
         </>
       }
     >
-      {howto ? (
+      {howto && (
         <div className="howto-card">
           <div className="howto-head">
             <b>버프 종료 알림 설정 방법</b>
@@ -61,12 +61,6 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
           </div>
           <BuffbarSteps />
         </div>
-      ) : (
-        <p className="panel-hint">
-          {isCore
-            ? "특수 코어가 발동해 버프칸에 아이콘이 뜨면 쿨타임을 세고, 다시 쓸 수 있을 때 알려요."
-            : "오른쪽 위 버프칸에서 등록한 아이콘을 찾아 남은 시간을 읽고 끝나기 전에 알려요. 처음이면 '설정 방법'을 눌러 보세요."}
-        </p>
       )}
       {buffs.length === 0 && (
         <div className="empty">
@@ -135,17 +129,6 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
         <Toggle checked={b.enabled} onChange={(v) => updateBuff(b.id, { enabled: v })} />
         <div className="row-title">
           <input className="name-input" value={b.name} aria-label="이름" onChange={(e) => updateBuff(b.id, { name: e.target.value })} />
-          <div className="sub">{b.slot ? "버프 즐겨찾기 칸" : "위쪽 버프칸"}</div>
-        </div>
-        <div className="cell">
-          <div className="cell-label">{isCore ? "숫자 세기" : "알림 시점"}</div>
-          {isCore ? (
-            <LeadSelect value={b.leadSec} options={[0, 3, 5, 10]} onChange={(leadSec) => updateBuff(b.id, { leadSec })} />
-          ) : b.readTime || b.durationSec != null ? (
-            <LeadSelect value={b.leadSec} onChange={(leadSec) => updateBuff(b.id, { leadSec })} />
-          ) : (
-            <div className="cell-value">사라지면</div>
-          )}
         </div>
         <div className="cell">
           <div className="cell-label">{isCore ? "남은 쿨타임" : "남은 시간"}</div>
@@ -176,6 +159,13 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
           value={b.alert}
           onChange={(alert) => updateBuff(b.id, { alert })}
           speech={isCore ? b.name : b.durationSec != null || b.readTime ? leadText(b.name, b.leadSec) : doneText(b.name)}
+          lead={
+            isCore
+              ? { value: b.leadSec, options: [0, 3, 5, 10], onChange: (leadSec) => updateBuff(b.id, { leadSec }) }
+              : b.readTime || b.durationSec != null
+                ? { value: b.leadSec, onChange: (leadSec) => updateBuff(b.id, { leadSec }) }
+                : undefined
+          }
         />
         <div className="field-row">
           <span className="field-label">찾는 곳</span>

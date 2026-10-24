@@ -97,10 +97,9 @@ export function SetupChecklist() {
         <ul className="checklist-items">
           {/* 해야 할 것만 보여 준다 (끝난 것·선택 항목은 숨겨서 짧게) */}
           {steps.filter((s) => !s.done && !s.optional).map((s) => (
-            <li key={s.text} className={s.done ? "ck-done" : s.optional ? "ck-optional" : "ck-todo"}>
+            <li key={s.text} className={s.done ? "ck-done" : s.optional ? "ck-optional" : "ck-todo"} title={s.hint}>
               <span className="ck-mark">{s.done ? "✓" : s.optional ? "–" : "○"}</span>
               <span>{s.text}</span>
-              {!s.done && s.hint && <span className="muted small"> — {s.hint}</span>}
             </li>
           ))}
         </ul>

@@ -2,7 +2,7 @@ import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { LeadSelect, Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
+import { Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
@@ -44,11 +44,6 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
           <Toggle checked={b.enabled} onChange={(v) => setBooster({ enabled: v })} />
           <div className="row-title">
             <div className="name">부스터 타이머</div>
-            <div className="sub">화면 위쪽 남은 시간 숫자를 읽어요</div>
-          </div>
-          <div className="cell">
-            <div className="cell-label">알림 시점</div>
-            <LeadSelect value={Math.max(0, b.leadSec)} onChange={(leadSec) => setBooster({ leadSec })} />
           </div>
           <div className="cell">
             <div className="cell-label">남은 시간</div>
@@ -64,7 +59,12 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
           </div>
         </div>
         <div className="row-sub">
-          <AlertSettings value={b.alert} onChange={(alert) => setBooster({ alert })} speech={leadText("부스터", b.leadSec)} />
+          <AlertSettings
+            value={b.alert}
+            onChange={(alert) => setBooster({ alert })}
+            speech={leadText("부스터", b.leadSec)}
+            lead={{ value: Math.max(0, b.leadSec), onChange: (leadSec) => setBooster({ leadSec }) }}
+          />
         </div>
       </div>
     </Panel>
