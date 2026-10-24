@@ -10,6 +10,7 @@ import {
   LEAD_MIN_INSTALL,
   SKILL_PRESETS,
   newSkill,
+  preciseIcon,
   profileStore,
   setRegion,
   shortName,
@@ -69,6 +70,22 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const regionOk = sharing && regionValidFor(region, screenCapture.width, screenCapture.height);
   const remaining = live?.expiresAt != null ? live.expiresAt - now : null;
   const leadMin = s.presetId === "class-install" ? LEAD_MIN_INSTALL : LEAD_MIN;
+  // (정밀): 퀵슬롯 대신 버프 아이콘의 남은 시간을 읽는다. 감지 위치만 고르면 된다
+  const precise = !!preciseIcon(s);
+  const onFavorites = s.where === "favorites";
+  const favRegion = profileStore.use((p) => p.regions.favorites);
+  const favOk = sharing && regionValidFor(favRegion, screenCapture.width, screenCapture.height);
+  const pickFavorites = () =>
+    openPicker({
+      title: "버프 즐겨찾기 위치 선택",
+      guide: [
+        "게임에서 버프 즐겨찾기로 옮겨 둔 버프 칸들을 넉넉하게 선택하세요.",
+        "이 위치는 '버프 즐겨찾기'로 감지하는 모든 정밀 스킬이 같이 써요.",
+        "게임에서 즐겨찾기 위치를 옮기면 여기서도 '위치 변경'을 눌러 주세요.",
+      ],
+      initial: favRegion,
+      onConfirm: ({ region }) => setRegion("favorites", region),
+    });
 
   const pickRegion = () =>
     openPicker({
@@ -91,6 +108,10 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
 
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
   if (!s.enabled) status = { tone: "idle", text: "꺼짐" };
+  else if (precise && remaining != null) status = { tone: "ok", text: "지속 중" };
+  else if (precise && !sharing) status = { tone: "warn", text: "화면 공유 필요" };
+  else if (precise && onFavorites && !favOk) status = { tone: "warn", text: "즐겨찾기 위치 선택 필요" };
+  else if (precise) status = { tone: "info", text: live?.iconState === "ready" ? "아이콘 찾음" : "감지 대기" };
   else if (remaining != null && remaining <= s.leadSec * 1000) status = { tone: "alert", text: remaining > 0 ? "곧 종료" : "종료됨" };
   else if (remaining != null) status = { tone: "ok", text: "지속 중" };
   else if (!sharing) status = { tone: "warn", text: "화면 공유 필요" };
@@ -104,9 +125,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
         <Toggle checked={s.enabled} onChange={(v) => updateSkill(s.id, { enabled: v })} />
         <div className="row-title">
           <div className="name">{s.name}</div>
-          <div className="sub">
-            지속 {s.durationSec}초 · 쿨 {s.cooldownSec}초
-          </div>
+          <div className="sub">{precise ? (onFavorites ? "버프 즐겨찾기" : "기본 버프칸") : `지속 ${s.durationSec}초 · 쿨 ${s.cooldownSec}초`}</div>
         </div>
         <div className="cell">
           <div className="cell-label">알림 시점</div>
@@ -120,15 +139,44 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
         </div>
         <StatusDot tone={status.tone}>{status.text}</StatusDot>
         <div className="row-buttons">
-          <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>
-          <button title="지금 스킬을 썼다고 보고 타이머 시작" onClick={() => manualSkillCast(s.id)}>
-            ▶ 수동 시작
-          </button>
+          {!precise && <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>}
+          {!precise && (
+            <button title="지금 스킬을 썼다고 보고 타이머 시작" onClick={() => manualSkillCast(s.id)}>
+              ▶ 수동 시작
+            </button>
+          )}
           <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
             {open ? "▴" : "▾"}
           </button>
         </div>
       </div>
+      {precise && (
+        <div className="field-row precise-where">
+          <span className="field-label">감지 위치</span>
+          <div className="seg">
+            <button className={onFavorites ? "" : "on"} onClick={() => updateSkill(s.id, { where: "bar" })}>
+              기본 버프칸
+            </button>
+            <button
+              className={onFavorites ? "on" : ""}
+              onClick={() => {
+                updateSkill(s.id, { where: "favorites" });
+                if (!favRegion) pickFavorites();
+              }}
+            >
+              버프 즐겨찾기
+            </button>
+          </div>
+          {onFavorites ? (
+            <>
+              <button onClick={pickFavorites}>{favRegion ? "위치 변경" : "위치 선택"}</button>
+              <span className="muted small">즐겨찾기 위치는 이 방식을 쓰는 모든 정밀 스킬에 함께 적용돼요.</span>
+            </>
+          ) : (
+            <span className="muted small">게임 화면 오른쪽 위의 기본 버프칸에서 찾아요. 이 스킬은 버프 즐겨찾기에서 빼 주세요.</span>
+          )}
+        </div>
+      )}
       {open && (
         <div className="row-detail">
           <div className="detail-grid">
@@ -137,12 +185,14 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
                 <span className="field-label">이름</span>
                 <input value={s.name} onChange={(e) => updateSkill(s.id, { name: e.target.value })} />
               </div>
+              {!precise && (
               <div className="field-row">
                 <span className="field-label">지속시간</span>
                 <NumberInput value={s.durationSec} min={1} max={3600} suffix="초" onChange={(v) => updateSkill(s.id, { durationSec: v })} />
                 <span className="field-label">쿨타임</span>
                 <NumberInput value={s.cooldownSec} min={1} max={3600} suffix="초" onChange={(v) => updateSkill(s.id, { cooldownSec: v })} />
               </div>
+              )}
               <div className="field-row">
                 <span className="field-label">알림 시점</span>
                 <NumberInput value={s.leadSec} min={leadMin} max={LEAD_MAX} suffix="초 전" onChange={(v) => updateSkill(s.id, { leadSec: v })} />

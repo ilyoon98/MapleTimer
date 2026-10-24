@@ -7,8 +7,8 @@ import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
 import { ScreenTransitionDetector } from "../detect/screenTransition";
-import { profileStore, tts, type Profile } from "../state/profile";
-import { detectBuffs, isBuffPresent, tickBuffTimers, trackBuffIcons } from "./buffs";
+import { preciseIcon, profileStore, tts, type Profile } from "../state/profile";
+import { detectBuffs, isBuffPresent, preciseBuffId, preciseSkillBuffs, tickBuffTimers, trackBuffIcons } from "./buffs";
 import { tickBooster } from "./booster";
 import { recordClip } from "./clip";
 import { debugCrops, liveStore } from "./live";
@@ -81,18 +81,38 @@ function tickInner(now: number) {
   wasWatching = watch;
 
   const skills = tickSkills(p, now, watch);
+  // (정밀) 스킬은 버프 아이콘으로 본다: 버프칸 감지 항목에 붙여서 같이 돌린다
+  const pb: Profile = { ...p, buffs: [...p.buffs, ...preciseSkillBuffs(p, screenCapture.width, screenCapture.height)] };
 
   let booster = prev.booster;
   if (now - lastBuff >= 500) {
     lastBuff = now;
-    detectBuffs(p, now, watch);
+    detectBuffs(pb, now, watch);
     if (!transition) booster = tickBooster(p, now, live);
     else runners.get("booster")?.tick(now);
   } else {
     runners.get("booster")?.tick(now);
   }
-  trackBuffIcons(p, now, watch);
-  const buffs = tickBuffTimers(p, now);
+  trackBuffIcons(pb, now, watch);
+  const buffs = tickBuffTimers(pb, now);
+  for (const s of p.skills) {
+    const b = preciseIcon(s) ? buffs[preciseBuffId(s.id)] : undefined;
+    if (!b) continue;
+    skills[s.id] = {
+      regionOk: b.regionOk,
+      iconState: b.present ? "ready" : "unknown",
+      diff: NaN,
+      lumaRatio: NaN,
+      castAt: null,
+      expiresAt: b.endsAt,
+      lastAlertAt: b.lastAlertAt,
+      digitText: b.readText,
+      digitConf: b.score,
+      learning: false,
+      learnObserved: 0,
+      learnMessage: null,
+    };
+  }
 
   let rune = prev.rune;
   let stall = prev.stall;

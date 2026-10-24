@@ -6,7 +6,7 @@ import { readDigits, segment, staticBrightMask, textMask } from "../cv/digits";
 import { EstimateConsensus } from "../detect/consensus";
 import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearner";
 import { QuickslotCastDetector, ReferenceHealer, referenceToPixels } from "../detect/quickslotCast";
-import { profileStore, shortName, updateSkill, type Profile, type SkillEntry } from "../state/profile";
+import { preciseIcon, profileStore, shortName, updateSkill, type Profile, type SkillEntry } from "../state/profile";
 import { debugCrops, type SkillLive } from "./live";
 import { frameTime, learnFrom, runner, runners } from "./shared";
 
@@ -94,6 +94,8 @@ export function clearSkill(id: string) {
 export function tickSkills(p: Profile, now: number, live: boolean) {
   const out: Record<string, SkillLive> = {};
   for (const s of p.skills) {
+    // (정밀) 스킬은 퀵슬롯이 아니라 버프 아이콘으로 본다 (engine 에서 버프칸 감지로 처리)
+    if (preciseIcon(s)) continue;
     const rt = skillRuntime(s);
     const r = runner(
       `skill:${s.id}`,

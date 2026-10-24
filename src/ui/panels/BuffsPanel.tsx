@@ -69,7 +69,7 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
         </p>
       )}
       {buffs.length === 0 && (
-        <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 위의 '+ 버프 종료', '+ 솔 야누스 (정밀)', '+ 특수 코어' 등을 눌러 주세요.</div>
+        <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 위의 '+ 버프 종료', '+ 특수 코어'를 눌러 주세요. 솔 야누스·에르다 파운틴 (정밀)은 스킬 알림에서 골라요.</div>
       )}
       {buffs.map((b) => (
         <BuffRow key={b.id} buff={b} hasRegion={!!region} />

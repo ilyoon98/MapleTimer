@@ -10,7 +10,7 @@ import { EstimateConsensus, applyExpiry, keepEndAfterVanish } from "../detect/co
 import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearner";
 import { PresenceTracker } from "../detect/presence";
 import type { SavedRegion } from "../capture/types";
-import { profileStore, tts, type BuffEntry, type Profile } from "../state/profile";
+import { preciseIcon, profileStore, shortName, tts, type BuffEntry, type Profile } from "../state/profile";
 import { debugCrops, type BuffLive } from "./live";
 import { frameTime, learnFrom, prepared, preparedScales, runner, runners } from "./shared";
 import { pauseLinkedTimers, startLinkedTimers } from "./timers";
@@ -73,6 +73,47 @@ function minScoreOf(b: BuffEntry): number {
   // 프로그램에 넣어 둔 게임 아이콘: 실제 화면에서 야누스 0.79~0.83(숫자 빼고 비교), 다른 아이콘은 0.60 이하
   if (b.icon) return 0.72;
   return b.slot ? Math.min(b.minScore, 0.85) : b.minScore;
+}
+
+/** 위쪽 기본 버프칸: 사용자가 영역을 잡지 않는다. 화면 오른쪽 위(가로 절반, 세로 30%)를 본다 */
+export function autoBuffbarRegion(frameW: number, frameH: number): SavedRegion {
+  const x = Math.round(frameW * 0.5);
+  return { x, y: 0, w: frameW - x, h: Math.round(frameH * 0.3), frameW, frameH };
+}
+
+/** 아직 정하지 않은 즐겨찾기 위치: 어느 화면에도 맞지 않는 영역이라 찾지 않는다 */
+const NO_REGION: SavedRegion = { x: 0, y: 0, w: 1, h: 1, frameW: 0, frameH: 0 };
+
+/** 정밀 스킬이 버프 감지 항목으로 쓰는 id (':' 를 쓰면 알림 정리에서 지워진다) */
+export const preciseBuffId = (skillId: string) => `precise-${skillId}`;
+
+/**
+ * '(정밀)' 스킬(솔 야누스·에르다 파운틴)을 버프칸 감지 항목처럼 만든다 (원래 사이트 방식).
+ * 퀵슬롯 대신 프로그램에 넣어 둔 아이콘을 찾아 남은 시간 숫자를 읽고, 스킬의 알림 설정으로 울린다.
+ */
+export function preciseSkillBuffs(p: Profile, frameW: number, frameH: number): BuffEntry[] {
+  const out: BuffEntry[] = [];
+  for (const s of p.skills) {
+    const icon = preciseIcon(s);
+    if (!icon) continue;
+    out.push({
+      id: preciseBuffId(s.id),
+      enabled: s.enabled,
+      name: shortName(s.name),
+      kind: "expiry",
+      template: null,
+      icon,
+      minScore: 0.9,
+      durationSec: null,
+      leadSec: s.leadSec,
+      alertOnDisappear: false,
+      countdownVoice: false,
+      readTime: true,
+      slot: s.where === "favorites" ? (p.regions.favorites ?? NO_REGION) : autoBuffbarRegion(frameW, frameH),
+      alert: s.alert,
+    });
+  }
+  return out;
 }
 
 /** 비교할 아이콘: 프로그램에 넣어 둔 게임 아이콘(크기 몇 가지) 또는 사용자가 등록한 아이콘 */
@@ -194,7 +235,7 @@ function buffRunner(b: BuffEntry, rt: BuffRuntime) {
   return runner(
     `buff:${b.id}`,
     b.name,
-    () => profileStore.get().buffs.find((x) => x.id === b.id)?.alert ?? b.alert,
+    () => profileStore.get().buffs.find((x) => x.id === b.id)?.alert ?? profileStore.get().skills.find((x) => preciseBuffId(x.id) === b.id)?.alert ?? b.alert,
     () => (b.kind === "cooldown" ? b.name : endingText(b.name, rt.endsAt)),
   );
 }

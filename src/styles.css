@@ -1158,3 +1158,24 @@ input[type="text"] {
   background: var(--card);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
+
+/* 둘 중 하나 고르기 (감지 위치: 기본 버프칸 / 버프 즐겨찾기) */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.seg button {
+  border: 0;
+  border-radius: 0;
+  padding: 4px 10px;
+}
+.seg button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.precise-where {
+  padding: 4px 12px 10px 56px;
+}

@@ -26,6 +26,8 @@ export interface SkillPreset {
   durationSec: number;
   cooldownSec: number;
   editable?: boolean;
+  /** (정밀): 퀵슬롯 대신 버프 아이콘의 남은 시간을 읽는다. 프로그램에 넣어 둔 게임 아이콘 */
+  precise?: GameIconId;
 }
 
 export const SKILL_PRESETS: SkillPreset[] = [
@@ -33,7 +35,9 @@ export const SKILL_PRESETS: SkillPreset[] = [
   { id: "sol-janus-80s", name: "솔 야누스 : 새벽 (80초)", durationSec: 80, cooldownSec: 56 },
   { id: "sol-janus-70s", name: "솔 야누스 : 새벽 (70초)", durationSec: 70, cooldownSec: 56 },
   { id: "sol-janus-1min", name: "솔 야누스 : 새벽 (1분)", durationSec: 60, cooldownSec: 56 },
+  { id: "sol-janus-precise", name: "솔 야누스 : 새벽 (정밀)", durationSec: 80, cooldownSec: 56, precise: "janus" },
   { id: "erda-fountain", name: "에르다 파운틴", durationSec: 60, cooldownSec: 56 },
+  { id: "erda-fountain-precise", name: "에르다 파운틴 (정밀)", durationSec: 60, cooldownSec: 56, precise: "fountain" },
   { id: "hologram-barrier", name: "홀로그램 그래피티 : 역장 VI", durationSec: 60, cooldownSec: 60 },
   { id: "petrified", name: "페트리파이드 VI", durationSec: 60, cooldownSec: 60 },
   { id: "frozen-ground", name: "프로즌 그라운드 VI", durationSec: 60, cooldownSec: 60 },
@@ -58,6 +62,13 @@ export interface SkillEntry {
   alert: AlertConfig;
   readyRef: ReadyReference | null;
   options: QuickslotOptions;
+  /** (정밀) 스킬의 감지 위치: 위쪽 기본 버프칸(자동) 또는 버프 즐겨찾기(위치를 한 번 정해 모든 정밀 스킬이 같이 씀) */
+  where?: "bar" | "favorites";
+}
+
+/** (정밀) 스킬이면 비교할 게임 아이콘 */
+export function preciseIcon(s: SkillEntry): GameIconId | undefined {
+  return SKILL_PRESETS.find((x) => x.id === s.presetId)?.precise;
 }
 
 export function newSkill(presetId: string): SkillEntry {
@@ -134,22 +145,15 @@ export interface BuffEntry {
   alert: AlertConfig;
 }
 
-export type BuffPresetId = "buff" | "janus" | "fountain" | "core";
+// 솔 야누스·에르다 파운틴 (정밀)은 원래 사이트처럼 스킬 알림에서 고른다
+export type BuffPresetId = "buff" | "core";
 export const BUFF_PRESETS: Array<{ id: BuffPresetId; label: string }> = [
   { id: "buff", label: "+ 버프 종료" },
-  { id: "janus", label: "+ 솔 야누스 (정밀)" },
-  { id: "fountain", label: "+ 에르다 파운틴 (정밀)" },
   { id: "core", label: "+ 특수 코어" },
 ];
 
 export function newBuffPreset(id: BuffPresetId): BuffEntry {
-  if (id === "core") return newBuff("cooldown");
-  const b = newBuff("expiry");
-  if (id === "janus" || id === "fountain") {
-    const name = id === "janus" ? "솔 야누스" : "에르다 파운틴";
-    return { ...b, name, leadSec: 10, alertOnDisappear: false, alert: alertCfg(tts(`${name} 곧 끝나요`)) };
-  }
-  return b;
+  return id === "core" ? newBuff("cooldown") : newBuff("expiry");
 }
 
 export function newBuff(kind: BuffKind): BuffEntry {
@@ -249,7 +253,7 @@ export function newTimer(preset: TimerPreset): TimerEntry {
 }
 
 /* ───────── 프로필 ───────── */
-export type RegionKey = "minimap" | "stall" | "buffbar" | "booster" | `skill:${string}`;
+export type RegionKey = "minimap" | "stall" | "buffbar" | "booster" | "favorites" | `skill:${string}`;
 
 export type ThemeMode = "system" | "light" | "dark";
 export type PipSize = "small" | "medium" | "large";
@@ -338,7 +342,7 @@ export function defaultProfile(): Profile {
     ttsVoice: null,
     ttsRate: 1.1,
     randomDelay: false,
-    skills: [newSkill("sol-janus-2min"), newSkill("erda-fountain")],
+    skills: [newSkill("sol-janus-precise"), newSkill("erda-fountain-precise")],
     rune: {
       enabled: true,
       mode: "color",
