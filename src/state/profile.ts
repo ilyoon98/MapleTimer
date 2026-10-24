@@ -6,6 +6,7 @@ import type { StoredTemplate } from "../cv/match";
 import { DEFAULT_CHANGE_OPTIONS, type ChangeMonitorOptions } from "../detect/changeMonitor";
 import { DEFAULT_QUICKSLOT_OPTIONS, type QuickslotOptions, type ReadyReference } from "../detect/quickslotCast";
 import { DEFAULT_RUNE_COLOR, OLD_DEFAULT_RUNE_COLOR, type RuneColorRange } from "../detect/rune";
+import type { GameIconId } from "../cv/gameIcons";
 import { createPersistentStore } from "./createStore";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -128,6 +129,8 @@ export interface BuffEntry {
    * 없으면 위쪽 버프칸 안에서 자동으로 찾는다 (원래 사이트 방식)
    */
   slot?: SavedRegion | null;
+  /** 프로그램에 넣어 둔 게임 아이콘(야누스·파운틴). 있으면 사용자가 아이콘을 등록하지 않는다 */
+  icon?: GameIconId;
   alert: AlertConfig;
 }
 

@@ -4,14 +4,15 @@ import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { readDigits, segment } from "../cv/digits";
 import { cropPixels, toGray, type Pixels } from "../cv/image";
-import { findTemplate } from "../cv/match";
+import { findTemplate, type PreparedTemplate } from "../cv/match";
+import { gameIcon } from "../cv/gameIcons";
 import { EstimateConsensus, applyExpiry, keepEndAfterVanish } from "../detect/consensus";
 import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearner";
 import { PresenceTracker } from "../detect/presence";
 import type { SavedRegion } from "../capture/types";
 import { profileStore, tts, type BuffEntry, type Profile } from "../state/profile";
 import { debugCrops, type BuffLive } from "./live";
-import { frameTime, learnFrom, prepared, runner, runners } from "./shared";
+import { frameTime, learnFrom, prepared, preparedScales, runner, runners } from "./shared";
 import { pauseLinkedTimers, startLinkedTimers } from "./timers";
 
 /* ───────── 버프칸 감지 ───────── */
@@ -27,6 +28,8 @@ interface BuffRuntime {
   /** 남은 시간 숫자를 마지막으로 읽은 시각 */
   lastReadAt: number;
   readEsts: EstimateConsensus;
+  /** 마지막으로 찾은 아이콘의 템플릿 번호 (게임 아이콘은 크기별로 여러 개) */
+  tplIdx: number;
   /** 마지막으로 찾은 아이콘 위치 (화면 기준) */
   lastPos: { x: number; y: number } | null;
   /** 마지막 위치 주변에서 아이콘을 다시 찾은 시각 (이때는 버프칸 전체를 다시 훑지 않는다) */
@@ -49,6 +52,7 @@ function buffRuntime(id: string) {
       readText: null,
       lastReadAt: 0,
       readEsts: new EstimateConsensus(2000),
+      tplIdx: 0,
       lastPos: null,
       localHitAt: 0,
       recorder: new CooldownSequenceRecorder(90, false),
@@ -66,7 +70,15 @@ export function isBuffPresent(id: string) {
  * (실제 게임: 즐겨찾기 칸의 야누스가 0.90~0.92, 끝나기 직전 깜빡일 때 0.87)
  */
 function minScoreOf(b: BuffEntry): number {
+  // 프로그램에 넣어 둔 게임 아이콘: 실제 화면에서 야누스 0.79~0.83(숫자 빼고 비교), 다른 아이콘은 0.60 이하
+  if (b.icon) return 0.72;
   return b.slot ? Math.min(b.minScore, 0.85) : b.minScore;
+}
+
+/** 비교할 아이콘: 프로그램에 넣어 둔 게임 아이콘(크기 몇 가지) 또는 사용자가 등록한 아이콘 */
+function templatesOf(b: BuffEntry): PreparedTemplate[] {
+  if (b.icon) return preparedScales(gameIcon(b.icon));
+  return b.template ? [prepared(b.template)] : [];
 }
 
 /** 이 버프를 찾을 영역: 정한 자리(버프 즐겨찾기 칸)가 있으면 그 자리만, 없으면 위쪽 버프칸 */
@@ -93,7 +105,8 @@ export function detectBuffs(p: Profile, now: number, live: boolean) {
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
     const region = buffRegion(p, b);
-    if (!b.enabled || !b.template || !live || !region || !regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
+    const ts = templatesOf(b);
+    if (!b.enabled || !ts.length || !live || !region || !regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
     // 마지막 위치 주변에서 방금(1초 안) 다시 찾은 아이콘은 그대로 있는 것으로 본다 (위치가 바뀌면 놓치고 다시 전체 탐색)
     if (rt.presence.present && now - rt.localHitAt < 1000) {
       onBuffEvent(b, rt, rt.presence.observe(true, now), now);
@@ -102,8 +115,14 @@ export function detectBuffs(p: Profile, now: number, live: boolean) {
     const full = regionImage(b, region);
     if (!full) continue;
     const { img, gray } = full;
-    const t = prepared(b.template);
-    const m = findTemplate(img, gray, t, 1)[0];
+    let m: ReturnType<typeof findTemplate>[number] | undefined;
+    ts.forEach((t, i) => {
+      const r = findTemplate(img, gray, t, 1)[0];
+      if (r && (!m || r.score > m.score)) {
+        m = r;
+        rt.tplIdx = i;
+      }
+    });
     rt.score = m?.score ?? 0;
     rt.colorDist = m?.colorDist ?? 0;
     const hit = !!m && m.score >= minScoreOf(b) && m.colorDist <= 60;
@@ -121,11 +140,11 @@ export function detectBuffs(p: Profile, now: number, live: boolean) {
 export function trackBuffIcons(p: Profile, now: number, live: boolean) {
   if (!live) return;
   for (const b of p.buffs) {
-    if (!b.enabled || !b.template || !b.readTime || b.kind !== "expiry") continue;
+    if (!b.enabled || !templatesOf(b).length || !b.readTime || b.kind !== "expiry") continue;
     if (!regionValidFor(buffRegion(p, b), screenCapture.width, screenCapture.height)) continue;
     const rt = buffRuntime(b.id);
     if (!rt.presence.present || !rt.lastPos) continue;
-    const t = prepared(b.template);
+    const t = templatesOf(b)[rt.tplIdx] ?? templatesOf(b)[0];
     const pad = 4;
     const wx = Math.max(0, rt.lastPos.x - pad);
     const wy = Math.max(0, rt.lastPos.y - pad);

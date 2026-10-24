@@ -1,6 +1,6 @@
 import { AlertRunner, emitAlertLog, type AlertConfig } from "../alerts/alertRunner";
 import { screenCapture } from "../capture/screenCapture";
-import { prepareTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
+import { prepareTemplate, scaleTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
 import { addDigitSamples, type LearnResult } from "../detect/digitLearner";
 import { shortName, type Profile } from "../state/profile";
 
@@ -41,6 +41,18 @@ export function prepared(t: StoredTemplate) {
     templateCache.set(t, p);
   }
   return p;
+}
+
+/** 프로그램에 넣어 둔 게임 아이콘은 칸마다 크기가 조금 달라서 크기를 바꾼 몇 가지로 비교한다 */
+const ICON_SCALES = [0.92, 1, 1.08];
+const scaledCache = new WeakMap<StoredTemplate, PreparedTemplate[]>();
+export function preparedScales(t: StoredTemplate): PreparedTemplate[] {
+  let list = scaledCache.get(t);
+  if (!list) {
+    list = ICON_SCALES.map((s) => prepareTemplate(s === 1 ? t : scaleTemplate(t, s)));
+    scaledCache.set(t, list);
+  }
+  return list;
 }
 
 /** 학습 결과를 저장하고 기록에 남긴다 */
