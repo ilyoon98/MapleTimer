@@ -50,7 +50,53 @@ export function detectRuneByColor(img: Pixels, c: RuneColorRange): RuneBox[] {
   }
   return connectedComponents(mask, img.width, img.height, c.minArea)
     .filter((b) => b.w <= c.maxSide && b.h <= c.maxSide && b.w / b.h >= 0.4 && b.w / b.h <= 2.5)
+    .filter((b) => whiteRingFraction(img, mask, b) >= 0.5)
     .map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h, score: Math.min(1, b.area / (b.w * b.h)) }));
+}
+
+/**
+ * 보라색 덩어리 가장자리 중 3픽셀 안에 흰 픽셀이 있는 비율.
+ * 미니맵의 룬은 흰 테두리를 두른 보라 마름모라 0.95, 미니맵 그림 속 보라 꽃 장식은 0~0.04
+ * (실제 게임 '어둠이 내리는 나무줄기 3' 맵에서 꽃 장식 3개를 룬으로 잘못 알리던 문제).
+ */
+function whiteRingFraction(img: Pixels, mask: Uint8Array, b: { x: number; y: number; w: number; h: number }): number {
+  const W = img.width,
+    H = img.height,
+    d = img.data;
+  const white = (x: number, y: number) => {
+    const p = (y * W + x) * 4;
+    const mn = Math.min(d[p], d[p + 1], d[p + 2]),
+      mx = Math.max(d[p], d[p + 1], d[p + 2]);
+    return mn >= 170 && mx - mn <= 50;
+  };
+  let edge = 0,
+    ringed = 0;
+  for (let y = b.y; y < b.y + b.h; y++)
+    for (let x = b.x; x < b.x + b.w; x++) {
+      if (!mask[y * W + x]) continue;
+      const onEdge = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].some(([dx, dy]) => {
+        const nx = x + dx,
+          ny = y + dy;
+        return nx < 0 || ny < 0 || nx >= W || ny >= H || !mask[ny * W + nx];
+      });
+      if (!onEdge) continue;
+      edge++;
+      search: for (let dy = -3; dy <= 3; dy++)
+        for (let dx = -3; dx <= 3; dx++) {
+          const nx = x + dx,
+            ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < W && ny < H && white(nx, ny)) {
+            ringed++;
+            break search;
+          }
+        }
+    }
+  return edge ? ringed / edge : 0;
 }
 
 /**

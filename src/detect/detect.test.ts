@@ -165,12 +165,18 @@ const minimapBg = () => solid(160, 100, [60, 70, 60]);
 
 describe("룬 감지", () => {
   const minimap = minimapBg;
-  const withRune = (x: number, y: number) => paint(minimap(), x, y, 7, 7, [200, 60, 230]);
+  // 실제 미니맵의 룬: 흰 테두리를 두른 보라 마름모
+  const ringed = (img: ReturnType<typeof minimapBg>, x: number, y: number, w: number, h: number, c: number[]) =>
+    paint(paint(img, x - 2, y - 2, w + 4, h + 4, [235, 235, 240]), x, y, w, h, c);
+  const withRune = (x: number, y: number) => ringed(minimap(), x, y, 7, 7, [200, 60, 230]);
 
-  it("보라색 덩어리를 후보로 찾음", () => {
+  it("흰 테두리를 두른 보라색 덩어리를 후보로 찾음", () => {
     const boxes = detectRuneByColor(withRune(40, 30), DEFAULT_RUNE_COLOR);
     expect(boxes).toHaveLength(1);
     expect(boxes[0]).toMatchObject({ x: 40, y: 30, w: 7, h: 7 });
+  });
+  it("흰 테두리가 없는 보라색 그림(미니맵 속 꽃 장식)은 룬이 아니다", () => {
+    expect(detectRuneByColor(paint(minimap(), 40, 30, 9, 7, [200, 60, 230]), DEFAULT_RUNE_COLOR)).toHaveLength(0);
   });
   it("두 번 보여야 확정, 같은 룬으로는 한 번만 알림, 잠깐 가려져도 유지", () => {
     const t = new RuneTracker();
@@ -193,8 +199,8 @@ describe("룬 감지", () => {
     const red = paint(solid(9, 9, [30, 30, 30]), 2, 2, 5, 5, [230, 30, 50]);
     const range = colorRangeFromTemplate(red)!;
     expect(range.hueMin).toBeGreaterThan(range.hueMax); // 0° 를 걸침
-    expect(detectRuneByColor(paint(minimapBg(), 50, 40, 6, 6, [230, 30, 50]), range)).toHaveLength(1);
-    expect(detectRuneByColor(paint(minimapBg(), 50, 40, 6, 6, [200, 60, 230]), range)).toHaveLength(0); // 보라는 아님
+    expect(detectRuneByColor(ringed(minimapBg(), 50, 40, 6, 6, [230, 30, 50]), range)).toHaveLength(1);
+    expect(detectRuneByColor(ringed(minimapBg(), 50, 40, 6, 6, [200, 60, 230]), range)).toHaveLength(0); // 보라는 아님
   });
 
   it("맵 이동(암전)하면 상태를 지우고 새 룬은 다시 알림", () => {
