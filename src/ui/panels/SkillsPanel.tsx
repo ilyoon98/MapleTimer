@@ -16,7 +16,7 @@ import {
 } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATE_LABEL = { ready: "사용 가능", cooling: "쿨타임", unknown: "판별 불가" } as const;
@@ -53,9 +53,6 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
     </Panel>
   );
 }
-
-/** 알림 시점: 고르기만 하게 단순하게 */
-const LEADS = [0, 3, 5, 10, 15, 20, 30];
 
 function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const live = liveStore.use((l) => l.skills[s.id]);
@@ -110,8 +107,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
   else if (!regionOk) status = { tone: "warn", text: "영역 선택 필요" };
   else status = { tone: "info", text: `감지 대기 · ${STATE_LABEL[live?.iconState ?? "unknown"]}` };
 
-  const leads = LEADS.includes(s.leadSec) ? LEADS : [...LEADS, s.leadSec].sort((x, y) => x - y);
-
   return (
     <div className={`row ${s.enabled ? "" : "row-off"}`}>
       <div className="row-main">
@@ -128,13 +123,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
         </div>
         <div className="cell">
           <div className="cell-label">알림 시점</div>
-          <select value={s.leadSec} onChange={(e) => updateSkill(s.id, { leadSec: Number(e.target.value) })}>
-            {leads.map((v) => (
-              <option key={v} value={v}>
-                {v === 0 ? "끝날 때" : v > 0 ? `${v}초 전` : `끝나고 ${-v}초 뒤`}
-              </option>
-            ))}
-          </select>
+          <LeadSelect value={s.leadSec} onChange={(leadSec) => updateSkill(s.id, { leadSec })} />
         </div>
         <div className="cell">
           <div className="cell-label">남은 시간</div>

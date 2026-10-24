@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { liveStore } from "../../engine/engine";
 import { STALL_DEFAULT_SEC, STALL_RANGE, profileStore, setRegion, type StallMode, type StallSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { STALL_TEXT } from "../../alerts/speech";
-import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { openPicker } from "../pickerStore";
 
 const MODES: Record<StallMode, { label: string; guide: string[] }> = {
@@ -49,7 +48,6 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
   const buffs = profileStore.use((p) => p.buffs);
   const region = profileStore.use((p) => p.regions.stall);
   const live = liveStore.use((l) => l.stall);
-  const [open, setOpen] = useState(false);
   const s = STATUS[live.status];
   const [lo, hi] = STALL_RANGE[st.mode];
 
@@ -83,9 +81,9 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
             </select>
           </div>
           <div className="cell">
-            <div className="cell-label">멈춤 기준</div>
+            <div className="cell-label">안 바뀌면 알림</div>
             <div className="cell-value">
-              <NumberInput value={st.thresholdSec} min={lo} max={hi} suffix="초 무변동" width={52} onChange={(v) => setStall({ thresholdSec: v })} />
+              <NumberInput value={st.thresholdSec} min={lo} max={hi} suffix="초" width={48} onChange={(v) => setStall({ thresholdSec: v })} />
             </div>
           </div>
           <div className="cell">
@@ -101,48 +99,24 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
           <StatusDot tone={s.tone}>{s.text}</StatusDot>
           <div className="row-buttons">
             <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>
-            <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
-              {open ? "▴" : "▾"}
-            </button>
           </div>
         </div>
-        {open && (
-          <div className="row-detail">
-            <div className="detail-grid">
-              <div>
-                <div className="field-row">
-                  <span className="field-label">버프 연계</span>
-                  <select value={st.linkedBuffId ?? ""} onChange={(e) => setStall({ linkedBuffId: e.target.value || null })}>
-                    <option value="">사용 안 함</option>
-                    {buffs.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        '{b.name}' 버프가 있을 때만 감시
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field-row">
-                  <span className="field-label">민감도</span>
-                  <NumberInput
-                    value={st.sensitivity.cellDiff}
-                    min={2}
-                    max={80}
-                    onChange={(v) => setStall({ sensitivity: { ...st.sensitivity, cellDiff: v } })}
-                  />
-                  <span className="muted">작을수록 작은 변화도 '변화'로 봐요 (기본 14)</span>
-                </div>
-                <AlertSettings value={st.alert} onChange={(alert) => setStall({ alert })} speech={STALL_TEXT} />
-              </div>
-              <div className="diag">
-                <div className="diag-title">진단</div>
-                <DebugCrop cropKey="stall" maxWidth={320} />
-                <div className="diag-values mono">
-                  바뀐 칸: {live.changedCells} / {live.totalCells}
-                </div>
-              </div>
+        <div className="row-sub">
+          <AlertSettings value={st.alert} onChange={(alert) => setStall({ alert })} speech={STALL_TEXT} />
+          {buffs.length > 0 && (
+            <div className="field-row">
+              <span className="field-label">버프 연계</span>
+              <select value={st.linkedBuffId ?? ""} onChange={(e) => setStall({ linkedBuffId: e.target.value || null })}>
+                <option value="">사용 안 함</option>
+                {buffs.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    '{b.name}' 버프가 있을 때만 감시
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </Panel>
   );

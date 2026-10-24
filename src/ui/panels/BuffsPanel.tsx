@@ -4,7 +4,7 @@ import { liveStore } from "../../engine/engine";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
-import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
+import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { openPicker } from "../pickerStore";
 import { BuffbarSteps } from "../guideArt";
 
@@ -86,7 +86,6 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
 }
 
 function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: boolean }) {
-  const [open, setOpen] = useState(false);
   const live = liveStore.use((l) => l.buffs[b.id]);
   const now = liveStore.use((l) => l.now);
   const barRegion = profileStore.use((p) => p.regions.buffbar);
@@ -141,11 +140,18 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
         <Toggle checked={b.enabled} onChange={(v) => updateBuff(b.id, { enabled: v })} />
         <TemplateThumb t={b.template} />
         <div className="row-title">
-          <div className="name">{b.name}</div>
-          <div className="sub">
-            {isCore ? `쿨타임 ${b.durationSec ?? "-"}초 · 카운트다운 ${b.leadSec}초 전부터` : b.durationSec ? `지속 ${Math.round(b.durationSec / 60)}분` : "사라지면 알림"}
-            {b.slot ? " · 정한 자리" : ""}
-          </div>
+          <input className="name-input" value={b.name} aria-label="이름" onChange={(e) => updateBuff(b.id, { name: e.target.value })} />
+          <div className="sub">{b.slot ? "버프 즐겨찾기 칸" : "위쪽 버프칸"}</div>
+        </div>
+        <div className="cell">
+          <div className="cell-label">{isCore ? "숫자 세기" : "알림 시점"}</div>
+          {isCore ? (
+            <LeadSelect value={b.leadSec} options={[0, 3, 5, 10]} onChange={(leadSec) => updateBuff(b.id, { leadSec })} />
+          ) : b.readTime || b.durationSec != null ? (
+            <LeadSelect value={b.leadSec} onChange={(leadSec) => updateBuff(b.id, { leadSec })} />
+          ) : (
+            <div className="cell-value">사라지면</div>
+          )}
         </div>
         <div className="cell">
           <div className="cell-label">{isCore ? "남은 쿨타임" : "남은 시간"}</div>
@@ -153,96 +159,69 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
             {fmtRemaining(remaining != null ? Math.max(remaining, isCore ? 0 : remaining) : null)}
           </div>
         </div>
-        <div className="cell">
-          <div className="cell-label">일치도</div>
-          <div className="cell-value mono">{live?.score ? live.score.toFixed(2) : "--"}</div>
-        </div>
-        {b.readTime && !isCore && (
-          <div className="cell">
-            <div className="cell-label">읽은 숫자</div>
-            <div className="cell-value mono">{live?.readText ?? "--"}</div>
-          </div>
-        )}
         <StatusDot tone={status.tone}>{status.text}</StatusDot>
         <div className="row-buttons">
           <button onClick={pickIcon} disabled={!hasRegion}>
             {b.template ? "아이콘 다시 등록" : "아이콘 등록"}
           </button>
-          <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
-            {open ? "▴" : "▾"}
+          <button
+            className="icon-btn danger"
+            aria-label="삭제"
+            title="삭제"
+            onClick={() => {
+              if (!confirm(`'${b.name}' 항목을 삭제할까요?`)) return;
+              profileStore.set((p) => ({ ...p, buffs: p.buffs.filter((x) => x.id !== b.id) }));
+            }}
+          >
+            🗑
           </button>
         </div>
       </div>
-      {open && (
-        <div className="row-detail">
-          <div className="field-row">
-            <span className="field-label">이름</span>
-            <input value={b.name} onChange={(e) => updateBuff(b.id, { name: e.target.value })} />
+      <div className="row-sub">
+        <AlertSettings
+          value={b.alert}
+          onChange={(alert) => updateBuff(b.id, { alert })}
+          speech={isCore ? b.name : b.durationSec != null || b.readTime ? leadText(b.name, b.leadSec) : doneText(b.name)}
+        />
+        <div className="field-row">
+          <span className="field-label">찾는 곳</span>
+          <div className="seg">
+            <button className={b.slot ? "" : "on"} onClick={() => updateBuff(b.id, { slot: null })}>
+              위쪽 버프칸
+            </button>
+            <button className={b.slot ? "on" : ""} onClick={pickSlot}>
+              버프 즐겨찾기 칸
+            </button>
           </div>
-          <div className="field-row">
-            <span className="field-label">찾는 곳</span>
-            <select value={b.slot ? "slot" : "bar"} onChange={(e) => (e.target.value === "bar" ? updateBuff(b.id, { slot: null }) : pickSlot())}>
-              <option value="bar">위쪽 버프칸에서 자동으로 찾기</option>
-              <option value="slot">정한 자리만 보기 (버프 즐겨찾기 칸)</option>
-            </select>
-            {b.slot && <button onClick={pickSlot}>자리 다시 선택</button>}
-          </div>
+          {b.slot && <button onClick={pickSlot}>자리 다시 선택</button>}
           {isCore ? (
-            <div className="field-row">
+            <>
               <span className="field-label">쿨타임</span>
               <NumberInput value={b.durationSec ?? 30} min={11} max={180} suffix="초" onChange={(v) => updateBuff(b.id, { durationSec: v })} />
-              <span className="field-label">카운트다운</span>
-              <NumberInput value={b.leadSec} min={0} max={10} suffix="초 전부터" onChange={(v) => updateBuff(b.id, { leadSec: v })} />
               <Toggle checked={b.countdownVoice} onChange={(v) => updateBuff(b.id, { countdownVoice: v })} label="숫자 읽어주기" />
-            </div>
+            </>
           ) : (
             <>
-              <div className="field-row">
-                <span className="field-label">지속시간</span>
+              <Toggle checked={b.readTime} onChange={(v) => updateBuff(b.id, { readTime: v })} label="남은 시간 읽기" />
+              {!b.readTime && (
                 <select
+                  aria-label="지속시간"
                   value={b.durationSec ?? ""}
                   onChange={(e) => updateBuff(b.id, { durationSec: e.target.value ? Number(e.target.value) : null })}
                 >
-                  <option value="">모름 (사라질 때만 알림)</option>
+                  <option value="">지속시간 모름</option>
                   <option value={600}>10분</option>
                   <option value={1200}>20분</option>
                   <option value={1800}>30분</option>
                   <option value={3600}>1시간</option>
                   <option value={7200}>2시간</option>
                 </select>
-                {b.durationSec != null && (
-                  <>
-                    <span className="field-label">알림 시점</span>
-                    <NumberInput value={b.leadSec} min={-5} max={600} suffix="초 전" onChange={(v) => updateBuff(b.id, { leadSec: v })} />
-                    <span className="muted">{leadLabel(b.leadSec)}</span>
-                  </>
-                )}
-              </div>
-              <div className="field-row">
-                <Toggle checked={b.readTime} onChange={(v) => updateBuff(b.id, { readTime: v })} label="아이콘의 남은 시간 읽기" />
-                <Toggle checked={b.alertOnDisappear} onChange={(v) => updateBuff(b.id, { alertOnDisappear: v })} label="아이콘이 사라지면 알림" />
-              </div>
-              <p className="muted small">지속시간은 아이콘이 나타난 순간부터 셉니다. 켜기 전부터 걸려 있던 버프는 사라질 때만 알 수 있어요.</p>
+              )}
+              <Toggle checked={b.alertOnDisappear} onChange={(v) => updateBuff(b.id, { alertOnDisappear: v })} label="사라지면 알림" />
             </>
           )}
-          <AlertSettings
-            value={b.alert}
-            onChange={(alert) => updateBuff(b.id, { alert })}
-            speech={isCore ? b.name : b.durationSec != null || b.readTime ? leadText(b.name, b.leadSec) : doneText(b.name)}
-          />
-          <div className="field-row">
-            <button
-              className="danger"
-              onClick={() => {
-                if (!confirm(`'${b.name}' 항목을 삭제할까요?`)) return;
-                profileStore.set((p) => ({ ...p, buffs: p.buffs.filter((x) => x.id !== b.id) }));
-              }}
-            >
-              삭제
-            </button>
-          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

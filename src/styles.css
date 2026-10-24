@@ -1235,3 +1235,14 @@ input[type="text"] {
   font-size: 12px;
   padding: 8px 14px;
 }
+/* 타이머 이름: 제목처럼 보이다가 누르면 바로 고칠 수 있게 */
+.name-input {
+  font-weight: 600;
+  border-color: transparent;
+  background: transparent;
+  max-width: 240px;
+}
+.name-input:hover,
+.name-input:focus {
+  border-color: var(--line);
+}

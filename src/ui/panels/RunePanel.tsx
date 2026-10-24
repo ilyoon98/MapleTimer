@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { RUNE_TEXT } from "../../alerts/speech";
-import { DebugCrop, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
@@ -24,7 +23,6 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
   const rune = profileStore.use((p) => p.rune);
   const region = profileStore.use((p) => p.regions.minimap);
   const live = liveStore.use((l) => l.rune);
-  const [open, setOpen] = useState(false);
   const st = STATUS[live.status];
 
   const pickRegion = () =>
@@ -48,7 +46,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
             <div className="sub">미니맵에 룬이 뜨면 알려요</div>
           </div>
           <div className="cell">
-            <div className="cell-label">후보</div>
+            <div className="cell-label">찾은 룬</div>
             <div className="cell-value">{live.boxes.length}개</div>
           </div>
           <div className="cell">
@@ -58,24 +56,11 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
           <StatusDot tone={st.tone}>{st.text}</StatusDot>
           <div className="row-buttons">
             <button onClick={pickRegion}>{region ? "미니맵 다시 선택" : "미니맵 선택"}</button>
-            <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
-              {open ? "▴" : "▾"}
-            </button>
           </div>
         </div>
-        {open && (
-          <div className="row-detail">
-            <div className="detail-grid">
-              <div>
-                <AlertSettings value={rune.alert} onChange={(alert) => setRune({ alert })} speech={RUNE_TEXT} />
-              </div>
-              <div className="diag">
-                <div className="diag-title">지금 미니맵 (초록 상자 = 찾은 룬)</div>
-                <DebugCrop cropKey="minimap" boxes={live.boxes} maxWidth={320} />
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="row-sub">
+          <AlertSettings value={rune.alert} onChange={(alert) => setRune({ alert })} speech={RUNE_TEXT} />
+        </div>
       </div>
     </Panel>
   );

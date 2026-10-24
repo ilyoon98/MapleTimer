@@ -3,7 +3,7 @@ import { liveStore, resetTimerAlert } from "../../engine/engine";
 import { leadText } from "../../alerts/speech";
 import { TIMER_PRESETS, TIMER_QUICK_SECS, newTimer, profileStore, shortName, updateTimer, type TimerEntry } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
-import { NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining, leadLabel } from "../common";
+import { LeadSelect, NumberInput, Panel, StatusDot, Toggle, durationLabel, fmtRemaining } from "../common";
 
 export function startTimer(t: TimerEntry, now = Date.now()) {
   if (!t.enabled) return;
@@ -62,8 +62,10 @@ export function TimersPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   );
 }
 
+/** 타이머 알림 시점: 긴 타이머가 많아서 분 단위도 고를 수 있게 */
+const TIMER_LEADS = [0, 5, 10, 30, 60, 120, 300];
+
 function TimerRow({ t }: { t: TimerEntry }) {
-  const [open, setOpen] = useState(false);
   const now = liveStore.use((l) => l.now);
   const buffs = profileStore.use((p) => p.buffs);
   const remaining = t.endsAt != null ? t.endsAt - now : t.pausedRemainingMs ?? t.durationSec * 1000;
@@ -73,40 +75,44 @@ function TimerRow({ t }: { t: TimerEntry }) {
   const minutes = Math.floor(t.durationSec / 60);
   const seconds = t.durationSec % 60;
   const quick = TIMER_QUICK_SECS.includes(t.durationSec);
+  const [custom, setCustom] = useState(!quick);
   const setEnabled = (v: boolean) => {
     if (!v) resetTimer(t);
     updateTimer(t.id, { enabled: v });
   };
+  const expiryBuffs = buffs.filter((b) => b.kind === "expiry");
 
   return (
     <div className={`row ${t.enabled ? "" : "row-off"}`}>
       <div className="row-main">
         <Toggle checked={t.enabled} onChange={setEnabled} />
         <div className="row-title">
-          <div className="name">{t.name}</div>
-          <div className="sub">
-            {leadLabel(t.leadSec)} 알림{t.autoRestart ? " · 자동 반복" : ""}
-            {t.linkedBuffId ? " · 버프 연계" : ""}
-          </div>
+          <input className="name-input" value={t.name} aria-label="타이머 이름" onChange={(e) => updateTimer(t.id, { name: e.target.value })} />
         </div>
-        <select
-          aria-label="타이머 시간"
-          value={quick ? t.durationSec : "custom"}
-          onChange={(e) => {
-            if (e.target.value === "custom") setOpen(true);
-            else updateTimer(t.id, { durationSec: Number(e.target.value) });
-          }}
-        >
-          {TIMER_QUICK_SECS.map((sec) => (
-            <option key={sec} value={sec}>
-              {durationLabel(sec)}
-            </option>
-          ))}
-          <option value="custom">{quick ? "직접 입력" : `직접 (${durationLabel(t.durationSec)})`}</option>
-        </select>
+        <div className="cell">
+          <div className="cell-label">시간</div>
+          <select
+            aria-label="타이머 시간"
+            value={custom ? "custom" : t.durationSec}
+            onChange={(e) => {
+              if (e.target.value === "custom") setCustom(true);
+              else {
+                setCustom(false);
+                updateTimer(t.id, { durationSec: Number(e.target.value) });
+              }
+            }}
+          >
+            {TIMER_QUICK_SECS.map((sec) => (
+              <option key={sec} value={sec}>
+                {durationLabel(sec)}
+              </option>
+            ))}
+            <option value="custom">직접 입력</option>
+          </select>
+        </div>
         <div className="cell">
           <div className="cell-label">남은 시간</div>
-          <div className={`cell-value huge mono ${urgent ? "urgent" : ""}`}>{fmtRemaining(remaining)}</div>
+          <div className={`cell-value big mono ${urgent ? "urgent" : ""}`}>{fmtRemaining(remaining)}</div>
         </div>
         <StatusDot tone={!t.enabled ? "idle" : running ? (urgent ? "alert" : "ok") : paused ? "warn" : "idle"}>
           {!t.enabled ? "꺼짐" : running ? "진행 중" : paused ? "일시정지" : "대기"}
@@ -119,70 +125,48 @@ function TimerRow({ t }: { t: TimerEntry }) {
               ▶ {paused ? "재개" : "시작"}
             </button>
           )}
-          <button onClick={() => resetTimer(t)}>↺ 초기화</button>
-          <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
-            {open ? "▴" : "▾"}
+          <button onClick={() => resetTimer(t)}>↺ 처음으로</button>
+          <button
+            className="icon-btn danger"
+            aria-label="삭제"
+            title="삭제"
+            onClick={() => {
+              if (!confirm(`'${t.name}' 타이머를 삭제할까요?`)) return;
+              profileStore.set((p) => ({ ...p, timers: p.timers.filter((x) => x.id !== t.id) }));
+            }}
+          >
+            🗑
           </button>
         </div>
       </div>
-      {open && (
-        <div className="row-detail">
-          <div className="field-row">
-            <span className="field-label">이름</span>
-            <input value={t.name} onChange={(e) => updateTimer(t.id, { name: e.target.value })} />
-            <span className="field-label">시간</span>
-            <NumberInput value={minutes} min={0} max={1440} suffix="분" width={56} onChange={(v) => updateTimer(t.id, { durationSec: Math.max(1, v * 60 + seconds) })} />
-            <NumberInput value={seconds} min={0} max={59} suffix="초" width={48} onChange={(v) => updateTimer(t.id, { durationSec: Math.max(1, minutes * 60 + v) })} />
-          </div>
-          <div className="field-row">
-            <span className="field-label">알림 시점</span>
-            <NumberInput value={t.leadSec} min={-5} max={600} suffix="초 전" onChange={(v) => updateTimer(t.id, { leadSec: v })} />
-            <Toggle checked={t.autoRestart} onChange={(v) => updateTimer(t.id, { autoRestart: v })} label="끝나면 자동으로 다시 시작" />
-            {t.autoRestart && (
-              <NumberInput
-                value={t.autoRestartDelaySec ?? 0}
-                min={0}
-                max={600}
-                suffix="초 뒤에"
-                width={56}
-                onChange={(v) => updateTimer(t.id, { autoRestartDelaySec: v })}
-              />
-            )}
-          </div>
-          <div className="field-row">
-            <span className="field-label">버프 연계</span>
-            <select value={t.linkedBuffId ?? ""} onChange={(e) => updateTimer(t.id, { linkedBuffId: e.target.value || null })}>
-              <option value="">사용 안 함</option>
-              {buffs
-                .filter((b) => b.kind === "expiry")
-                .map((b) => (
+      <div className="row-sub">
+        <AlertSettings value={t.alert} onChange={(alert) => updateTimer(t.id, { alert })} speech={leadText(shortName(t.name), t.leadSec)} />
+        <div className="field-row">
+          <span className="field-label">알림 시점</span>
+          <LeadSelect value={t.leadSec} options={TIMER_LEADS} onChange={(leadSec) => updateTimer(t.id, { leadSec })} />
+          {custom && (
+            <>
+              <span className="field-label">시간</span>
+              <NumberInput value={minutes} min={0} max={1440} suffix="분" width={56} onChange={(v) => updateTimer(t.id, { durationSec: Math.max(1, v * 60 + seconds) })} />
+              <NumberInput value={seconds} min={0} max={59} suffix="초" width={48} onChange={(v) => updateTimer(t.id, { durationSec: Math.max(1, minutes * 60 + v) })} />
+            </>
+          )}
+          <Toggle checked={t.autoRestart} onChange={(v) => updateTimer(t.id, { autoRestart: v })} label="끝나면 다시 시작" />
+          {expiryBuffs.length > 0 && (
+            <>
+              <span className="field-label">버프 연계</span>
+              <select value={t.linkedBuffId ?? ""} onChange={(e) => updateTimer(t.id, { linkedBuffId: e.target.value || null })}>
+                <option value="">사용 안 함</option>
+                {expiryBuffs.map((b) => (
                   <option key={b.id} value={b.id}>
-                    '{b.name}' 아이콘이 나타나면 자동 시작
+                    '{b.name}' 아이콘이 뜨면 자동 시작
                   </option>
                 ))}
-            </select>
-            {t.linkedBuffId && (
-              <Toggle
-                checked={!!t.pauseWithoutBuff}
-                onChange={(v) => updateTimer(t.id, { pauseWithoutBuff: v })}
-                label="버프가 사라지면 일시정지, 다시 뜨면 이어서"
-              />
-            )}
-          </div>
-          <AlertSettings value={t.alert} onChange={(alert) => updateTimer(t.id, { alert })} speech={leadText(shortName(t.name), t.leadSec)} />
-          <div className="field-row">
-            <button
-              className="danger"
-              onClick={() => {
-                if (!confirm(`'${t.name}' 타이머를 삭제할까요?`)) return;
-                profileStore.set((p) => ({ ...p, timers: p.timers.filter((x) => x.id !== t.id) }));
-              }}
-            >
-              삭제
-            </button>
-          </div>
+              </select>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

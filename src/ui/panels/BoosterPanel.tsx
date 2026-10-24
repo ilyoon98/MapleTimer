@@ -1,10 +1,8 @@
-import { useState } from "react";
-import { lastBoosterSegment, liveStore } from "../../engine/engine";
-import { teachDigits } from "../teachDigits";
+import { liveStore } from "../../engine/engine";
 import { profileStore, setRegion, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtClock, fmtRemaining, leadLabel } from "../common";
+import { LeadSelect, Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
 import { openPicker } from "../pickerStore";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
@@ -25,7 +23,6 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
   const region = profileStore.use((p) => p.regions.booster);
   const live = liveStore.use((l) => l.booster);
   const now = liveStore.use((l) => l.now);
-  const [open, setOpen] = useState(false);
   const st = STATUS[live.status];
   const remaining = live.endsAt != null ? live.endsAt - now : null;
 
@@ -51,17 +48,11 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
           </div>
           <div className="cell">
             <div className="cell-label">알림 시점</div>
-            <div className="cell-value">{leadLabel(b.leadSec)}</div>
-          </div>
-          <div className="cell">
-            <div className="cell-label">읽은 값</div>
-            <div className="cell-value mono">{live.readText ?? "--"}</div>
+            <LeadSelect value={Math.max(0, b.leadSec)} onChange={(leadSec) => setBooster({ leadSec })} />
           </div>
           <div className="cell">
             <div className="cell-label">남은 시간</div>
-            <div className={`cell-value big mono ${remaining != null && remaining <= b.leadSec * 1000 ? "urgent" : ""}`}>
-              {fmtRemaining(remaining)}
-            </div>
+            <div className={`cell-value big mono ${remaining != null && remaining <= b.leadSec * 1000 ? "urgent" : ""}`}>{fmtRemaining(remaining)}</div>
           </div>
           <div className="cell">
             <div className="cell-label">마지막 알림</div>
@@ -70,35 +61,11 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
           <StatusDot tone={st.tone}>{st.text}</StatusDot>
           <div className="row-buttons">
             <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>
-            <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="설정 펼치기">
-              {open ? "▴" : "▾"}
-            </button>
           </div>
         </div>
-        {open && (
-          <div className="row-detail">
-            <div className="detail-grid">
-              <div>
-                <div className="field-row">
-                  <span className="field-label">알림 시점</span>
-                  <NumberInput value={b.leadSec} min={-5} max={60} suffix="초 전" onChange={(v) => setBooster({ leadSec: v })} />
-                </div>
-                <AlertSettings value={b.alert} onChange={(alert) => setBooster({ alert })} speech={leadText("부스터", b.leadSec)} />
-              </div>
-              <div className="diag">
-                <div className="diag-title">진단</div>
-                <DebugCrop cropKey="booster" maxWidth={320} />
-                <p className="muted small">
-                  부스터의 디지털 시계 모양 숫자(예: 36.83)는 따로 가르치지 않아도 읽어요. 그래도 읽은 값이 비어 있거나 틀리면, 숫자가 보일 때
-                  아래 버튼으로 화면 숫자를 직접 입력해 가르쳐 주세요.
-                </p>
-                <div className="field-row">
-                  <button onClick={() => teachDigits(lastBoosterSegment, "부스터 타이머")}>지금 보이는 숫자 가르치기</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="row-sub">
+          <AlertSettings value={b.alert} onChange={(alert) => setBooster({ alert })} speech={leadText("부스터", b.leadSec)} />
+        </div>
       </div>
     </Panel>
   );

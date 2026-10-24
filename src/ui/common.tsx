@@ -115,6 +115,22 @@ export function Panel({
   );
 }
 
+/** 알림 시점: 숫자를 쓰지 않고 고르기만 하게 (끝날 때 / N초 전) */
+export const LEADS = [0, 3, 5, 10, 15, 20, 30];
+export function LeadSelect({ value, onChange, options = LEADS }: { value: number; onChange: (v: number) => void; options?: number[] }) {
+  const list = options.includes(value) ? options : [...options, value].sort((x, y) => x - y);
+  const label = (v: number) => (v === 0 ? "끝날 때" : v > 0 ? (v >= 60 && v % 60 === 0 ? `${v / 60}분 전` : `${v}초 전`) : `끝나고 ${-v}초 뒤`);
+  return (
+    <select value={value} onChange={(e) => onChange(Number(e.target.value))}>
+      {list.map((v) => (
+        <option key={v} value={v}>
+          {label(v)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function StatusDot({ tone, children }: { tone: "ok" | "warn" | "alert" | "idle" | "info"; children: ReactNode }) {
   return <span className={`status status-${tone}`}>{children}</span>;
 }
