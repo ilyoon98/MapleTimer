@@ -130,7 +130,7 @@ const SECTIONS: Array<{ id: string; title: string; body: ReactNode }> = [
   },
   {
     id: "buffs",
-    title: "버프칸 감지",
+    title: "버프 종료 · 특수 코어 알림",
     body: (
       <>
         <p>오른쪽 위 버프칸에서 등록한 아이콘을 찾아, 아이콘 위의 남은 시간을 읽고 끝나기 전에 알려요. 특수 코어는 아이콘이 뜬 순간부터 쿨타임을 세요.</p>

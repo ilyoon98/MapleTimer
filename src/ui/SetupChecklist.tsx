@@ -89,13 +89,14 @@ export function SetupChecklist() {
     <section className={`checklist ${remaining === 0 ? "checklist-done" : ""}`}>
       <header className="checklist-head" onClick={toggle}>
         <b>{remaining === 0 ? "✓ 준비 완료" : `준비 체크리스트 · ${remaining}개 남음`}</b>
-        <span className="muted small">인게임: UI 크기 [최적 비율] · 시간표시 [중앙, 크게] · [분 + 초] · 버프 정렬 모두 켜기</span>
+        {remaining > 0 && <span className="muted small">끝난 항목 {steps.filter((s) => s.done).length}개는 숨겼어요</span>}
         <span className="spacer" />
         <span className="muted">{hidden ? "▸" : "▾"}</span>
       </header>
       {!hidden && (
         <ul className="checklist-items">
-          {steps.map((s) => (
+          {/* 해야 할 것만 보여 준다 (끝난 것·선택 항목은 숨겨서 짧게) */}
+          {steps.filter((s) => !s.done && !s.optional).map((s) => (
             <li key={s.text} className={s.done ? "ck-done" : s.optional ? "ck-optional" : "ck-todo"}>
               <span className="ck-mark">{s.done ? "✓" : s.optional ? "–" : "○"}</span>
               <span>{s.text}</span>

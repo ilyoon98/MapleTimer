@@ -1179,3 +1179,59 @@ input[type="text"] {
 .precise-where {
   padding: 4px 12px 10px 56px;
 }
+
+/* ───── 보기 쉽게 정리 ───── */
+/* 줄마다 칸 너비를 고정해서 위아래 줄의 '알림 시점·남은 시간·상태'가 같은 자리에 오게 */
+.row-main {
+  gap: 14px;
+}
+.row-main > .toggle {
+  flex: none;
+}
+.row-title {
+  min-width: 200px;
+}
+.row-title select {
+  font-weight: 600;
+  max-width: 260px;
+}
+.cell {
+  flex: none;
+  width: 104px;
+  min-width: 0;
+}
+.row-main > .status {
+  flex: none;
+  width: 170px;
+}
+.row-buttons {
+  flex: none;
+  justify-content: flex-end;
+  min-width: 132px;
+}
+/* 알림음·볼륨·반복, 감지 위치: 위 항목 이름 아래로 들여서 한 묶음으로 보이게 */
+.row-sub {
+  padding: 0 14px 12px 72px;
+  font-size: 13px;
+}
+.row-sub .field-row {
+  margin-top: 6px;
+}
+.row-sub .alert-settings {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.row-sub input[type="range"] {
+  width: 140px;
+}
+.row-off .row-sub {
+  opacity: 0.5;
+}
+.row:hover {
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+.panel-hint {
+  font-size: 12px;
+  padding: 8px 14px;
+}

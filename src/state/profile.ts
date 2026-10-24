@@ -31,13 +31,14 @@ export interface SkillPreset {
 }
 
 export const SKILL_PRESETS: SkillPreset[] = [
+  // (정밀): 버프 아이콘이 보이면 이쪽이 더 정확해서 위에 둔다. 아래 퀵슬롯 방식은 아이콘이 숨겨지거나 시간 표시를 끈 경우의 예비
+  { id: "sol-janus-precise", name: "솔 야누스 : 새벽 (정밀)", durationSec: 80, cooldownSec: 56, precise: "janus" },
+  { id: "erda-fountain-precise", name: "에르다 파운틴 (정밀)", durationSec: 60, cooldownSec: 56, precise: "fountain" },
   { id: "sol-janus-2min", name: "솔 야누스 : 새벽 (2분)", durationSec: 120, cooldownSec: 56 },
   { id: "sol-janus-80s", name: "솔 야누스 : 새벽 (80초)", durationSec: 80, cooldownSec: 56 },
   { id: "sol-janus-70s", name: "솔 야누스 : 새벽 (70초)", durationSec: 70, cooldownSec: 56 },
   { id: "sol-janus-1min", name: "솔 야누스 : 새벽 (1분)", durationSec: 60, cooldownSec: 56 },
-  { id: "sol-janus-precise", name: "솔 야누스 : 새벽 (정밀)", durationSec: 80, cooldownSec: 56, precise: "janus" },
   { id: "erda-fountain", name: "에르다 파운틴", durationSec: 60, cooldownSec: 56 },
-  { id: "erda-fountain-precise", name: "에르다 파운틴 (정밀)", durationSec: 60, cooldownSec: 56, precise: "fountain" },
   { id: "hologram-barrier", name: "홀로그램 그래피티 : 역장 VI", durationSec: 60, cooldownSec: 60 },
   { id: "petrified", name: "페트리파이드 VI", durationSec: 60, cooldownSec: 60 },
   { id: "frozen-ground", name: "프로즌 그라운드 VI", durationSec: 60, cooldownSec: 60 },
@@ -323,8 +324,8 @@ export interface Profile {
   collapsed: Partial<Record<PanelId | "checklist", boolean>>;
 }
 
-export type PanelId = "skills" | "rune" | "stall" | "buffs" | "booster" | "timers";
-export const PANEL_IDS: PanelId[] = ["skills", "rune", "stall", "buffs", "booster", "timers"];
+export type PanelId = "skills" | "rune" | "stall" | "buffs" | "core" | "booster" | "timers";
+export const PANEL_IDS: PanelId[] = ["skills", "rune", "stall", "buffs", "core", "booster", "timers"];
 
 export function defaultProfile(): Profile {
   return {

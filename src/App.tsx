@@ -22,7 +22,8 @@ const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => 
   skills: (p) => <SkillsPanel {...p} />,
   rune: (p) => <RunePanel {...p} />,
   stall: (p) => <StallPanel {...p} />,
-  buffs: (p) => <BuffsPanel {...p} />,
+  buffs: (p) => <BuffsPanel kind="expiry" {...p} />,
+  core: (p) => <BuffsPanel kind="cooldown" {...p} />,
   booster: (p) => <BoosterPanel {...p} />,
   timers: (p) => <TimersPanel {...p} />,
 };

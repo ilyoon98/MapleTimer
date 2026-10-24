@@ -116,7 +116,7 @@ function CorePipView() {
       <PipBackground />
       <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
       <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
-      <div className="pip-core-state muted">{!core ? "버프칸 감지에서 '+ 특수 코어'를 추가하세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
+      <div className="pip-core-state muted">{!core ? "특수 코어 알림에서 '+ 추가'를 눌러 주세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
       <ModeSwitch />
     </div>
   );

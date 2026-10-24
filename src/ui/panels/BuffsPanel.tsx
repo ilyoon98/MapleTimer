@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { storeTemplate, templateMode, trimToIconBorder, type StoredTemplate } from "../../cv/match";
-import { segment } from "../../cv/digits";
-import { debugCrops, liveStore } from "../../engine/engine";
-import { teachDigits } from "../teachDigits";
+import { storeTemplate, trimToIconBorder, type StoredTemplate } from "../../cv/match";
+import { liveStore } from "../../engine/engine";
 import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
-import { DebugCrop, NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, leadLabel } from "../common";
 import { openPicker } from "../pickerStore";
 import { BuffbarSteps } from "../guideArt";
 
@@ -19,12 +17,18 @@ function TemplateThumb({ t }: { t: StoredTemplate | null }) {
   return <img className="thumb" src={c.toDataURL()} width={32} height={32} alt="" />;
 }
 
-export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
-  const buffs = profileStore.use((p) => p.buffs);
+/**
+ * 원래 사이트처럼 두 칸으로 나눈다: '버프 종료 알림'(kind expiry)과 '특수 코어 알림'(kind cooldown).
+ * 둘 다 같은 위쪽 버프칸 영역을 쓴다.
+ */
+export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expiry" | "cooldown"; collapsed: boolean; onToggleCollapse: () => void }) {
+  const isCore = kind === "cooldown";
+  const all = profileStore.use((p) => p.buffs);
+  const buffs = all.filter((b) => b.kind === kind);
   const region = profileStore.use((p) => p.regions.buffbar);
   const add = (id: BuffPresetId) => profileStore.set((p) => ({ ...p, buffs: [...p.buffs, newBuffPreset(id)] }));
   // 아직 아무것도 등록 안 했으면 설정 방법을 펼쳐서 보여 준다
-  const [howto, setHowto] = useState(buffs.length === 0);
+  const [howto, setHowto] = useState(!isCore && buffs.length === 0);
 
   const pickRegion = () =>
     openPicker({
@@ -39,17 +43,16 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
 
   return (
     <Panel
-      title="버프칸 감지"
-      badge={<span className="badge">버프 종료 · 특수 코어</span>}
+      title={isCore ? "특수 코어 알림" : "버프 종료 알림"}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       actions={
         <>
-          <button onClick={() => setHowto(!howto)}>{howto ? "설정 방법 닫기" : "설정 방법"}</button>
+          {!isCore && <button onClick={() => setHowto(!howto)}>{howto ? "설정 방법 닫기" : "설정 방법"}</button>}
           <button onClick={pickRegion}>{region ? "버프칸 다시 선택" : "버프칸 선택"}</button>
-          {BUFF_PRESETS.map((bp) => (
+          {BUFF_PRESETS.filter((bp) => (bp.id === "core") === isCore).map((bp) => (
             <button key={bp.id} onClick={() => add(bp.id)}>
-              {bp.label}
+              + 추가
             </button>
           ))}
         </>
@@ -58,28 +61,26 @@ export function BuffsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
       {howto ? (
         <div className="howto-card">
           <div className="howto-head">
-            <b>버프칸 감지 설정 방법</b>
+            <b>버프 종료 알림 설정 방법</b>
             <button onClick={() => setHowto(false)}>닫기</button>
           </div>
           <BuffbarSteps />
         </div>
       ) : (
         <p className="panel-hint">
-          오른쪽 위 버프칸에서 등록한 아이콘을 찾아 <b>아이콘 위 남은 시간</b>을 읽고 끝나기 전에 알려요. 처음이면 <b>설정 방법</b>을 눌러 보세요.
+          {isCore
+            ? "특수 코어가 발동해 버프칸에 아이콘이 뜨면 쿨타임을 세고, 다시 쓸 수 있을 때 알려요."
+            : "오른쪽 위 버프칸에서 등록한 아이콘을 찾아 남은 시간을 읽고 끝나기 전에 알려요. 처음이면 '설정 방법'을 눌러 보세요."}
         </p>
       )}
       {buffs.length === 0 && (
-        <div className="empty">등록된 항목이 없어요. 버프칸을 선택한 뒤 위의 '+ 버프 종료', '+ 특수 코어'를 눌러 주세요. 솔 야누스·에르다 파운틴 (정밀)은 스킬 알림에서 골라요.</div>
+        <div className="empty">
+          {isCore ? "등록된 특수 코어가 없어요. 버프칸을 선택한 뒤 '+ 추가'를 눌러 주세요." : "등록된 버프가 없어요. 버프칸을 선택한 뒤 '+ 추가'를 눌러 주세요. 솔 야누스·에르다 파운틴은 스킬 알림의 (정밀)에서 골라요."}
+        </div>
       )}
       {buffs.map((b) => (
         <BuffRow key={b.id} buff={b} hasRegion={!!region} />
       ))}
-      {region && (
-        <details className="diag-details">
-          <summary>버프칸 진단 화면</summary>
-          <DebugCrop cropKey="buffbar" maxWidth={640} />
-        </details>
-      )}
     </Panel>
   );
 }
@@ -185,7 +186,6 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
               <option value="slot">정한 자리만 보기 (버프 즐겨찾기 칸)</option>
             </select>
             {b.slot && <button onClick={pickSlot}>자리 다시 선택</button>}
-            {b.slot && <DebugCrop cropKey={`slot:${b.id}`} maxWidth={96} />}
           </div>
           {isCore ? (
             <div className="field-row">
@@ -218,47 +218,12 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
                   </>
                 )}
               </div>
-              {b.readTime && (
-                <div className="field-row">
-                  <DebugCrop cropKey={`buff:${b.id}`} maxWidth={96} />
-                  <button
-                    title="자동 학습이 잘 안 될 때: 아이콘에 남은 시간 숫자가 보일 때 눌러서 직접 입력"
-                    onClick={() => {
-                      const img = debugCrops.get(`buff:${b.id}`);
-                      teachDigits(img ? segment(img) : null, `'${b.name}' 아이콘`);
-                    }}
-                  >
-                    숫자 직접 가르치기
-                  </button>
-                </div>
-              )}
               <div className="field-row">
-                <Toggle checked={b.readTime} onChange={(v) => updateBuff(b.id, { readTime: v })} label="아이콘의 남은 시간 숫자 읽기 (정밀)" />
+                <Toggle checked={b.readTime} onChange={(v) => updateBuff(b.id, { readTime: v })} label="아이콘의 남은 시간 읽기" />
                 <Toggle checked={b.alertOnDisappear} onChange={(v) => updateBuff(b.id, { alertOnDisappear: v })} label="아이콘이 사라지면 알림" />
               </div>
               <p className="muted small">지속시간은 아이콘이 나타난 순간부터 셉니다. 켜기 전부터 걸려 있던 버프는 사라질 때만 알 수 있어요.</p>
             </>
-          )}
-          <div className="field-row">
-            <span className="field-label">일치 기준</span>
-            <NumberInput value={b.minScore} min={0.5} max={0.99} step={0.01} onChange={(v) => updateBuff(b.id, { minScore: v })} />
-            <span className="muted">현재 일치도가 버프가 있을 때 이 값보다 높고, 없을 때 낮아야 해요.</span>
-          </div>
-          {b.template && (
-            <div className="field-row">
-              <span className="field-label">비교 방식</span>
-              <select
-                value={templateMode(b.template)}
-                onChange={(e) =>
-                  b.template && updateBuff(b.id, { template: { ...b.template, matchMode: e.target.value as "ring" | "noText" | "full" } })
-                }
-              >
-                <option value="ring">테두리만 (기본)</option>
-                <option value="noText">아이콘 전체 (숫자 부분만 제외)</option>
-                <option value="full">아이콘 전체</option>
-              </select>
-              <span className="muted small">다른 버프와 헷갈리면 '아이콘 전체 (숫자 부분만 제외)'를 써 보세요.</span>
-            </div>
           )}
           <AlertSettings
             value={b.alert}
