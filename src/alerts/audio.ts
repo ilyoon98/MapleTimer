@@ -33,6 +33,15 @@ const PATTERNS: Record<BeepPattern, Array<[freq: number, startSec: number, durSe
   ],
 };
 
+/**
+ * 음성 읽기는 브라우저가 100% 를 넘겨 키울 수 없어서, 목소리를 고르지 않았으면 큰 목소리를 먼저 쓴다.
+ * 윈도우 기본 목소리(Microsoft Heami)는 작게 들리고, 인터넷 목소리(Google 한국의, Edge 의 Online 목소리)가 크고 또렷하다.
+ */
+export function loudKoreanVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  const ko = voices.filter((v) => v.lang.toLowerCase().startsWith("ko"));
+  return ko.find((v) => /google/i.test(v.name)) ?? ko.find((v) => /online/i.test(v.name)) ?? ko.find((v) => !v.localService) ?? ko[0];
+}
+
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private buffers = new Map<string, AudioBuffer>();
@@ -77,8 +86,7 @@ class AudioEngine {
     u.volume = vol;
     u.rate = this.ttsRate;
     const voices = speechSynthesis.getVoices();
-    const voice =
-      (this.ttsVoiceURI && voices.find((v) => v.voiceURI === this.ttsVoiceURI)) || voices.find((v) => v.lang.startsWith("ko"));
+    const voice = (this.ttsVoiceURI && voices.find((v) => v.voiceURI === this.ttsVoiceURI)) || loudKoreanVoice(voices);
     if (voice) u.voice = voice;
     return new Promise((resolve) => {
       const done = () => resolve();

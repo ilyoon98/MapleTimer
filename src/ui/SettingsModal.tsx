@@ -158,7 +158,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <div className="field-row">
             <span className="field-label">읽어주는 목소리</span>
             <select value={ttsVoice ?? ""} onChange={(e) => profileStore.set({ ttsVoice: e.target.value || null })}>
-              <option value="">자동 (첫 한국어 목소리)</option>
+              <option value="">자동 (크게 들리는 목소리 먼저)</option>
               {voices.map((v) => (
                 <option key={v.voiceURI} value={v.voiceURI}>
                   {v.name} {v.localService ? "" : "(온라인)"}
