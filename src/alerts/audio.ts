@@ -88,13 +88,23 @@ class AudioEngine {
     const voices = speechSynthesis.getVoices();
     const voice = (this.ttsVoiceURI && voices.find((v) => v.voiceURI === this.ttsVoiceURI)) || loudKoreanVoice(voices);
     if (voice) u.voice = voice;
+    // 크롬은 탭이 뒤에 오래 있으면 음성 읽기가 '대기 중'에 걸린 채 멈추는 일이 있다.
+    // 읽기 전에 깨우고, 2초 안에 시작을 안 하면(다른 음성도 안 읽는 중인데) 막힌 걸 풀고 비프음으로 대신 알린다
+    speechSynthesis.resume();
     return new Promise((resolve) => {
+      let started = false;
       const done = () => resolve();
+      u.onstart = () => (started = true);
       u.onend = done;
       u.onerror = done;
       // 일부 환경에서 onend 가 오지 않는 경우 대비
       setTimeout(done, 1500 + text.length * 250);
       speechSynthesis.speak(u);
+      setTimeout(() => {
+        if (started || speechSynthesis.speaking) return;
+        speechSynthesis.cancel();
+        void this.beep("double", vol).then(done);
+      }, 2000);
     });
   }
 
