@@ -44,7 +44,13 @@ let perfAvg = 0;
 let perfMax = 0;
 let perfMaxAt = 0;
 
+let lastTickAt = 0;
+
 function tick(now: number) {
+  // 확인이 10초 넘게 끊겼다가 다시 돌면 기록 (크롬이 탭을 멈추는 설정 등). 다음에 원인을 바로 알 수 있게
+  if (lastTickAt && now - lastTickAt > 10_000 && screenCapture.state === "live")
+    emitAlertLog(`감지가 ${Math.round((now - lastTickAt) / 1000)}초 멈췄어요 (크롬이 탭을 멈췄을 수 있어요)`, now);
+  lastTickAt = now;
   const t0 = performance.now();
   tickInner(now);
   const ms = performance.now() - t0;

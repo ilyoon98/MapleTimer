@@ -79,12 +79,30 @@ export class ScreenCapture {
         this.video = v;
       }
       this.state = "live";
+      this.holdAwake();
     } catch (err) {
       this.state = "idle";
       this.emit();
       throw err;
     }
     this.emit();
+  }
+
+  /**
+   * 화면 공유 중에는 웹 잠금을 잡아 둔다. 크롬은 잠금을 잡은 탭을 멈추지(freeze) 않아서,
+   * 다른 탭·다른 창을 보고 있어도 감지가 계속 돈다. 공유가 끝나면 풀린다.
+   */
+  private holdAwake() {
+    const locks = (navigator as Navigator & { locks?: LockManager }).locks;
+    if (!locks) return;
+    void locks.request("maple-timer-awake", () => new Promise<void>((release) => {
+      const check = setInterval(() => {
+        if (this.state !== "live") {
+          clearInterval(check);
+          release();
+        }
+      }, 5000);
+    }));
   }
 
   private async pump(reader: ReadableStreamDefaultReader<VideoFrame>) {
