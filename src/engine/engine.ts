@@ -160,6 +160,11 @@ export function startEngine() {
   if (started) return;
   started = true;
   appTicker.subscribe(tick);
+  screenCapture.onFrame(() => appTicker.pulse());
+  const resume = () => appTicker.pulse();
+  document.addEventListener("visibilitychange", resume);
+  document.addEventListener("resume", resume);
+  window.addEventListener("pageshow", resume);
   appTicker.start();
 }
 

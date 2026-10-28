@@ -48,6 +48,10 @@ const SECTIONS: Array<{ id: string; title: string; body: ReactNode }> = [
           </li>
         </ol>
         <MockScreen />
+        <p>
+          다른 탭을 함께 쓴다면 <b>PIP 타이머</b>를 열어 두세요. 보이는 작은 창에서도 감지를 계속 확인해요.
+          게임 창은 최소화하지 마세요. 공유 상태가 '화면이 멈춤'이거나 '화면 공유가 끝났어요'로 바뀌면 공유를 다시 시작해 주세요.
+        </p>
       </>
     ),
   },

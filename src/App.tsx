@@ -91,6 +91,7 @@ function ShareChip() {
         화면 공유 시작
       </button>
       {err && <span className="error">{err}</span>}
+      {cap.state === "ended" && screenCapture.error && <span className="error">{screenCapture.error}</span>}
     </div>
   );
 }

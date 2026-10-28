@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { screenCapture } from "../capture/screenCapture";
+import { appTicker } from "../core/ticker";
 import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
 import { PIP_ALERT_COLORS, PIP_SIZES, profileStore, shortName, type PipAlertColor } from "../state/profile";
@@ -48,7 +49,10 @@ export async function openPip() {
   pipRoot = createRoot(mount);
   pipRoot.render(<PipRoot />);
   pipStore.set({ open: true });
+  // 보이는 PIP 창의 타이머도 감지를 깨운다. 원래 탭의 워커 신호가 늦어져도 계속 확인한다.
+  const heartbeat = pip.setInterval(() => appTicker.pulse(), 250);
   pip.addEventListener("pagehide", () => {
+    pip.clearInterval(heartbeat);
     pipRoot?.unmount();
     pipRoot = null;
     pipStore.set({ open: false });

@@ -25,11 +25,31 @@ export class ScreenCapture {
   private ctx = this.canvas.getContext("2d", { willReadFrequently: true })!;
   private frameStamp = 0;
   private drawnStamp = -1;
-  /** 마지막으로 새 프레임이 들어온 시각 (Date.now). video 대체 경로에서는 알 수 없어 null */
+  /** 마지막으로 새 프레임이 들어온 시각 (Date.now). 첫 프레임 전에는 공유 시작 시각 */
   lastFrameAt: number | null = null;
   /** 내부 캔버스에 마지막으로 그린 프레임이 들어온 시각 */
   drawnAt: number | null = null;
   private listeners = new Set<() => void>();
+  private frameListeners = new Set<() => void>();
+  private generation = 0;
+  private releaseAwake: (() => void) | null = null;
+  private awakeAbort: AbortController | null = null;
+  private videoFrameId: number | null = null;
+  private videoTime = -1;
+  error: string | null = null;
+
+  onFrame(l: () => void) {
+    this.frameListeners.add(l);
+    return () => { this.frameListeners.delete(l); };
+  }
+
+  private frameArrived() {
+    this.frameStamp++;
+    this.lastFrameAt = Date.now();
+    for (const l of this.frameListeners) {
+      try { l(); } catch (err) { console.error("[capture frame]", err); }
+    }
+  }
 
   onChange(l: () => void) {
     this.listeners.add(l);
@@ -45,6 +65,8 @@ export class ScreenCapture {
 
   async start() {
     this.stop("user");
+    const generation = this.generation;
+    this.error = null;
     this.lastFrameAt = null;
     this.drawnAt = null;
     this.state = "starting";
@@ -64,72 +86,114 @@ export class ScreenCapture {
               selfBrowserSurface: "exclude",
               surfaceSwitching: "include",
             });
+      if (generation !== this.generation) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       this.stream = stream;
       const track = stream.getVideoTracks()[0];
       // 게임 창이 닫히거나 브라우저의 '공유 중지'로 끊긴 경우
-      track.addEventListener("ended", () => this.stop("ended"));
+      track.addEventListener("ended", () => {
+        if (generation === this.generation) this.stop("ended");
+      });
+      let reader: ReadableStreamDefaultReader<VideoFrame> | null = null;
       if (TrackProcessor) {
-        void this.pump(new TrackProcessor({ track }).readable.getReader());
-      } else {
+        try { reader = new TrackProcessor({ track }).readable.getReader(); }
+        catch { /* API가 노출돼 있어도 사용할 수 없는 환경은 video로 대체 */ }
+      }
+      if (!reader) {
         const v = document.createElement("video");
         v.muted = true;
         v.playsInline = true;
         v.srcObject = stream;
-        await v.play();
         this.video = v;
+        await v.play();
+        if (generation !== this.generation) { v.srcObject = null; return; }
       }
       this.state = "live";
+      // 최초 프레임이 오지 않는 경우도 멈춤으로 표시한다.
+      this.lastFrameAt = Date.now();
       this.holdAwake();
+      if (reader) void this.pump(reader, generation);
+      else this.watchVideoFrames(generation);
     } catch (err) {
-      this.state = "idle";
-      this.emit();
+      if (generation !== this.generation) return;
+      this.stop("user");
+      this.error = (err as Error).message;
       throw err;
     }
     this.emit();
   }
 
   /**
-   * 화면 공유 중에는 웹 잠금을 잡아 둔다. 크롬은 잠금을 잡은 탭을 멈추지(freeze) 않아서,
-   * 다른 탭·다른 창을 보고 있어도 감지가 계속 돈다. 공유가 끝나면 풀린다.
+   * 공유 세션마다 별도 잠금을 잡고 즉시 해제한다.
+   * Web Lock은 브라우저의 백그라운드 실행을 보장하는 API는 아니다.
    */
   private holdAwake() {
     const locks = (navigator as Navigator & { locks?: LockManager }).locks;
     if (!locks) return;
-    void locks.request("maple-timer-awake", () => new Promise<void>((release) => {
-      const check = setInterval(() => {
-        if (this.state !== "live") {
-          clearInterval(check);
-          release();
-        }
-      }, 5000);
-    }));
+    const controller = new AbortController();
+    this.awakeAbort = controller;
+    void locks.request("maple-timer-awake", { mode: "shared", signal: controller.signal }, () => {
+      if (controller.signal.aborted) return;
+      return new Promise<void>((release) => { this.releaseAwake = release; });
+    }).catch((err: unknown) => {
+      if (!controller.signal.aborted) console.warn("[capture lock]", err);
+    });
   }
 
-  private async pump(reader: ReadableStreamDefaultReader<VideoFrame>) {
+  private watchVideoFrames(generation: number) {
+    const video = this.video;
+    if (!video?.requestVideoFrameCallback) return;
+    this.videoFrameId = video.requestVideoFrameCallback(() => {
+      if (generation !== this.generation) return;
+      this.videoTime = video.currentTime;
+      this.frameArrived();
+      this.watchVideoFrames(generation);
+    });
+  }
+
+  private async pump(reader: ReadableStreamDefaultReader<VideoFrame>, generation: number) {
     this.reader = reader;
     try {
       for (;;) {
         const { value, done } = await reader.read();
+        if (generation !== this.generation) { value?.close(); return; }
         if (done || !value) break;
         this.latest?.close();
         this.latest = value;
-        this.frameStamp++;
-        this.lastFrameAt = Date.now();
+        this.frameArrived();
       }
-    } catch {
-      /* 스트림 종료 */
+    } catch (err) {
+      if (generation === this.generation) this.error = `화면 수신 오류: ${(err as Error).message}`;
+    } finally {
+      if (generation === this.generation && this.state === "live") {
+        this.error ??= "화면 수신이 중단됐어요. 화면 공유를 다시 시작해 주세요.";
+        this.stop("ended");
+      }
     }
   }
 
   /** user: 이 앱에서 직접 멈춤(알림 없음), ended: 공유가 바깥에서 끊김 */
   stop(reason: "user" | "ended" = "user") {
+    this.generation++;
+    this.awakeAbort?.abort();
+    this.awakeAbort = null;
+    this.releaseAwake?.();
+    this.releaseAwake = null;
     this.reader?.cancel().catch(() => {});
     this.reader = null;
     this.latest?.close();
     this.latest = null;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
-    if (this.video) this.video.srcObject = null;
+    if (this.video) {
+      if (this.videoFrameId != null) this.video.cancelVideoFrameCallback?.(this.videoFrameId);
+      this.video.pause();
+      this.video.srcObject = null;
+    }
+    this.videoFrameId = null;
+    this.videoTime = -1;
     this.video = null;
     if (this.state !== "idle") {
       this.state = reason === "ended" ? "ended" : "idle";
@@ -144,6 +208,11 @@ export class ScreenCapture {
     const w = src instanceof HTMLVideoElement ? src.videoWidth : src.displayWidth;
     const h = src instanceof HTMLVideoElement ? src.videoHeight : src.displayHeight;
     if (!w || !h) return false;
+    // video 대체 경로도 실제 재생 위치가 진행될 때만 도착 시각을 갱신한다.
+    if (src instanceof HTMLVideoElement && src.currentTime !== this.videoTime) {
+      this.videoTime = src.currentTime;
+      this.lastFrameAt = Date.now();
+    }
     if (src instanceof HTMLVideoElement || this.drawnStamp !== this.frameStamp) {
       if (this.canvas.width !== w || this.canvas.height !== h) {
         this.canvas.width = w;
@@ -154,7 +223,7 @@ export class ScreenCapture {
       this.height = h;
       this.ctx.drawImage(src, 0, 0);
       this.drawnStamp = this.frameStamp;
-      this.drawnAt = src instanceof HTMLVideoElement ? Date.now() : this.lastFrameAt;
+      this.drawnAt = this.lastFrameAt;
       if (sizeChanged) this.emit();
     }
     return true;

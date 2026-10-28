@@ -83,7 +83,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       kind: "maple-timer-diagnostics",
       savedAt: new Date().toISOString(),
       userAgent: navigator.userAgent,
-      capture: { state: screenCapture.state, width: screenCapture.width, height: screenCapture.height },
+      capture: {
+        state: screenCapture.state, width: screenCapture.width, height: screenCapture.height,
+        lastFrameAt: screenCapture.lastFrameAt, drawnAt: screenCapture.drawnAt,
+        error: screenCapture.error, visibility: document.visibilityState,
+      },
       profile: profileStore.get(),
       learnedDigits: digitStore.get(),
       live: {
