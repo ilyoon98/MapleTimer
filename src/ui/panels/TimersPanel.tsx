@@ -140,7 +140,7 @@ function TimerRow({ t }: { t: TimerEntry }) {
           </button>
         </div>
       </div>
-      <div className="row-sub">
+      <details className="row-sub compact-settings"><summary>설정</summary>
         <AlertSettings
           value={t.alert}
           onChange={(alert) => updateTimer(t.id, { alert })}
@@ -170,7 +170,7 @@ function TimerRow({ t }: { t: TimerEntry }) {
             </>
           )}
         </div>
-      </div>
+      </details>
     </div>
   );
 }

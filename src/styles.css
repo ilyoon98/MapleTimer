@@ -1282,3 +1282,14 @@ input[type="text"] {
   width: 26px;
   height: 26px;
 }
+.capture-sources { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; max-height:55vh; overflow:auto; margin:12px 0; }
+.capture-sources button { display:flex; flex-direction:column; text-align:left; gap:6px; padding:8px; }
+.capture-sources img { width:100%; aspect-ratio:16/9; object-fit:contain; background:#111; }
+.capture-sources span { overflow-wrap:anywhere; }
+.capture-sources .capture-selected { outline:2px solid #56b687; outline-offset:-2px; }
+.compact-settings > summary { cursor:pointer; color:var(--muted); padding:6px 0; }
+.compact-settings[open] > summary { margin-bottom:8px; }
+.capture-sources + .error { white-space:normal; }
+.capture-sources button { min-width:0; }
+.capture-sources span { max-width:100%; white-space:normal; }
+.modal-head h2 { margin:0; flex:1; font-size:20px; }

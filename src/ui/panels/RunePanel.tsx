@@ -58,7 +58,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
             <button onClick={pickRegion}>{region ? "미니맵 다시 선택" : "미니맵 선택"}</button>
           </div>
         </div>
-        <div className="row-sub">
+        <details className="row-sub compact-settings"><summary>설정</summary>
           <AlertSettings value={rune.alert} onChange={(alert) => setRune({ alert })} speech={RUNE_TEXT} />
           {region && (
             <div className="field-row">
@@ -67,7 +67,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
               <span className="muted small">초록 상자 = 찾은 룬</span>
             </div>
           )}
-        </div>
+        </details>
       </div>
     </Panel>
   );

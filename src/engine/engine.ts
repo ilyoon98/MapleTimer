@@ -12,7 +12,10 @@ import { detectBuffs, isBuffPresent, preciseBuffId, preciseSkillBuffs, tickBuffT
 import { tickBooster } from "./booster";
 import { recordClip } from "./clip";
 import { debugCrops, liveStore } from "./live";
-import { tickRune, tickStall } from "./runeStall";
+import { resetVisualWatch, tickRune, tickStall } from "./runeStall";
+import { FrameGate } from "../capture/frameGate";
+import { resetBuffObservations } from "./buffs";
+import { resetBoosterObservations } from "./booster";
 import { pruneRunners, runnerLabel, runners } from "./shared";
 import { interruptSkillWatch, resumeSkillWatch, tickSkills } from "./skills";
 import { tickTimers } from "./timers";
@@ -45,6 +48,7 @@ let perfMax = 0;
 let perfMaxAt = 0;
 
 let lastTickAt = 0;
+const frameGate = new FrameGate();
 
 function tick(now: number) {
   // 확인이 10초 넘게 끊겼다가 다시 돌면 기록 (크롬이 탭을 멈추는 설정 등). 다음에 원인을 바로 알 수 있게
@@ -72,10 +76,20 @@ function tickInner(now: number) {
   audioEngine.ttsRate = p.ttsRate;
   randomDelaySetting.enabled = p.randomDelay;
   checkShareEnded(p, now);
-  const live = screenCapture.state === "live" && screenCapture.refresh();
+  const available = screenCapture.state === "live" && screenCapture.refresh();
+  const frame = frameGate.sample(screenCapture.sessionId, screenCapture.frameId, screenCapture.drawnAt, now, available);
+  const live = frame.usable;
+  if (frame.reset) {
+    resetVisualWatch();
+    resetBuffObservations();
+    resetBoosterObservations();
+    resumeSkillWatch();
+    lastSlow = 0;
+    lastBuff = 0;
+  }
   const prev = liveStore.get();
   const stats = live ? screenCapture.frameStats() : null;
-  recordClip(p, now, live, stats?.mean ?? null);
+  if (frame.fresh || !live) recordClip(p, now, live, stats?.mean ?? null);
 
   // 화면 전환 중(맵 이동·로딩으로 화면 전체가 어두워짐)에는 퀵슬롯·버프칸·부스터를 보지 않는다.
   // 실제 게임에서 화면이 어두워질 때 모든 퀵슬롯이 '스킬 사용'으로, 버프가 '사라짐'으로 잘못 잡혔다.
@@ -86,12 +100,14 @@ function tickInner(now: number) {
   if (watch && !wasWatching) resumeSkillWatch();
   wasWatching = watch;
 
-  const skills = tickSkills(p, now, watch);
+  const skills = tickSkills(p, now, watch && frame.fresh);
+  // 같은 프레임을 건너뛰는 동안도 설정된 영역이 사라진 것처럼 표시하지 않는다.
+  if (live && !frame.fresh) for (const id of Object.keys(skills)) skills[id].regionOk = prev.skills[id]?.regionOk ?? false;
   // (정밀) 스킬은 버프 아이콘으로 본다: 버프칸 감지 항목에 붙여서 같이 돌린다
   const pb: Profile = { ...p, buffs: [...p.buffs, ...preciseSkillBuffs(p, screenCapture.width, screenCapture.height)] };
 
   let booster = prev.booster;
-  if (now - lastBuff >= 500) {
+  if (frame.fresh && now - lastBuff >= 500) {
     lastBuff = now;
     detectBuffs(pb, now, watch);
     if (!transition) booster = tickBooster(p, now, live);
@@ -99,7 +115,7 @@ function tickInner(now: number) {
   } else {
     runners.get("booster")?.tick(now);
   }
-  trackBuffIcons(pb, now, watch);
+  trackBuffIcons(pb, now, watch && frame.fresh);
   const buffs = tickBuffTimers(pb, now);
   for (const s of p.skills) {
     const b = preciseIcon(s) ? buffs[preciseBuffId(s.id)] : undefined;
@@ -122,7 +138,7 @@ function tickInner(now: number) {
 
   let rune = prev.rune;
   let stall = prev.stall;
-  if (now - lastSlow >= 1000) {
+  if ((frame.fresh || !live) && now - lastSlow >= 1000) {
     lastSlow = now;
     rune = tickRune(p, now, live, prev.rune);
     stall = tickStall(p, now, live, isBuffPresent);

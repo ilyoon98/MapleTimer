@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
+import { desktop } from "../platform/desktop";
 import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
 import { PIP_ALERT_COLORS, PIP_SIZES, profileStore, shortName, type PipAlertColor } from "../state/profile";
@@ -19,20 +20,26 @@ declare global {
 
 export const pipStore = createStore<{ open: boolean }>({ open: false });
 let pipRoot: Root | null = null;
+let overlay: Window | null = null;
 
-export const pipSupported = () => typeof window !== "undefined" && !!window.documentPictureInPicture;
+export const pipSupported = () => !!desktop || !!window.documentPictureInPicture;
 
 /** 게임 위에 항상 떠 있는 작은 타이머 창 (Chrome Document Picture-in-Picture) */
 export async function openPip() {
-  if (!window.documentPictureInPicture) {
+  if (!desktop && !window.documentPictureInPicture) {
     alert("이 브라우저는 PIP 창을 지원하지 않아요. 최신 Chrome 이나 Edge 에서 열어 주세요.");
     return;
   }
-  if (window.documentPictureInPicture.window) return;
+  if (overlay && !overlay.closed) { overlay.focus(); return; }
+  if (!desktop && window.documentPictureInPicture?.window) return;
   let pip: Window;
   try {
     const size = PIP_SIZES[profileStore.get().pipSize] ?? PIP_SIZES.medium;
-    pip = await window.documentPictureInPicture.requestWindow({ width: size.width, height: size.height });
+    if (desktop) {
+      const popup = window.open('about:blank', 'maple-overlay', `width=${size.width},height=${size.height}`);
+      if (!popup) throw new Error('타이머 창을 열지 못했어요.');
+      pip = popup;
+    } else pip = await window.documentPictureInPicture!.requestWindow({ width: size.width, height: size.height });
   } catch (e) {
     alert(`PIP 창을 열 수 없어요. 일반 Chrome/Edge 창에서 열어 주세요.\n(${(e as Error).message})`);
     return;
@@ -48,6 +55,7 @@ export async function openPip() {
   pip.document.body.appendChild(mount);
   pipRoot = createRoot(mount);
   pipRoot.render(<PipRoot />);
+  overlay = pip;
   pipStore.set({ open: true });
   // 보이는 PIP 창의 타이머도 감지를 깨운다. 원래 탭의 워커 신호가 늦어져도 계속 확인한다.
   const heartbeat = pip.setInterval(() => appTicker.pulse(), 250);
@@ -55,11 +63,13 @@ export async function openPip() {
     pip.clearInterval(heartbeat);
     pipRoot?.unmount();
     pipRoot = null;
+    overlay = null;
     pipStore.set({ open: false });
   });
 }
 
 export function closePip() {
+  overlay?.close();
   window.documentPictureInPicture?.window?.close();
 }
 

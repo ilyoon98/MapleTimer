@@ -37,6 +37,8 @@ export class ScreenCapture {
   private videoFrameId: number | null = null;
   private videoTime = -1;
   error: string | null = null;
+  get sessionId() { return this.generation; }
+  get frameId() { return this.frameStamp; }
 
   onFrame(l: () => void) {
     this.frameListeners.add(l);
@@ -211,6 +213,7 @@ export class ScreenCapture {
     // video 대체 경로도 실제 재생 위치가 진행될 때만 도착 시각을 갱신한다.
     if (src instanceof HTMLVideoElement && src.currentTime !== this.videoTime) {
       this.videoTime = src.currentTime;
+      this.frameStamp++;
       this.lastFrameAt = Date.now();
     }
     if (src instanceof HTMLVideoElement || this.drawnStamp !== this.frameStamp) {

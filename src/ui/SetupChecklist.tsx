@@ -2,7 +2,7 @@ import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { digitStore, learnedDigitCount } from "../detect/digitLearner";
 import { liveStore } from "../engine/engine";
-import { profileStore } from "../state/profile";
+import { preciseIcon, profileStore } from "../state/profile";
 
 interface Step {
   done: boolean;
@@ -24,7 +24,9 @@ export function SetupChecklist() {
   const ok = (key: keyof typeof p.regions) => live && regionValidFor(p.regions[key], w, h);
 
   const skillsOn = p.skills.filter((s) => s.enabled);
-  const skillsReady = skillsOn.filter((s) => live && regionValidFor(p.regions[`skill:${s.id}`], w, h) && s.readyRef);
+  const skillsReady = skillsOn.filter((s) => live && (preciseIcon(s)
+    ? s.where !== 'favorites' || ok('favorites')
+    : regionValidFor(p.regions[`skill:${s.id}`], w, h) && s.readyRef));
   const buffsOn = p.buffs.filter((b) => b.enabled);
   const onBar = buffsOn.filter((b) => !b.slot);
 
@@ -39,14 +41,14 @@ export function SetupChecklist() {
             : `화면 공유 중 (${w}×${h})`
         : "화면 공유 시작",
       hint: !live
-        ? "오른쪽 위 '화면 공유 시작' → 메이플스토리 창 선택"
+        ? "'메이플 연결'을 누르세요"
         : black
           ? "'다른 창 선택' → '전체 화면' 탭에서 모니터를 골라 주세요"
           : "게임 창이 최소화되면 화면이 멈춰요",
     },
     {
       done: skillsOn.length === 0 || skillsReady.length === skillsOn.length,
-      text: `스킬 퀵슬롯 영역 ${skillsReady.length}/${skillsOn.length}`,
+      text: `스킬 준비 ${skillsReady.length}/${skillsOn.length}`,
       hint: "각 스킬의 '영역 선택'을 스킬이 준비된 상태에서",
       optional: skillsOn.length === 0,
     },
@@ -69,11 +71,11 @@ export function SetupChecklist() {
     },
     {
       // 정한 자리(버프 즐겨찾기 칸)를 쓰는 버프는 위쪽 버프칸이 없어도 된다
-      done: buffsOn.length === 0 || ((onBar.length === 0 || ok("buffbar")) && buffsOn.every((b) => b.template)),
+      done: buffsOn.length === 0 || ((onBar.length === 0 || ok("buffbar")) && buffsOn.every((b) => (b.template || b.icon) && (!b.slot || regionValidFor(b.slot, w, h)))),
       text:
         buffsOn.length === 0
           ? "버프칸 감지 항목 없음"
-          : `버프칸: ${onBar.length === 0 ? "정한 자리만 사용" : ok("buffbar") ? "선택됨" : "영역 선택"} · 아이콘 ${buffsOn.filter((b) => b.template).length}/${buffsOn.length}`,
+          : '버프 감지 위치를 확인해 주세요',
       optional: buffsOn.length === 0,
     },
     {
@@ -88,8 +90,7 @@ export function SetupChecklist() {
   return (
     <section className={`checklist ${remaining === 0 ? "checklist-done" : ""}`}>
       <header className="checklist-head" onClick={toggle}>
-        <b>{remaining === 0 ? "✓ 준비 완료" : `준비 체크리스트 · ${remaining}개 남음`}</b>
-        {remaining > 0 && <span className="muted small">끝난 항목 {steps.filter((s) => s.done).length}개는 숨겼어요</span>}
+        <b>{remaining === 0 ? "✓ 설정 완료" : `연결 준비 · ${remaining}개 남음`}</b>
         <span className="spacer" />
         <span className="muted">{hidden ? "▸" : "▾"}</span>
       </header>

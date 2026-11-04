@@ -144,7 +144,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
           </button>
         </div>
       </div>
-      <div className="row-sub">
+      <details className="row-sub compact-settings"><summary>설정</summary>
         <AlertSettings
           value={s.alert}
           onChange={(alert) => updateSkill(s.id, { alert })}
@@ -177,7 +177,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
             <NumberInput value={s.durationSec} min={1} max={3600} suffix="초" onChange={(v) => updateSkill(s.id, { durationSec: v })} />
           </div>
         )}
-      </div>
+      </details>
     </div>
   );
 }

@@ -17,6 +17,7 @@ interface BoosterRuntime {
   readText: string | null;
 }
 const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: null, alerted: false, readText: null };
+export function resetBoosterObservations() { boosterRt.ests.reset(); }
 
 /** 부스터 진단 화면의 '직접 가르치기'용: 마지막으로 나눈 글자 */
 export let lastBoosterSegment: ReturnType<typeof segment> | null = null;

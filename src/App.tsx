@@ -17,6 +17,8 @@ import { ReplayLoader } from "./dev/ReplayLoader";
 import { GuideModal } from "./ui/Guide";
 import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
+import { CapturePicker } from "./ui/CapturePicker";
+import { desktop } from "./platform/desktop";
 
 const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => void }) => React.ReactNode> = {
   skills: (p) => <SkillsPanel {...p} />,
@@ -56,6 +58,7 @@ function ShareChip() {
   const stale = liveStore.use((s) => s.captureStale);
   const black = liveStore.use((s) => s.captureBlack);
   const [err, setErr] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
   const start = async () => {
     setErr(null);
     audioEngine.unlock();
@@ -64,6 +67,7 @@ function ShareChip() {
     } catch (e) {
       const name = (e as Error).name;
       if (name !== "NotAllowedError") setErr((e as Error).message);
+      if (desktop) throw e;
     }
   };
   if (cap.state === "live")
@@ -80,18 +84,20 @@ function ShareChip() {
           "화면 공유 중"
         )}{" "}
         {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
-        <button onClick={start}>다른 창 선택</button>
+        <button onClick={() => desktop ? setPicking(true) : void start()}>다른 창 선택</button>
         <button onClick={() => screenCapture.stop("user")}>중지</button>
+        {picking && <CapturePicker onSelect={start} onClose={() => setPicking(false)} />}
       </div>
     );
   return (
     <div className="share-chip share-off">
       <span className="dot" /> {cap.state === "starting" ? "선택 대기 중…" : cap.state === "ended" ? "화면 공유가 끝났어요" : "화면 공유 필요"}
-      <button className="primary" onClick={start} disabled={cap.state === "starting"}>
-        화면 공유 시작
+      <button className="primary" onClick={() => desktop ? setPicking(true) : void start()} disabled={cap.state === "starting"}>
+        메이플 연결
       </button>
       {err && <span className="error">{err}</span>}
       {cap.state === "ended" && screenCapture.error && <span className="error">{screenCapture.error}</span>}
+      {picking && <CapturePicker onSelect={start} onClose={() => setPicking(false)} />}
     </div>
   );
 }

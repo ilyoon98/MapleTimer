@@ -7,6 +7,7 @@ import type { Profile } from "../state/profile";
  * 진단 파일에 같이 넣어 두면, 그 30초를 개발 모드에서 다시 재생해 실제 게임 문제를 그대로 재현할 수 있다.
  */
 export const CLIP_MS = 30_000;
+export const CLIP_MAX_BYTES = 32 * 1024 * 1024;
 /** 엔진처럼 0.25초마다 (tick 이 조금 늦어도 건너뛰지 않게 여유를 둔다) */
 const STEP_MS = 250;
 
@@ -15,25 +16,32 @@ interface ClipFrame {
   /** 화면 전체 평균 밝기 (재생할 때 바탕 밝기로 써서 맵 이동 암전도 재현) */
   mean: number;
   crops: Record<string, ImageData>;
+  bytes: number;
 }
 const frames: ClipFrame[] = [];
 let last = 0;
+let retainedBytes = 0;
+export const clipUsage = () => ({ bytes: retainedBytes, frames: frames.length, maxBytes: CLIP_MAX_BYTES });
 
 export function recordClip(p: Profile, now: number, live: boolean, mean: number | null) {
   if (!live) {
     frames.length = 0; // 공유가 끊기면 이어 붙이지 않는다
+    retainedBytes = 0;
     return;
   }
   if (now - last < STEP_MS - 60) return;
   last = now;
   const crops: Record<string, ImageData> = {};
+  let bytes = 0;
   for (const [key, r] of Object.entries(p.regions)) {
     if (!regionValidFor(r, screenCapture.width, screenCapture.height)) continue;
+    if (bytes + r.w * r.h * 4 > CLIP_MAX_BYTES) continue;
     const img = screenCapture.crop(r);
-    if (img) crops[key] = img;
+    if (img) { crops[key] = img; bytes += img.data.byteLength; }
   }
-  frames.push({ t: now, mean: mean ?? 0, crops });
-  while (frames.length && now - frames[0].t > CLIP_MS) frames.shift();
+  frames.push({ t: now, mean: mean ?? 0, crops, bytes });
+  retainedBytes += bytes;
+  while (frames.length && (now - frames[0].t > CLIP_MS || retainedBytes > CLIP_MAX_BYTES)) retainedBytes -= frames.shift()!.bytes;
 }
 
 /** 진단 파일에 넣는 형식: 영역 위치 + 0.25초마다의 영역 그림(PNG) */

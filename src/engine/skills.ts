@@ -242,6 +242,7 @@ export function resumeSkillWatch() {
     rt.digitsAbsentSince = null;
     rt.cycleStart = null;
     rt.readCasts.reset();
+    rt.recorder.reset();
     rt.resync = true;
   }
 }

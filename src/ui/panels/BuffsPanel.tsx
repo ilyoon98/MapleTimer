@@ -154,7 +154,7 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
           </button>
         </div>
       </div>
-      <div className="row-sub">
+      <details className="row-sub compact-settings"><summary>설정</summary>
         <AlertSettings
           value={b.alert}
           onChange={(alert) => updateBuff(b.id, { alert })}
@@ -205,7 +205,7 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
             </>
           )}
         </div>
-      </div>
+      </details>
     </div>
   );
 }

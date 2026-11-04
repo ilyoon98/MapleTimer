@@ -58,14 +58,14 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
             <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>
           </div>
         </div>
-        <div className="row-sub">
+        <details className="row-sub compact-settings"><summary>설정</summary>
           <AlertSettings
             value={b.alert}
             onChange={(alert) => setBooster({ alert })}
             speech={leadText("부스터", b.leadSec)}
             lead={{ value: Math.max(0, b.leadSec), onChange: (leadSec) => setBooster({ leadSec }) }}
           />
-        </div>
+        </details>
       </div>
     </Panel>
   );

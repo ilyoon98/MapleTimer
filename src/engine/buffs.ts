@@ -38,6 +38,15 @@ interface BuffRuntime {
   recorder: CooldownSequenceRecorder;
 }
 const buffRt = new Map<string, BuffRuntime>();
+export function resetBuffObservations() {
+  for (const rt of buffRt.values()) {
+    rt.readEsts.reset();
+    rt.recorder.reset();
+    rt.presence.reset();
+    rt.localHitAt = 0;
+    rt.lastPos = null;
+  }
+}
 function buffRuntime(id: string) {
   let rt = buffRt.get(id);
   if (!rt) {

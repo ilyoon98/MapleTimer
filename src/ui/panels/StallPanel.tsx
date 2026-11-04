@@ -101,7 +101,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
             <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>
           </div>
         </div>
-        <div className="row-sub">
+        <details className="row-sub compact-settings"><summary>설정</summary>
           <AlertSettings value={st.alert} onChange={(alert) => setStall({ alert })} speech={STALL_TEXT} />
           {buffs.length > 0 && (
             <div className="field-row">
@@ -116,7 +116,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
               </select>
             </div>
           )}
-        </div>
+        </details>
       </div>
     </Panel>
   );

@@ -46,6 +46,13 @@ export function tickRune(p: Profile, now: number, live: boolean, prev: RuneLive)
 const stallMonitor = new ChangeMonitor();
 let stallKey = "";
 
+export function resetVisualWatch() {
+  stallMonitor.reset();
+  runeTracker.reset();
+  runner("stall", "사냥 멈춤", () => profileStore.get().stall.alert, () => STALL_TEXT).reset();
+  runner("rune", "룬", () => profileStore.get().rune.alert, () => RUNE_TEXT).reset();
+}
+
 export function tickStall(p: Profile, now: number, live: boolean, buffPresent: (id: string) => boolean): StallLive {
   const r = runner("stall", "사냥 멈춤", () => profileStore.get().stall.alert, () => STALL_TEXT);
   const st = p.stall;

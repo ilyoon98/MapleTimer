@@ -21,6 +21,7 @@ import {
 import { deletePreset, loadPreset, presetStore, savePreset } from "../state/presets";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
+import { clipUsage } from "../engine/clip";
 
 export function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -82,6 +83,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     const data = {
       kind: "maple-timer-diagnostics",
       savedAt: new Date().toISOString(),
+      clipUsage: clipUsage(),
       userAgent: navigator.userAgent,
       capture: {
         state: screenCapture.state, width: screenCapture.width, height: screenCapture.height,
