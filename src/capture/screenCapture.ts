@@ -1,4 +1,5 @@
 import type { Rect } from "./types";
+import { inferGameViewport, validViewport } from './layout';
 
 type FrameSource = VideoFrame | HTMLVideoElement;
 
@@ -17,6 +18,9 @@ export class ScreenCapture {
   state: CaptureState = "idle";
   width = 0;
   height = 0;
+  sourceWidth = 0;
+  sourceHeight = 0;
+  viewportFor: (width: number, height: number) => Rect | undefined = () => undefined;
   private stream: MediaStream | null = null;
   private latest: VideoFrame | null = null;
   private video: HTMLVideoElement | null = null;
@@ -39,6 +43,8 @@ export class ScreenCapture {
   error: string | null = null;
   get sessionId() { return this.generation; }
   get frameId() { return this.frameStamp; }
+  layoutRevision = 0;
+  private viewportKey = '';
 
   onFrame(l: () => void) {
     this.frameListeners.add(l);
@@ -207,8 +213,15 @@ export class ScreenCapture {
   refresh(): boolean {
     const src: FrameSource | null = this.latest ?? this.video;
     if (!src) return false;
-    const w = src instanceof HTMLVideoElement ? src.videoWidth : src.displayWidth;
-    const h = src instanceof HTMLVideoElement ? src.videoHeight : src.displayHeight;
+    const sw = src instanceof HTMLVideoElement ? src.videoWidth : src.displayWidth;
+    const sh = src instanceof HTMLVideoElement ? src.videoHeight : src.displayHeight;
+    this.sourceWidth = sw;
+    this.sourceHeight = sh;
+    const override = this.viewportFor(sw, sh);
+    const viewport = validViewport(override, sw, sh) ? override : inferGameViewport(sw, sh);
+    const { w, h } = viewport;
+    const viewportKey = `${sw}x${sh}:${viewport.x},${viewport.y},${w},${h}`;
+    if(viewportKey !== this.viewportKey){this.viewportKey=viewportKey;this.layoutRevision++;this.drawnStamp=-1;}
     if (!w || !h) return false;
     // video 대체 경로도 실제 재생 위치가 진행될 때만 도착 시각을 갱신한다.
     if (src instanceof HTMLVideoElement && src.currentTime !== this.videoTime) {
@@ -216,7 +229,7 @@ export class ScreenCapture {
       this.frameStamp++;
       this.lastFrameAt = Date.now();
     }
-    if (src instanceof HTMLVideoElement || this.drawnStamp !== this.frameStamp) {
+    if (src instanceof HTMLVideoElement || this.drawnStamp !== this.frameStamp || this.width !== w || this.height !== h) {
       if (this.canvas.width !== w || this.canvas.height !== h) {
         this.canvas.width = w;
         this.canvas.height = h;
@@ -224,7 +237,7 @@ export class ScreenCapture {
       const sizeChanged = this.width !== w || this.height !== h;
       this.width = w;
       this.height = h;
-      this.ctx.drawImage(src, 0, 0);
+      this.ctx.drawImage(src, viewport.x, viewport.y, w, h, 0, 0, w, h);
       this.drawnStamp = this.frameStamp;
       this.drawnAt = this.lastFrameAt;
       if (sizeChanged) this.emit();
@@ -276,6 +289,14 @@ export class ScreenCapture {
     c.width = this.width;
     c.height = this.height;
     c.getContext("2d")!.drawImage(this.canvas, 0, 0);
+    return c;
+  }
+  snapshotRaw(): HTMLCanvasElement | null {
+    const src = this.latest ?? this.video;
+    if (!src || !this.sourceWidth || !this.sourceHeight) return null;
+    const c = document.createElement('canvas');
+    c.width = this.sourceWidth; c.height = this.sourceHeight;
+    c.getContext('2d')!.drawImage(src, 0, 0);
     return c;
   }
 }

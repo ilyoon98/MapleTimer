@@ -35,6 +35,7 @@ export function RegionPicker({
   initial,
   onConfirm,
   onClose,
+  raw = false,
 }: {
   title: string;
   guide: string[];
@@ -42,6 +43,7 @@ export function RegionPicker({
   initial?: SavedRegion | null;
   onConfirm: (r: PickResult) => void;
   onClose: () => void;
+  raw?: boolean;
 }) {
   const [snap, setSnap] = useState<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -57,7 +59,7 @@ export function RegionPicker({
   const offset = within ? { x: within.x, y: within.y } : { x: 0, y: 0 };
 
   const grab = useCallback(() => {
-    const full = screenCapture.snapshot();
+    const full = raw ? screenCapture.snapshotRaw() : screenCapture.snapshot();
     if (!full) return;
     let c = full;
     if (within) {
@@ -73,7 +75,7 @@ export function RegionPicker({
     const fit = Math.min(availW / c.width, availH / c.height);
     const z = fit >= 4 ? 4 : fit >= 3 ? 3 : fit >= 2 ? 2 : fit >= 1 ? 1 : Math.floor(fit * 100) / 100;
     setZoom(z);
-  }, [within]);
+  }, [within, raw]);
 
   useEffect(() => {
     grab();
@@ -199,8 +201,8 @@ export function RegionPicker({
         y: rect.y + offset.y,
         w: rect.w,
         h: rect.h,
-        frameW: screenCapture.width,
-        frameH: screenCapture.height,
+        frameW: raw ? screenCapture.sourceWidth : screenCapture.width,
+        frameH: raw ? screenCapture.sourceHeight : screenCapture.height,
       },
       pixels,
     });

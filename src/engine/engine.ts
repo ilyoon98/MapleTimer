@@ -7,13 +7,14 @@ import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
 import { ScreenTransitionDetector } from "../detect/screenTransition";
-import { preciseIcon, profileStore, tts, type Profile } from "../state/profile";
+import { preciseIcon, profileStore, restoreRegionLayout, tts, type Profile } from "../state/profile";
 import { detectBuffs, isBuffPresent, preciseBuffId, preciseSkillBuffs, tickBuffTimers, trackBuffIcons } from "./buffs";
 import { tickBooster } from "./booster";
 import { recordClip } from "./clip";
 import { debugCrops, liveStore } from "./live";
 import { resetVisualWatch, tickRune, tickStall } from "./runeStall";
 import { FrameGate } from "../capture/frameGate";
+import { autoSetup } from './autoSetup';
 import { resetBuffObservations } from "./buffs";
 import { resetBoosterObservations } from "./booster";
 import { pruneRunners, runnerLabel, runners } from "./shared";
@@ -49,6 +50,7 @@ let perfMaxAt = 0;
 
 let lastTickAt = 0;
 const frameGate = new FrameGate();
+let layoutSize = '';
 
 function tick(now: number) {
   // 확인이 10초 넘게 끊겼다가 다시 돌면 기록 (크롬이 탭을 멈추는 설정 등). 다음에 원인을 바로 알 수 있게
@@ -69,7 +71,7 @@ function tick(now: number) {
 }
 
 function tickInner(now: number) {
-  const p = profileStore.get();
+  let p = profileStore.get();
   audioEngine.masterVolume = p.masterVolume;
   audioEngine.muted = p.muted;
   audioEngine.ttsVoiceURI = p.ttsVoice;
@@ -77,8 +79,16 @@ function tickInner(now: number) {
   randomDelaySetting.enabled = p.randomDelay;
   checkShareEnded(p, now);
   const available = screenCapture.state === "live" && screenCapture.refresh();
+  const size = `${screenCapture.width}x${screenCapture.height}:${screenCapture.layoutRevision}`;
+  if (available && size !== layoutSize) {
+    layoutSize = size;
+    restoreRegionLayout(screenCapture.width, screenCapture.height);
+    resetVisualWatch(); resumeSkillWatch(); resetBuffObservations(); resetBoosterObservations();
+    p = profileStore.get();
+  }
   const frame = frameGate.sample(screenCapture.sessionId, screenCapture.frameId, screenCapture.drawnAt, now, available);
   const live = frame.usable;
+  if (live && frame.fresh) { autoSetup(now); p = profileStore.get(); }
   if (frame.reset) {
     resetVisualWatch();
     resetBuffObservations();
@@ -175,6 +185,7 @@ let started = false;
 export function startEngine() {
   if (started) return;
   started = true;
+  screenCapture.viewportFor = (w,h) => profileStore.get().gameViewports[`${w}x${h}`];
   appTicker.subscribe(tick);
   screenCapture.onFrame(() => appTicker.pulse());
   const resume = () => appTicker.pulse();

@@ -59,6 +59,7 @@ function ShareChip() {
   const black = liveStore.use((s) => s.captureBlack);
   const [err, setErr] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [viewportPick, setViewportPick] = useState(false);
   const start = async () => {
     setErr(null);
     audioEngine.unlock();
@@ -86,6 +87,14 @@ function ShareChip() {
         {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
         <button onClick={() => desktop ? setPicking(true) : void start()}>다른 창 선택</button>
         <button onClick={() => screenCapture.stop("user")}>중지</button>
+        <button onClick={() => setViewportPick(true)}>게임 영역</button>
+        {viewportPick && <RegionPicker raw title="게임 영역 맞추기" guide={['검은 여백과 창 테두리를 빼고 게임 화면만 선택하세요.']} onClose={() => setViewportPick(false)}
+          onConfirm={({region})=>{
+            if(region.w<320||region.h<240){setErr('게임 화면 전체를 선택해 주세요.');return;}
+            const size=`${screenCapture.sourceWidth}x${screenCapture.sourceHeight}`;
+            profileStore.set(p=>({...p,gameViewports:{...p.gameViewports,[size]:{x:region.x,y:region.y,w:region.w,h:region.h}}}));
+            setViewportPick(false);
+          }} />}
         {picking && <CapturePicker onSelect={start} onClose={() => setPicking(false)} />}
       </div>
     );

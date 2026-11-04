@@ -8,7 +8,7 @@ await fs.mkdir('release', { recursive: true });
 const packaged = process.argv.includes('--packaged');
 const executable = packaged ? path.join(root, 'release/win-unpacked/MapleTimer Personal.exe') : electron;
 const child = spawn(executable, [...(packaged ? [] : ['.']), '--remote-debugging-port=9333', '--remote-debugging-address=127.0.0.1',
-  `--user-data-dir=${path.join(root, 'release/smoke-profile')}`], { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  `--user-data-dir=${path.join(root, 'release', process.argv.includes('--fresh-profile') ? 'smoke-profile-'+Date.now() : 'smoke-profile')}`], { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 let logs = '';
 child.stderr.on('data', d => { logs += d; });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -63,6 +63,18 @@ try {
     await delay(4000);
     capture = await evaluate(`({live:!!document.querySelector('.share-live'),text:document.querySelector('.share-chip')?.innerText, error:document.querySelector('[role=alert]')?.textContent})`);
     if (!capture.live || capture.error) throw new Error('Game capture failed: ' + JSON.stringify(capture));
+    if (process.argv.includes('--inspect-frame')) {
+      await delay(11000);
+      console.log('Auto setup:', await evaluate(`[...document.querySelectorAll('.panel')].filter(p=>/룬 알림|부스터/.test(p.querySelector('h2')?.textContent||'')).map(p=>p.innerText.slice(0,300))`));
+      await evaluate(`[...document.querySelectorAll('.share-live button')].find(b=>b.textContent==='게임 영역').click()`);
+      await delay(500);
+      const data = await evaluate(`document.querySelector('.picker-canvas-wrap canvas').toDataURL('image/png')`);
+      await fs.writeFile('release/game-frame.png', Buffer.from(data.split(',')[1], 'base64'));
+      const { build } = await import('esbuild');
+      const bundle = await build({entryPoints:['src/detect/autoRegions.ts'],bundle:true,format:'iife',globalName:'AutoRegions',write:false});
+      console.log('Minimap candidate:', await evaluate(bundle.outputFiles[0].text + `; AutoRegions.findMinimap(document.querySelector('.picker-canvas-wrap canvas').getContext('2d').getImageData(1,31,600,450))`));
+      await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))`);
+    }
     await evaluate(`[...document.querySelectorAll('.share-live button')].find(b=>b.textContent==='중지').click()`);
   } else await evaluate(`document.querySelector('[aria-label="메이플 연결"] button').click()`);
   await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='PIP 타이머').click()`);

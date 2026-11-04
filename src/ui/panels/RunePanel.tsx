@@ -9,7 +9,7 @@ import { openPicker } from "../pickerStore";
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
   "no-share": { tone: "warn", text: "화면 공유 필요" },
-  "no-region": { tone: "warn", text: "미니맵 영역 선택 필요" },
+  "no-region": { tone: "info", text: "미니맵 자동 탐색 중" },
   searching: { tone: "ok", text: "미니맵에서 룬 찾는 중" },
   candidate: { tone: "info", text: "룬 후보 확인 중" },
   present: { tone: "alert", text: "룬 있음!" },
@@ -55,7 +55,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
           </div>
           <StatusDot tone={st.tone}>{st.text}</StatusDot>
           <div className="row-buttons">
-            <button onClick={pickRegion}>{region ? "미니맵 다시 선택" : "미니맵 선택"}</button>
+            <button onClick={pickRegion}>{region ? "위치 변경" : "직접 지정"}</button>
           </div>
         </div>
         <details className="row-sub compact-settings"><summary>설정</summary>

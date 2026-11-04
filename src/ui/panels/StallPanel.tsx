@@ -32,7 +32,7 @@ const MODES: Record<StallMode, { label: string; guide: string[] }> = {
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
   "no-share": { tone: "warn", text: "화면 공유 필요" },
-  "no-region": { tone: "warn", text: "영역 선택 필요" },
+  "no-region": { tone: "info", text: "영역 찾는 중 · 필요하면 직접 지정" },
   waiting: { tone: "info", text: "첫 변화 기다리는 중" },
   watching: { tone: "ok", text: "감시 중" },
   stalled: { tone: "alert", text: "멈춤!" },

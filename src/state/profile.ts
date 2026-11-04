@@ -1,7 +1,7 @@
 import type { AlertConfig } from "../alerts/alertRunner";
 import { DEFAULT_REPEAT } from "../alerts/alertRunner";
 import type { SoundSpec } from "../alerts/audio";
-import type { SavedRegion } from "../capture/types";
+import type { Rect, SavedRegion } from "../capture/types";
 import type { StoredTemplate } from "../cv/match";
 import { DEFAULT_CHANGE_OPTIONS, type ChangeMonitorOptions } from "../detect/changeMonitor";
 import { DEFAULT_QUICKSLOT_OPTIONS, type QuickslotOptions, type ReadyReference } from "../detect/quickslotCast";
@@ -322,6 +322,10 @@ export interface Profile {
   booster: BoosterSettings;
   timers: TimerEntry[];
   regions: Partial<Record<RegionKey, SavedRegion>>;
+  regionHistory: Record<string, Partial<Record<RegionKey, SavedRegion>>>;
+  gameViewports: Record<string, Rect>;
+  referenceHistory: Record<string, Record<string, ReadyReference | null>>;
+  slotHistory: Record<string, Record<string, SavedRegion>>;
   panelOrder: PanelId[];
   collapsed: Partial<Record<PanelId | "checklist", boolean>>;
 }
@@ -366,6 +370,10 @@ export function defaultProfile(): Profile {
     booster: { enabled: false, leadSec: 10, alert: alertCfg(tts("부스터 곧 끝나요")) },
     timers: [newTimer(TIMER_PRESETS[0])],
     regions: {},
+    regionHistory: {},
+    gameViewports: {},
+    referenceHistory: {},
+    slotHistory: {},
     panelOrder: [...PANEL_IDS],
     collapsed: {},
   };
@@ -404,6 +412,10 @@ export function migrate(raw: unknown): Profile {
     buffs: (p.buffs ?? []).map((b) => ({ readTime: b.kind === "expiry", ...(b as Partial<BuffEntry>) }) as BuffEntry),
     timers: (p.timers ?? d.timers).map((t) => ({ enabled: true, ...(t as Partial<TimerEntry>) }) as TimerEntry),
     regions: { ...p.regions },
+    regionHistory: { ...p.regionHistory },
+    gameViewports: { ...p.gameViewports },
+    referenceHistory: { ...p.referenceHistory },
+    slotHistory: { ...p.slotHistory },
     panelOrder: order,
   } as Profile;
 }
@@ -412,10 +424,19 @@ export const profileStore = createPersistentStore<Profile>("maple-timer-personal
 
 /** 프로필 일부만 바꾸는 헬퍼 */
 export function updateSkill(id: string, patch: Partial<SkillEntry>) {
-  profileStore.set((s) => ({ ...s, skills: s.skills.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  profileStore.set((s) => {
+    const refs={...s.referenceHistory},r=s.regions[`skill:${id}`];
+    if(r&&patch.readyRef!==undefined){const size=`${r.frameW}x${r.frameH}`;refs[size]={...refs[size],[id]:patch.readyRef};}
+    return {...s,referenceHistory:refs,skills:s.skills.map(x=>x.id===id?{...x,...patch}:x)};
+  });
 }
 export function updateBuff(id: string, patch: Partial<BuffEntry>) {
-  profileStore.set((s) => ({ ...s, buffs: s.buffs.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  profileStore.set((s) => {
+    const slots={...s.slotHistory};
+    if(patch.slot){const r=patch.slot,size=`${r.frameW}x${r.frameH}`;slots[size]={...slots[size],[id]:r};}
+    if(patch.slot===null)for(const size of Object.keys(slots)){slots[size]={...slots[size]};delete slots[size][id];}
+    return {...s,slotHistory:slots,buffs:s.buffs.map(x=>x.id===id?{...x,...patch}:x)};
+  });
 }
 export function updateTimer(id: string, patch: Partial<TimerEntry>) {
   profileStore.set((s) => ({ ...s, timers: s.timers.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
@@ -425,6 +446,36 @@ export function setRegion(key: RegionKey, r: SavedRegion | null) {
     const regions = { ...s.regions };
     if (r) regions[key] = r;
     else delete regions[key];
-    return { ...s, regions };
+    const history = { ...s.regionHistory };
+    if (r) {
+      const size = `${r.frameW}x${r.frameH}`;
+      history[size] = { ...history[size], [key]: r };
+    } else {
+      for (const size of Object.keys(history)) {
+        history[size] = { ...history[size] };
+        delete history[size][key];
+      }
+    }
+    return { ...s, regions, regionHistory: history };
   });
+}
+
+/** 해상도별 영역을 복원한다. 처음 보는 크기로 무작정 확대하지 않는다. */
+export function restoreRegionLayout(width: number, height: number) {
+  const p = profileStore.get();
+  const regions = { ...p.regions };
+  const history = { ...p.regionHistory };
+  for (const [key, region] of Object.entries(regions)) if (region) {
+    const size = `${region.frameW}x${region.frameH}`;
+    history[size] = { ...history[size], [key]: region };
+  }
+  const known = history[`${width}x${height}`];
+  const refs={...p.referenceHistory},slots={...p.slotHistory};
+  for(const s of p.skills){const r=p.regions[`skill:${s.id}`];if(r){const size=`${r.frameW}x${r.frameH}`;refs[size]={...refs[size],[s.id]:s.readyRef};}}
+  for(const b of p.buffs)if(b.slot){const size=`${b.slot.frameW}x${b.slot.frameH}`;slots[size]={...slots[size],[b.id]:b.slot};}
+  if (known) Object.assign(regions, known);
+  const size=`${width}x${height}`;
+  profileStore.set({ regions, regionHistory: history,referenceHistory:refs,slotHistory:slots,
+    skills:p.skills.map(s=>refs[size]&&Object.hasOwn(refs[size],s.id)?{...s,readyRef:refs[size][s.id]}:s),
+    buffs:p.buffs.map(b=>b.slot&&slots[size]?.[b.id]?{...b,slot:slots[size][b.id]}:b) });
 }

@@ -60,13 +60,13 @@ export function SetupChecklist() {
     },
     {
       done: !p.rune.enabled || ok("minimap"),
-      text: p.rune.enabled ? (ok("minimap") ? "룬: 미니맵 선택됨" : "룬: 미니맵 영역 선택") : "룬 알림 꺼짐",
+      text: p.rune.enabled ? (ok("minimap") ? "룬: 준비됨" : "미니맵을 자동으로 찾고 있어요 · 안 잡히면 직접 지정") : "룬 알림 꺼짐",
       hint: "사냥터에서 미니맵 안쪽만 선택",
       optional: !p.rune.enabled,
     },
     {
       done: !p.stall.enabled || ok("stall"),
-      text: p.stall.enabled ? (ok("stall") ? "사냥 멈춤: 영역 선택됨" : "사냥 멈춤: 영역 선택") : "사냥 멈춤 꺼짐",
+      text: p.stall.enabled ? (ok("stall") ? "사냥 멈춤: 준비됨" : p.stall.mode === 'exp' ? "경험치 막대를 자동으로 찾고 있어요" : "사냥 멈춤: 영역 선택") : "사냥 멈춤 꺼짐",
       optional: !p.stall.enabled,
     },
     {
@@ -80,7 +80,7 @@ export function SetupChecklist() {
     },
     {
       done: !p.booster.enabled || ok("booster"),
-      text: p.booster.enabled ? (ok("booster") ? "부스터: 영역 선택됨" : "부스터: 타이머 영역 선택") : "부스터 알림 꺼짐",
+      text: p.booster.enabled ? (ok("booster") ? "부스터: 준비됨" : "부스터가 켜지면 자동으로 찾아요") : "부스터 알림 꺼짐",
       optional: !p.booster.enabled,
     },
   ];

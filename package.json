@@ -1,7 +1,7 @@
 {
   "name": "maple-timer",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -43,5 +43,7 @@
       "signAndEditExecutable": false
     },
     "artifactName": "MapleTimer-Personal-${version}-${arch}.${ext}"
-  }
+  },
+  "description": "개인용 메이플 화면 알림과 독립 타이머",
+  "author": "ilyoon"
 }
