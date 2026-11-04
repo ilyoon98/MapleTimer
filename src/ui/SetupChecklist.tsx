@@ -1,4 +1,5 @@
 import { screenCapture } from "../capture/screenCapture";
+import { favoritesRegion, stallRegion } from "../capture/detectionRegions";
 import { regionValidFor } from "../capture/types";
 import { digitStore, learnedDigitCount } from "../detect/digitLearner";
 import { liveStore } from "../engine/engine";
@@ -25,7 +26,7 @@ export function SetupChecklist() {
 
   const skillsOn = p.skills.filter((s) => s.enabled);
   const skillsReady = skillsOn.filter((s) => live && (preciseIcon(s)
-    ? s.where !== 'favorites' || ok('favorites')
+    ? s.where !== 'favorites' || regionValidFor(favoritesRegion(p, w, h), w, h)
     : regionValidFor(p.regions[`skill:${s.id}`], w, h) && s.readyRef));
   const buffsOn = p.buffs.filter((b) => b.enabled);
   const onBar = buffsOn.filter((b) => !b.slot);
@@ -49,7 +50,7 @@ export function SetupChecklist() {
     {
       done: skillsOn.length === 0 || skillsReady.length === skillsOn.length,
       text: `스킬 준비 ${skillsReady.length}/${skillsOn.length}`,
-      hint: "각 스킬의 '영역 선택'을 스킬이 준비된 상태에서",
+      hint: "즐겨찾기는 스킬 설정에서 좌측·우측 하단을 고르세요",
       optional: skillsOn.length === 0,
     },
     {
@@ -65,8 +66,8 @@ export function SetupChecklist() {
       optional: !p.rune.enabled,
     },
     {
-      done: !p.stall.enabled || ok("stall"),
-      text: p.stall.enabled ? (ok("stall") ? "사냥 멈춤: 준비됨" : p.stall.mode === 'exp' ? "경험치 막대를 자동으로 찾고 있어요" : "사냥 멈춤: 영역 선택") : "사냥 멈춤 꺼짐",
+      done: !p.stall.enabled || (live && regionValidFor(stallRegion(p, w, h), w, h)),
+      text: p.stall.enabled ? (p.stall.mode === 'exp' ? "경험치: 중앙 자동 감지 · 필요하면 높이 조정" : "사냥 멈춤: 영역 선택") : "사냥 멈춤 꺼짐",
       optional: !p.stall.enabled,
     },
     {
@@ -79,7 +80,7 @@ export function SetupChecklist() {
       optional: buffsOn.length === 0,
     },
     {
-      done: !p.booster.enabled || ok("booster"),
+      done: !p.booster.enabled || live,
       text: p.booster.enabled ? (ok("booster") ? "부스터: 준비됨" : "부스터가 켜지면 자동으로 찾아요") : "부스터 알림 꺼짐",
       optional: !p.booster.enabled,
     },

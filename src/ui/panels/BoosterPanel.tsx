@@ -1,9 +1,8 @@
 import { liveStore } from "../../engine/engine";
-import { profileStore, setRegion, type BoosterSettings } from "../../state/profile";
+import { profileStore, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
 import { Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
-import { openPicker } from "../pickerStore";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
@@ -20,22 +19,10 @@ function setBooster(patch: Partial<BoosterSettings>) {
 
 export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const b = profileStore.use((p) => p.booster);
-  const region = profileStore.use((p) => p.regions.booster);
   const live = liveStore.use((l) => l.booster);
   const now = liveStore.use((l) => l.now);
   const st = STATUS[live.status];
   const remaining = live.endsAt != null ? live.endsAt - now : null;
-
-  const pickRegion = () =>
-    openPicker({
-      title: "부스터 타이머 영역 선택",
-      guide: [
-        "부스터를 쓰면 화면 위쪽 가운데에 뜨는 '남은시간' 숫자(예: 36.83 초)를 선택하세요.",
-        "부스터가 켜져 있을 때 열거나 '3초 후 가져오기'를 활용하세요. 숫자 주변을 조금 여유 있게 잡아 주세요.",
-      ],
-      initial: region,
-      onConfirm: ({ region }) => setRegion("booster", region),
-    });
 
   return (
     <Panel title="부스터 종료 알림" icon="🚀" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
@@ -54,9 +41,7 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
             <div className="cell-value mono">{fmtClock(live.lastAlertAt)}</div>
           </div>
           <StatusDot tone={st.tone}>{st.text}</StatusDot>
-          <div className="row-buttons">
-            <button onClick={pickRegion}>{region ? "위치 변경" : "직접 지정"}</button>
-          </div>
+
         </div>
         <details className="row-sub compact-settings"><summary>설정</summary>
           <AlertSettings

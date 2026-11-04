@@ -1,4 +1,5 @@
 import { RUNE_TEXT, STALL_TEXT } from "../alerts/speech";
+import { stallRegion, regionSignature } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { ChangeMonitor } from "../detect/changeMonitor";
@@ -63,14 +64,14 @@ export function tickStall(p: Profile, now: number, live: boolean, buffPresent: (
     return { ...base, status: "off" };
   }
   if (!live) return { ...base, status: "no-share" };
-  const region = p.regions.stall;
+  const region = stallRegion(p, screenCapture.width, screenCapture.height);
   if (!regionValidFor(region, screenCapture.width, screenCapture.height)) return { ...base, status: "no-region" };
   if (st.linkedBuffId && !buffPresent(st.linkedBuffId)) {
     r.reset();
     stallMonitor.reset();
     return { ...base, status: "gated" };
   }
-  const key = `${st.mode}|${region.x},${region.y},${region.w},${region.h}`;
+  const key = `${st.mode}|${regionSignature(region)}`;
   if (key !== stallKey) {
     stallKey = key;
     stallMonitor.reset();

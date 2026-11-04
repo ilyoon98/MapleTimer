@@ -63,7 +63,24 @@ export function AlertSettings({
   const vol = Math.round(Math.min(value.volume, maxVol) * 100);
 
   return (
-    <div className="field-row alert-settings">
+    <div className="alert-settings">
+      <fieldset className="alert-group">
+        <legend>알림</legend>
+        {lead && (
+          <label className="alert-control">시점 <LeadSelect value={lead.value} onChange={lead.onChange} options={lead.options} /></label>
+        )}
+        <label className="alert-control">횟수
+          <select value={value.repeat.enabled ? "loop" : "once"} onChange={(e) => onChange({
+            ...value,
+            repeat: e.target.value === "loop" ? { enabled: true, intervalSec: 3, maxCount: null } : { ...value.repeat, enabled: false },
+          })}>
+            <option value="once">한 번</option><option value="loop">반복 · 3초마다</option>
+          </select>
+        </label>
+      </fieldset>
+      <fieldset className="alert-group">
+      <legend>소리</legend>
+      <label className="alert-control">
       <span className="field-label">알림음</span>
       <select value={key} onChange={(e) => pick(e.target.value)}>
         <option value="tts">음성 읽기</option>
@@ -78,28 +95,13 @@ export function AlertSettings({
           </option>
         ))}
       </select>
+      </label>
+      <label className="alert-control">
       <span className="field-label">볼륨</span>
       <input type="range" min={0} max={maxVol * 100} step={5} value={vol} onChange={(e) => onChange({ ...value, volume: Number(e.target.value) / 100 })} />
       <span className="mono">{vol}%</span>
-      {lead && (
-        <>
-          <span className="field-label">알림 시점</span>
-          <LeadSelect value={lead.value} onChange={lead.onChange} options={lead.options} />
-        </>
-      )}
-      <span className="field-label">반복</span>
-      <select
-        value={value.repeat.enabled ? "loop" : "once"}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            repeat: e.target.value === "loop" ? { enabled: true, intervalSec: 3, maxCount: null } : { ...value.repeat, enabled: false },
-          })
-        }
-      >
-        <option value="once">한 번만</option>
-        <option value="loop">계속 반복 (3초마다)</option>
-      </select>
+      </label>
+      </fieldset>
     </div>
   );
 }

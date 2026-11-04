@@ -1,6 +1,7 @@
 import type { AlertConfig } from "../alerts/alertRunner";
 import { DEFAULT_REPEAT } from "../alerts/alertRunner";
 import type { SoundSpec } from "../alerts/audio";
+import type { FavoritesPosition } from "../capture/detectionRegions";
 import type { Rect, SavedRegion } from "../capture/types";
 import type { StoredTemplate } from "../cv/match";
 import { DEFAULT_CHANGE_OPTIONS, type ChangeMonitorOptions } from "../detect/changeMonitor";
@@ -31,20 +32,8 @@ export interface SkillPreset {
 }
 
 export const SKILL_PRESETS: SkillPreset[] = [
-  // (정밀): 버프 아이콘이 보이면 이쪽이 더 정확해서 위에 둔다. 아래 퀵슬롯 방식은 아이콘이 숨겨지거나 시간 표시를 끈 경우의 예비
   { id: "sol-janus-precise", name: "솔 야누스 : 새벽 (정밀)", durationSec: 80, cooldownSec: 56, precise: "janus" },
   { id: "erda-fountain-precise", name: "에르다 파운틴 (정밀)", durationSec: 60, cooldownSec: 56, precise: "fountain" },
-  { id: "sol-janus-2min", name: "솔 야누스 : 새벽 (2분)", durationSec: 120, cooldownSec: 56 },
-  { id: "sol-janus-80s", name: "솔 야누스 : 새벽 (80초)", durationSec: 80, cooldownSec: 56 },
-  { id: "sol-janus-70s", name: "솔 야누스 : 새벽 (70초)", durationSec: 70, cooldownSec: 56 },
-  { id: "sol-janus-1min", name: "솔 야누스 : 새벽 (1분)", durationSec: 60, cooldownSec: 56 },
-  { id: "erda-fountain", name: "에르다 파운틴", durationSec: 60, cooldownSec: 56 },
-  { id: "hologram-barrier", name: "홀로그램 그래피티 : 역장 VI", durationSec: 60, cooldownSec: 60 },
-  { id: "petrified", name: "페트리파이드 VI", durationSec: 60, cooldownSec: 60 },
-  { id: "frozen-ground", name: "프로즌 그라운드 VI", durationSec: 60, cooldownSec: 60 },
-  { id: "liberation-orb", name: "리버레이션 오브", durationSec: 30, cooldownSec: 120 },
-  { id: "sword-of-burning-soul", name: "소드 오브 버닝 소울", durationSec: 117, cooldownSec: 120 },
-  { id: "class-install", name: "직업 설치기", durationSec: 60, cooldownSec: 60, editable: true },
 ];
 
 export const LEAD_MIN = -5;
@@ -114,6 +103,8 @@ export interface StallSettings {
   mode: StallMode;
   thresholdSec: number;
   sensitivity: ChangeMonitorOptions;
+  /** 화면 아래에서 경험치 숫자 줄 중심까지 거리 / 화면 높이. null이면 기본 위치 */
+  expHeightRatio: number | null;
   /** 버프 연계: 지정한 버프(버프칸 감지 항목)가 떠 있을 때만 감시 */
   linkedBuffId: string | null;
   alert: AlertConfig;
@@ -316,6 +307,7 @@ export interface Profile {
   ttsRate: number;
   randomDelay: boolean;
   skills: SkillEntry[];
+  favoritesPosition: FavoritesPosition;
   rune: RuneSettings;
   stall: StallSettings;
   buffs: BuffEntry[];
@@ -350,6 +342,7 @@ export function defaultProfile(): Profile {
     ttsRate: 1.1,
     randomDelay: false,
     skills: [newSkill("sol-janus-precise"), newSkill("erda-fountain-precise")],
+    favoritesPosition: "right",
     rune: {
       enabled: true,
       mode: "color",
@@ -361,6 +354,7 @@ export function defaultProfile(): Profile {
     stall: {
       enabled: false,
       mode: "exp",
+      expHeightRatio: null,
       thresholdSec: STALL_DEFAULT_SEC.exp,
       sensitivity: { ...DEFAULT_CHANGE_OPTIONS },
       linkedBuffId: null,
@@ -407,7 +401,17 @@ export function migrate(raw: unknown): Profile {
     },
     booster: { ...d.booster, ...p.booster },
     pipShow: { ...d.pipShow, ...p.pipShow },
-    stall: { ...d.stall, ...p.stall, sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity } },
+    skills: (p.skills ?? d.skills).filter((s) => SKILL_PRESETS.some((preset) => preset.id === s.presetId)),
+    favoritesPosition: p.favoritesPosition === "left" || p.favoritesPosition === "right" || p.favoritesPosition === "manual"
+      ? p.favoritesPosition : p.regions?.favorites ? "manual" : "right",
+    stall: {
+      ...d.stall, ...p.stall,
+      expHeightRatio: typeof p.stall?.expHeightRatio === "number" && Number.isFinite(p.stall.expHeightRatio)
+        ? Math.max(0, Math.min(1, p.stall.expHeightRatio))
+        : p.stall?.expHeightRatio === undefined && p.stall?.mode === "exp" && p.regions?.stall && !p.regions.stall.automatic && p.regions.stall.frameH > 0
+          ? Math.max(0, Math.min(1, 1 - (p.regions.stall.y + p.regions.stall.h / 2) / p.regions.stall.frameH)) : null,
+      sensitivity: { ...d.stall.sensitivity, ...p.stall?.sensitivity },
+    },
     // 예전 버전에서 저장한 항목엔 새 필드가 없을 수 있음
     buffs: (p.buffs ?? []).map((b) => ({ readTime: b.kind === "expiry", ...(b as Partial<BuffEntry>) }) as BuffEntry),
     timers: (p.timers ?? d.timers).map((t) => ({ enabled: true, ...(t as Partial<TimerEntry>) }) as TimerEntry),

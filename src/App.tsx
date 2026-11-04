@@ -238,6 +238,7 @@ export function App() {
       {picker && (
         <RegionPicker
           title={picker.title}
+          selection={picker.selection}
           guide={picker.guide}
           within={picker.within}
           initial={picker.initial}

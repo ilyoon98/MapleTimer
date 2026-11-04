@@ -49,6 +49,42 @@ try {
   }
   const initial = await evaluate(`({title:document.title,bridge:!!window.mapleDesktop, node:typeof require, panels:document.querySelectorAll('.panel').length, expanded:document.querySelectorAll('details.compact-settings[open]').length})`);
   if (!initial.bridge || initial.node !== 'undefined' || initial.panels < 1) throw new Error('Bad shell: ' + JSON.stringify(initial));
+  if (process.argv.includes('--check-settings')) {
+    const rows = await evaluate(`(() => {
+      const panel = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('h2')?.textContent==='스킬 알림');
+      panel.querySelectorAll('details').forEach(d=>d.open=true);
+      return [...panel.querySelectorAll('.row-title')].map(r=>r.textContent);
+    })()`);
+    if (rows.length !== 2 || !rows[0].includes('솔 야누스') || !rows[1].includes('에르다 파운틴')) throw new Error('Unexpected skills: '+JSON.stringify(rows));
+    await evaluate(`document.querySelectorAll('select[aria-label$=" 감지 위치"]').forEach(s=>{s.value='favorites';s.dispatchEvent(new Event('change',{bubbles:true}));})`);
+    await delay(100);
+    await evaluate(`(()=>{const s=document.querySelector('select[aria-label="즐겨찾기 위치 (두 스킬 공통)"]');s.value='left';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await delay(100);
+    const shared = await evaluate(`({positions:[...document.querySelectorAll('select[aria-label="즐겨찾기 위치 (두 스킬 공통)"]')].map(s=>s.value),picker:!!document.querySelector('.picker-stage')})`);
+    if (shared.positions.length !== 2 || shared.positions.some(p=>p!=='left') || shared.picker) throw new Error('Favorites needs a rectangle: '+JSON.stringify(shared));
+    await evaluate(`(()=>{
+      const row=document.querySelector('.panel .row');
+      const groups=row.querySelectorAll('.alert-group');
+      const lead=groups[0].querySelectorAll('select')[0];lead.value='5';lead.dispatchEvent(new Event('change',{bubbles:true}));
+    })()`);
+    await delay(100);
+    await evaluate(`(()=>{
+      const row=document.querySelector('.panel .row');
+      const sound=row.querySelectorAll('.alert-group')[1].querySelector('select');sound.value='beep:double';sound.dispatchEvent(new Event('change',{bubbles:true}));
+    })()`);
+    await delay(400);
+    const saved = await evaluate(`(()=>{const p=JSON.parse(localStorage.getItem('maple-timer-personal.profile.v1'));return {position:p.favoritesPosition,lead:p.skills[0].leadSec,sound:p.skills[0].alert.sound.kind,groups:[...document.querySelector('.panel .row').querySelectorAll('legend')].map(l=>l.textContent)};})()`);
+    if (saved.position !== 'left' || saved.lead !== 5 || saved.sound !== 'beep' || saved.groups.join(',') !== '알림,소리') throw new Error('Settings did not persist: '+JSON.stringify(saved));
+    const boosterButtons = await evaluate(`[...document.querySelectorAll('.panel')].find(p=>p.querySelector('h2')?.textContent==='부스터 종료 알림').querySelectorAll('.row-main button').length`);
+    if (boosterButtons) throw new Error('Booster still needs manual setup');
+    const settingsPng = await call('Page.captureScreenshot', { format:'png' });
+    await fs.writeFile('release/settings-smoke.png', Buffer.from(settingsPng.data,'base64'));
+    await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='높이 조정').click()`);
+    const heightPicker = await evaluate(`({title:document.querySelector('.modal h3')?.textContent,help:document.querySelector('.modal .guide-list')?.textContent})`);
+    if (heightPicker.title !== '경험치 숫자 높이 선택' || !heightPicker.help?.includes('중앙 40%')) throw new Error('Wrong height picker: '+JSON.stringify(heightPicker));
+    await evaluate(`document.querySelector('.modal [aria-label="닫기"]').click()`);
+    console.log('Simplified settings:', JSON.stringify({rows,shared,saved,heightPicker}));
+  }
   await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='메이플 연결').click()`);
   await delay(2000);
   const picker = await evaluate(`({open:!!document.querySelector('[aria-label="메이플 연결"]'), sources:document.querySelectorAll('.capture-sources button').length,error:document.querySelector('[role=alert]')?.textContent})`);

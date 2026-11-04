@@ -1,5 +1,6 @@
 import { audioEngine } from "../alerts/audio";
 import { endingText } from "../alerts/speech";
+import { favoritesRegion, regionSignature } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { readDigits, segment } from "../cv/digits";
@@ -17,6 +18,7 @@ import { pauseLinkedTimers, startLinkedTimers } from "./timers";
 
 /* ───────── 버프칸 감지 ───────── */
 interface BuffRuntime {
+  regionKey: string;
   presence: PresenceTracker;
   startedAt: number | null;
   endsAt: number | null;
@@ -51,6 +53,7 @@ function buffRuntime(id: string) {
   let rt = buffRt.get(id);
   if (!rt) {
     rt = {
+      regionKey: "",
       presence: new PresenceTracker(2, 2),
       startedAt: null,
       endsAt: null,
@@ -70,6 +73,21 @@ function buffRuntime(id: string) {
   }
   return rt;
 }
+/** 위치를 바꾸면 이전 위치의 추적 결과를 버리고 다시 찾는다. */
+function syncBuffRegion(rt: BuffRuntime, region: SavedRegion | undefined) {
+  const key = regionSignature(region);
+  if (rt.regionKey === key) return;
+  rt.regionKey = key;
+  rt.presence.reset();
+  rt.lastPos = null;
+  rt.localHitAt = 0;
+  rt.readText = null;
+  rt.score = 0;
+  rt.lastReadAt = 0;
+  rt.readEsts.reset();
+  rt.recorder.reset();
+}
+
 export function isBuffPresent(id: string) {
   return buffRt.get(id)?.presence.present ?? false;
 }
@@ -118,7 +136,7 @@ export function preciseSkillBuffs(p: Profile, frameW: number, frameH: number): B
       alertOnDisappear: false,
       countdownVoice: false,
       readTime: true,
-      slot: s.where === "favorites" ? (p.regions.favorites ?? NO_REGION) : autoBuffbarRegion(frameW, frameH),
+      slot: s.where === "favorites" ? (favoritesRegion(p, frameW, frameH) ?? NO_REGION) : autoBuffbarRegion(frameW, frameH),
       alert: s.alert,
     });
   }
@@ -144,7 +162,7 @@ export function detectBuffs(p: Profile, now: number, live: boolean) {
   // 영역 탐색은 무겁다(버프칸이 넓으면 0.1초). 필요한 버프가 있을 때만, 영역마다 한 번만 잘라 낸다
   const crops = new Map<string, { img: ImageData; gray: ReturnType<typeof toGray> } | null>();
   const regionImage = (b: BuffEntry, region: SavedRegion) => {
-    const key = b.slot ? `slot:${b.id}` : "buffbar";
+    const key = regionSignature(region);
     if (!crops.has(key)) {
       const img = screenCapture.crop(region);
       if (img) debugCrops.set(b.slot ? `slot:${b.id}` : "buffbar", img);
@@ -155,6 +173,7 @@ export function detectBuffs(p: Profile, now: number, live: boolean) {
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
     const region = buffRegion(p, b);
+    syncBuffRegion(rt, region);
     const ts = templatesOf(b);
     if (!b.enabled || !ts.length || !live || !region || !regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
     // 마지막 위치 주변에서 방금(1초 안) 다시 찾은 아이콘은 그대로 있는 것으로 본다 (위치가 바뀌면 놓치고 다시 전체 탐색)
@@ -191,14 +210,18 @@ export function trackBuffIcons(p: Profile, now: number, live: boolean) {
   if (!live) return;
   for (const b of p.buffs) {
     if (!b.enabled || !templatesOf(b).length || !b.readTime || b.kind !== "expiry") continue;
-    if (!regionValidFor(buffRegion(p, b), screenCapture.width, screenCapture.height)) continue;
+    const region = buffRegion(p, b);
+    if (!regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
     const rt = buffRuntime(b.id);
+    syncBuffRegion(rt, region);
     if (!rt.presence.present || !rt.lastPos) continue;
     const t = templatesOf(b)[rt.tplIdx] ?? templatesOf(b)[0];
     const pad = 4;
-    const wx = Math.max(0, rt.lastPos.x - pad);
-    const wy = Math.max(0, rt.lastPos.y - pad);
-    const img = screenCapture.crop({ x: wx, y: wy, w: t.gray.width + pad * 2, h: t.gray.height + pad * 2 });
+    const wx = Math.max(region.x, rt.lastPos.x - pad);
+    const wy = Math.max(region.y, rt.lastPos.y - pad);
+    const right = Math.min(region.x + region.w, rt.lastPos.x + t.gray.width + pad);
+    const bottom = Math.min(region.y + region.h, rt.lastPos.y + t.gray.height + pad);
+    const img = screenCapture.crop({ x: wx, y: wy, w: right - wx, h: bottom - wy });
     if (!img) continue;
     const m = findTemplate(img, toGray(img), t, 1)[0];
     if (!m || m.score < minScoreOf(b) || m.colorDist > 60) continue;

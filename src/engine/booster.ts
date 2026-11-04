@@ -1,4 +1,5 @@
 import { endingText } from "../alerts/speech";
+import { regionSignature } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { readDigits, segment } from "../cv/digits";
@@ -16,6 +17,7 @@ interface BoosterRuntime {
   alerted: boolean;
   readText: string | null;
 }
+let boosterRegionKey = "";
 const boosterRt: BoosterRuntime = { ests: new EstimateConsensus(1500), endsAt: null, alerted: false, readText: null };
 export function resetBoosterObservations() { boosterRt.ests.reset(); }
 
@@ -39,6 +41,12 @@ export function tickBooster(p: Profile, now: number, live: boolean): BoosterLive
   if (!live) return { ...base, status: "no-share", endsAt: rt.endsAt };
   const region = p.regions.booster;
   if (!regionValidFor(region, screenCapture.width, screenCapture.height)) return { ...base, status: "no-region", endsAt: null };
+  const key = regionSignature(region);
+  if (key !== boosterRegionKey) {
+    boosterRegionKey = key;
+    rt.ests.reset();
+    rt.readText = null;
+  }
   const img = screenCapture.crop(region);
   if (img) {
     debugCrops.set("booster", img);

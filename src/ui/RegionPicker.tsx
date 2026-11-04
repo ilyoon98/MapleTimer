@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { experienceRegion } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import type { Rect, SavedRegion } from "../capture/types";
 
@@ -36,6 +37,7 @@ export function RegionPicker({
   onConfirm,
   onClose,
   raw = false,
+  selection,
 }: {
   title: string;
   guide: string[];
@@ -44,6 +46,7 @@ export function RegionPicker({
   onConfirm: (r: PickResult) => void;
   onClose: () => void;
   raw?: boolean;
+  selection?: "experience-height";
 }) {
   const [snap, setSnap] = useState<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -123,7 +126,9 @@ export function RegionPicker({
     }
     const p = toImg(e);
     dragRef.current = p;
-    setRect({ x: Math.floor(p.x), y: Math.floor(p.y), w: 0, h: 0 });
+    setRect(selection === "experience-height"
+      ? experienceRegion(snap.width, snap.height, 1 - p.y / snap.height)
+      : { x: Math.floor(p.x), y: Math.floor(p.y), w: 0, h: 0 });
   };
   const onMove = (e: React.PointerEvent) => {
     const pan = panRef.current;
@@ -136,6 +141,10 @@ export function RegionPicker({
     const s = dragRef.current;
     if (!s || !snap) return;
     const p = toImg(e);
+    if (selection === "experience-height") {
+      setRect(experienceRegion(snap.width, snap.height, 1 - p.y / snap.height));
+      return;
+    }
     const x = Math.floor(Math.min(s.x, p.x)),
       y = Math.floor(Math.min(s.y, p.y));
     setRect({ x, y, w: Math.ceil(Math.max(s.x, p.x)) - x, h: Math.ceil(Math.max(s.y, p.y)) - y });
@@ -184,13 +193,17 @@ export function RegionPicker({
       const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
       if (!d) return;
       e.preventDefault();
+      if (selection === "experience-height" && snap) {
+        setRect((r) => r && experienceRegion(snap.width, snap.height, 1 - (r.y + r.h / 2 + d[1]) / snap.height));
+        return;
+      }
       setRect((r) =>
         r && (e.shiftKey ? { ...r, w: Math.max(2, r.w + d[0]), h: Math.max(2, r.h + d[1]) } : { ...r, x: r.x + d[0], y: r.y + d[1] }),
       );
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rect, onClose]);
+  }, [rect, onClose, selection, snap]);
 
   const confirm = () => {
     if (!rect || !snap || rect.w < 2 || rect.h < 2) return;
@@ -223,7 +236,7 @@ export function RegionPicker({
           {guide.map((g) => (
             <li key={g}>{g}</li>
           ))}
-          <li>드래그로 영역을 고르고, 방향키로 1px 이동 · Shift+방향키로 크기 조절할 수 있어요.</li>
+          <li>{selection === "experience-height" ? "클릭으로 높이를 고르고, 위·아래 방향키로 미세 조정하세요." : "드래그로 영역을 고르고, 방향키로 1px 이동 · Shift+방향키로 크기 조절할 수 있어요."}</li>
           <li>마우스 휠로 커서 위치를 확대/축소하고, 오른쪽(또는 휠) 버튼을 누른 채 끌면 화면을 옮길 수 있어요.</li>
         </ul>
         <div className="picker-toolbar">
@@ -269,7 +282,7 @@ export function RegionPicker({
         </div>
         <footer className="modal-foot">
           {snap && rect && rect.w >= 2 && rect.h >= 2 && <SelectionPreview snap={snap} rect={rect} />}
-          <span className="muted">{rect ? `선택: ${rect.w}×${rect.h}px @ (${rect.x + offset.x}, ${rect.y + offset.y})` : "영역을 드래그하세요"}</span>
+          <span className="muted">{rect ? `선택: ${rect.w}×${rect.h}px @ (${rect.x + offset.x}, ${rect.y + offset.y})` : selection === "experience-height" ? "경험치 숫자 높이를 클릭하세요" : "영역을 드래그하세요"}</span>
           <span className="spacer" />
           <button onClick={onClose}>취소</button>
           <button className="primary" onClick={confirm} disabled={!rect || rect.w < 2 || rect.h < 2}>

@@ -4,6 +4,7 @@ import type { PickResult } from "./RegionPicker";
 
 export interface PickRequest {
   title: string;
+  selection?: "experience-height";
   guide: string[];
   within?: SavedRegion | null;
   initial?: SavedRegion | null;

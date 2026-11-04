@@ -1,3 +1,5 @@
+import { screenCapture } from "../../capture/screenCapture";
+import { stallRegion } from "../../capture/detectionRegions";
 import { liveStore } from "../../engine/engine";
 import { STALL_DEFAULT_SEC, STALL_RANGE, profileStore, setRegion, type StallMode, type StallSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
@@ -46,17 +48,21 @@ function setStall(patch: Partial<StallSettings>) {
 export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const st = profileStore.use((p) => p.stall);
   const buffs = profileStore.use((p) => p.buffs);
-  const region = profileStore.use((p) => p.regions.stall);
+  const p = profileStore.use((p) => p);
+  const region = stallRegion(p, screenCapture.width, screenCapture.height);
   const live = liveStore.use((l) => l.stall);
   const s = STATUS[live.status];
   const [lo, hi] = STALL_RANGE[st.mode];
 
   const pickRegion = () =>
     openPicker({
-      title: `사냥 멈춤 · ${MODES[st.mode].label} 영역 선택`,
-      guide: MODES[st.mode].guide,
+      title: st.mode === "exp" ? "경험치 숫자 높이 선택" : `사냥 멈춤 · ${MODES[st.mode].label} 영역 선택`,
+      selection: st.mode === "exp" ? "experience-height" : undefined,
+      guide: st.mode === "exp" ? ["경험치 숫자가 있는 높이를 클릭하세요. 가로는 중앙 40%로 맞춰져요."] : MODES[st.mode].guide,
       initial: region,
-      onConfirm: ({ region }) => setRegion("stall", region),
+      onConfirm: ({ region }) => st.mode === "exp"
+        ? setStall({ expHeightRatio: 1 - (region.y + region.h / 2) / region.frameH })
+        : setRegion("stall", region),
     });
 
   return (
@@ -98,7 +104,8 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
           </div>
           <StatusDot tone={s.tone}>{s.text}</StatusDot>
           <div className="row-buttons">
-            <button onClick={pickRegion}>{region ? "영역 다시 선택" : "영역 선택"}</button>
+            <button onClick={pickRegion}>{st.mode === "exp" ? "높이 조정" : region ? "영역 다시 선택" : "영역 선택"}</button>
+            {st.mode === "exp" && st.expHeightRatio != null && <button onClick={() => setStall({ expHeightRatio: null })}>기본 높이</button>}
           </div>
         </div>
         <details className="row-sub compact-settings"><summary>설정</summary>
