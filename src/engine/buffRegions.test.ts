@@ -3,7 +3,10 @@ const mock = vi.hoisted(() => ({ crop: vi.fn(), match: vi.fn() }));
 vi.mock("../capture/screenCapture", () => ({screenCapture:{state:"live",width:1024,height:768,crop:mock.crop}}));
 vi.mock("../cv/match", async (original) => ({ ...await original<typeof import("../cv/match")>(), findTemplate:mock.match }));
 import { defaultProfile } from "../state/profile";
-import { detectBuffs, isBuffPresent, preciseSkillBuffs, resetBuffObservations, trackBuffIcons } from "./buffs";
+import { applyBuffSearch, detectBuffs as request, isBuffPresent, preciseSkillBuffs, resetBuffObservations, trackBuffIcons } from "./buffs";
+
+// 엔진처럼: 탐색을 요청하고 같은 tick 에 끝난 결과를 반영한다 (테스트에서는 워커 없이 그 자리에서 계산)
+const detectBuffs = (p: ReturnType<typeof defaultProfile>, now: number, live: boolean) => { request(p, now, live); applyBuffSearch(p, now, live); };
 
 beforeEach(() => {
   resetBuffObservations();

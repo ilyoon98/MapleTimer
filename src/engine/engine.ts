@@ -8,7 +8,7 @@ import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
 import { ScreenTransitionDetector } from "../detect/screenTransition";
 import { preciseIcon, profileStore, restoreRegionLayout, tts, type Profile } from "../state/profile";
-import { detectBuffs, isBuffPresent, preciseBuffId, preciseSkillBuffs, tickBuffTimers, trackBuffIcons } from "./buffs";
+import { applyBuffSearch, detectBuffs, isBuffPresent, preciseBuffId, preciseSkillBuffs, tickBuffTimers, trackBuffIcons } from "./buffs";
 import { tickBooster } from "./booster";
 import { recordClip } from "./clip";
 import { debugCrops, liveStore } from "./live";
@@ -24,7 +24,7 @@ import { tickTimers } from "./timers";
 export * from "./live";
 export { getRunner, stopRingingAlerts } from "./shared";
 export { clearSkill, manualSkillCast } from "./skills";
-export { isBuffPresent } from "./buffs";
+export { buffSearchStats, isBuffPresent } from "./buffs";
 export { lastBoosterSegment } from "./booster";
 export { resetTimerAlert } from "./timers";
 export { clipSnapshot, clipUsage, type ClipData } from "./clip";
@@ -145,6 +145,7 @@ function tickInner(now: number) {
   } else {
     runners.get("booster")?.tick(now);
   }
+  timed("buffApply", now, () => applyBuffSearch(pb, now, live));
   timed("buffTrack", now, () => trackBuffIcons(pb, now, watch && frame.fresh));
   const buffs = tickBuffTimers(pb, now);
   for (const s of p.skills) {

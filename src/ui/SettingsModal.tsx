@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
-import { clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
+import { buffSearchStats, clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
 import {
@@ -108,6 +108,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           log: live.log,
           perf: live.perf,
         featurePerf: featurePerf(),
+        buffSearch: buffSearchStats(),
           captureStale: live.captureStale,
           captureBlack: live.captureBlack,
           screenTransition: live.screenTransition,

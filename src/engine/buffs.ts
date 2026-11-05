@@ -5,7 +5,7 @@ import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { readDigits, segment } from "../cv/digits";
 import { cropPixels, toGray, type Pixels } from "../cv/image";
-import { findTemplate, type PreparedTemplate } from "../cv/match";
+import { findTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
 import { gameIcon } from "../cv/gameIcons";
 import { EstimateConsensus, applyExpiry, keepEndAfterVanish } from "../detect/consensus";
 import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearner";
@@ -15,6 +15,8 @@ import { preciseIcon, profileStore, shortName, tts, type BuffEntry, type Profile
 import { debugCrops, type BuffLive } from "./live";
 import { frameTime, observation, learnFrom, prepared, preparedScales, runner, runners } from "./shared";
 import { pauseLinkedTimers, startLinkedTimers } from "./timers";
+import { createBuffSearcher, type SearchMeta } from "./search/buffSearcher";
+import type { SearchItem, SearchRegion, TemplateDef } from "./search/buffSearch";
 
 /* ───────── 버프칸 감지 ───────── */
 interface BuffRuntime {
@@ -40,7 +42,32 @@ interface BuffRuntime {
   recorder: CooldownSequenceRecorder;
 }
 const buffRt = new Map<string, BuffRuntime>();
+
+/* 버프칸 전체 탐색은 워커에서 (영역이 넓으면 0.1초라 화면·타이머가 끊긴다) */
+interface BuffSearchMeta extends SearchMeta {
+  session: number;
+  epoch: number;
+  /** 버프마다 요청 때 본 영역 (그 사이 영역이 바뀌었으면 결과를 쓰지 않는다) */
+  regionKeys: Record<string, string>;
+}
+const searcher = createBuffSearcher<BuffSearchMeta>();
+/** 관측을 초기화할 때마다 올라간다: 그 전에 보낸 탐색 결과는 버린다 */
+let obsEpoch = 0;
+export const buffSearchStats = () => ({ ...searcher.stats });
+
+const templateIds = new WeakMap<StoredTemplate, number>();
+let templateSeq = 0;
+function templateDef(b: BuffEntry): TemplateDef | null {
+  if (b.icon) return { key: `icon:${b.icon}`, icon: b.icon };
+  if (!b.template) return null;
+  let id = templateIds.get(b.template);
+  if (!id) templateIds.set(b.template, (id = ++templateSeq));
+  return { key: `tpl:${id}`, stored: b.template };
+}
+
 export function resetBuffObservations() {
+  obsEpoch++;
+  searcher.cancel();
   for (const rt of buffRt.values()) {
     rt.readEsts.reset();
     rt.recorder.reset();
@@ -159,46 +186,69 @@ export function buffRegionOk(p: Profile, b: BuffEntry): boolean {
 }
 
 export function detectBuffs(p: Profile, now: number, live: boolean) {
-  // 영역 탐색은 무겁다(버프칸이 넓으면 0.1초). 필요한 버프가 있을 때만, 영역마다 한 번만 잘라 낸다
-  const crops = new Map<string, { img: ImageData; gray: ReturnType<typeof toGray> } | null>();
-  const regionImage = (b: BuffEntry, region: SavedRegion) => {
-    const key = regionSignature(region);
-    if (!crops.has(key)) {
-      const img = screenCapture.crop(region);
-      if (img) debugCrops.set(b.slot ? `slot:${b.id}` : "buffbar", img);
-      crops.set(key, img ? { img, gray: toGray(img) } : null);
-    }
-    return crops.get(key) ?? null;
-  };
+  const need: Array<{ b: BuffEntry; region: SavedRegion; def: TemplateDef }> = [];
   for (const b of p.buffs) {
     const rt = buffRuntime(b.id);
     const region = buffRegion(p, b);
     syncBuffRegion(rt, region);
-    const ts = templatesOf(b);
-    if (!b.enabled || !ts.length || !live || !region || !regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
+    const def = templateDef(b);
+    if (!b.enabled || !def || !live || !region || !regionValidFor(region, screenCapture.width, screenCapture.height)) continue;
     // 마지막 위치 주변에서 방금(1초 안) 다시 찾은 아이콘은 그대로 있는 것으로 본다 (위치가 바뀌면 놓치고 다시 전체 탐색)
     if (rt.presence.present && now - rt.localHitAt < 1000) {
       onBuffEvent(b, rt, rt.presence.observe(true, now), now);
       continue;
     }
-    const full = regionImage(b, region);
-    if (!full) continue;
-    const { img, gray } = full;
-    let m: ReturnType<typeof findTemplate>[number] | undefined;
-    ts.forEach((t, i) => {
-      const r = findTemplate(img, gray, t, 1)[0];
-      if (r && (!m || r.score > m.score)) {
-        m = r;
-        rt.tplIdx = i;
-      }
-    });
+    need.push({ b, region, def });
+  }
+  if (!need.length) return;
+  // 앞 탐색이 아직이면 이번 화면은 건너뛴다 (쌓아 두지 않는다)
+  if (searcher.isBusy) {
+    searcher.stats.busy++;
+    return;
+  }
+  // 영역마다 한 번만 잘라 낸다
+  const regions = new Map<string, SearchRegion>();
+  const defs = new Map<string, TemplateDef>();
+  const items: SearchItem[] = [];
+  const regionKeys: Record<string, string> = {};
+  for (const { b, region, def } of need) {
+    const key = regionSignature(region);
+    if (!regions.has(key)) {
+      const img = screenCapture.crop(region);
+      if (!img) continue;
+      debugCrops.set(b.slot ? `slot:${b.id}` : "buffbar", img);
+      // 워커로 넘기면 원본 버퍼가 비므로 진단 그림용 원본은 두고 복사본을 보낸다
+      regions.set(key, { key, width: img.width, height: img.height, data: new Uint8ClampedArray(img.data) });
+    }
+    defs.set(def.key, def);
+    items.push({ buffId: b.id, regionKey: key, templateKey: def.key });
+    regionKeys[b.id] = key;
+  }
+  if (items.length) searcher.submit([...defs.values()], [...regions.values()], items, { at: now, session: screenCapture.sessionId, epoch: obsEpoch, regionKeys });
+}
+
+/** 끝난 버프칸 탐색 결과를 반영한다 (매 tick). 그 사이 공유·영역이 바뀌었거나 관측을 초기화했으면 버린다 */
+export function applyBuffSearch(p: Profile, now: number, live: boolean) {
+  const done = searcher.take();
+  if (!done || !live) return;
+  const { meta } = done;
+  if (meta.session !== screenCapture.sessionId || meta.epoch !== obsEpoch) return;
+  for (const hit of done.hits) {
+    const b = p.buffs.find((x) => x.id === hit.buffId);
+    if (!b || !b.enabled) continue;
+    const rt = buffRuntime(b.id);
+    const region = buffRegion(p, b);
+    if (!region || rt.regionKey !== meta.regionKeys[b.id] || regionSignature(region) !== rt.regionKey) continue;
+    // 결과를 기다리는 사이 주변 탐색으로 이미 다시 찾았으면 그쪽이 더 새 정보다
+    if (rt.presence.present && rt.localHitAt > meta.at) continue;
+    const m = hit.best;
+    if (m) rt.tplIdx = m.tplIdx;
     rt.score = m?.score ?? 0;
     rt.colorDist = m?.colorDist ?? 0;
-    const hit = !!m && m.score >= minScoreOf(b) && m.colorDist <= 60;
-    if (hit && m) rt.lastPos = { x: region.x + m.x, y: region.y + m.y };
-    const ev = rt.presence.observe(hit, now);
-    onBuffEvent(b, rt, ev, now);
-    if (!hit) rt.readText = null;
+    const found = !!m && m.score >= minScoreOf(b) && m.colorDist <= 60;
+    if (found && m) rt.lastPos = { x: region.x + m.x, y: region.y + m.y };
+    onBuffEvent(b, rt, rt.presence.observe(found, now), now);
+    if (!found) rt.readText = null;
   }
 }
 
