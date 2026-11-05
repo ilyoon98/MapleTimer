@@ -17,6 +17,31 @@ const trusted = (event) => event.sender === main?.webContents && event.senderFra
 const sources = () => desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 240, height: 135 } });
 const ownIds = () => new Set(BrowserWindow.getAllWindows().map(w => w.getMediaSourceId().split(':').slice(0, 2).join(':')));
 
+/**
+ * 자동 업데이트: 설치판(GitHub Releases)에서만. 켤 때와 6시간마다 새 버전을 찾아 뒤에서 받아 두고,
+ * 다 받으면 화면에 한 줄로 알린다. 그냥 꺼도 다음에 켤 때 새 버전이 된다.
+ */
+let updateReady = null;
+function setupUpdates() {
+  if (!app.isPackaged) return;
+  let autoUpdater;
+  try { ({ autoUpdater } = require('electron-updater')); } catch { return; }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-downloaded', (info) => {
+    updateReady = { version: info.version };
+    main?.webContents.send('update:ready', updateReady);
+  });
+  autoUpdater.on('error', () => { /* 인터넷이 없거나 릴리스가 없으면 조용히 넘어간다 */ });
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  check();
+  setInterval(check, 6 * 60 * 60 * 1000);
+  ipcMain.handle('update:install', (event) => {
+    if (!trusted(event) || !updateReady) throw new Error('허용되지 않은 요청');
+    autoUpdater.quitAndInstall(true, true);
+  });
+}
+
 app.whenReady().then(async () => {
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg' };
   protocol.handle('app', async (req) => {
@@ -33,6 +58,10 @@ app.whenReady().then(async () => {
         'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; font-src 'self' data:",
       } });
     } catch { return new Response(null, { status: 404 }); }
+  });
+  ipcMain.handle('update:status', (event) => {
+    if (!trusted(event)) throw new Error('허용되지 않은 요청');
+    return updateReady;
   });
   ipcMain.handle('capture:list', async (event) => {
     if (!trusted(event)) throw new Error('허용되지 않은 요청');
@@ -77,5 +106,6 @@ app.whenReady().then(async () => {
   });
   main.on('closed', () => { for (const child of children) child.destroy(); main = null; });
   await main.loadURL(`${ORIGIN}/`);
+  setupUpdates();
 });
 app.on('window-all-closed', () => app.quit());

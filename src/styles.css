@@ -1466,3 +1466,11 @@ input[type="text"] {
   padding: 6px;
   border-radius: 10px;
 }
+/* 새 버전 준비됨: 문제가 아니라서 노랑 대신 초록 */
+.notice-update {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+  border-color: var(--accent);
+}
+.notice-update .notice-mark {
+  background: var(--accent);
+}

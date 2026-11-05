@@ -1,7 +1,7 @@
 {
   "name": "maple-timer",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,11 +10,11 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run src && node --test electron/sources.test.cjs",
     "desktop": "npm run build && electron .",
-    "desktop:pack": "npm run build && electron-builder --win portable --x64"
+    "desktop:pack": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "desktop:release": "npm run build && electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
-    "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "electron-updater": "6.8.11"
   },
   "devDependencies": {
     "@types/react": "19.1.8",
@@ -22,6 +22,8 @@
     "@vitejs/plugin-react": "4.5.2",
     "electron": "^45.2.2",
     "electron-builder": "^26.18.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "typescript": "5.8.3",
     "vite": "6.3.5",
     "vitest": "3.2.4"
@@ -39,10 +41,23 @@
       "package.json"
     ],
     "win": {
-      "target": "portable",
+      "target": "nsis",
       "signAndEditExecutable": false
     },
-    "artifactName": "MapleTimer-Personal-${version}-${arch}.${ext}"
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "MapleTimer-Setup-${version}.${ext}",
+      "shortcutName": "메이플 타이머"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ilyoon98",
+        "repo": "MapleTimer",
+        "releaseType": "release"
+      }
+    ]
   },
   "description": "개인용 메이플 화면 알림과 독립 타이머",
   "author": "ilyoon"

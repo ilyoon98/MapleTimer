@@ -16,6 +16,7 @@ import { ReplayLoader } from "./dev/ReplayLoader";
 import { GuideModal } from "./ui/Guide";
 import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
+import { UpdateBanner } from "./ui/UpdateBanner";
 import { CapturePicker } from "./ui/CapturePicker";
 import { audioEngine } from "./alerts/audio";
 import { connectMaple, connectStore, startCapture } from "./ui/connect";
@@ -194,6 +195,7 @@ export function App() {
         <button onClick={() => setEditOrder(!editOrder)}>{editOrder ? "순서 편집 끝" : "순서 편집"}</button>
       </div>
 
+      <UpdateBanner />
       <SetupChecklist />
 
       <main className="panels">
