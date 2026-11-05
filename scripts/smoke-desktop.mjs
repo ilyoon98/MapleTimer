@@ -49,6 +49,24 @@ try {
   }
   const initial = await evaluate(`({title:document.title,bridge:!!window.mapleDesktop, node:typeof require, panels:document.querySelectorAll('.panel').length, expanded:document.querySelectorAll('details.compact-settings[open]').length})`);
   if (!initial.bridge || initial.node !== 'undefined' || initial.panels < 1) throw new Error('Bad shell: ' + JSON.stringify(initial));
+  if (process.argv.includes('--check-persistence')) {
+    const expected=JSON.parse(await fs.readFile('package.json','utf8')).version;
+    const info=await evaluate(`window.mapleDesktop.appInfo()`);
+    if(info.version!==expected)throw new Error('Wrong native app version: '+JSON.stringify(info));
+    await evaluate(`[...document.querySelectorAll('button')].find(b=>b.title.startsWith('화면 테마 바꾸기')).click()`);
+    const saved=await evaluate(`JSON.parse(window.mapleDesktop.settings.read('maple-timer-personal.profile.v1').value).theme`);
+    if(saved!=='dark')throw new Error('Theme was not immediately saved: '+saved);
+    // 브라우저 설정이 비어도 앱 파일에서 돌아와야 한다. 300ms 저장 대기는 하지 않는다.
+    await evaluate(`localStorage.removeItem('maple-timer-personal.profile.v1')`);
+    await call('Page.reload');await delay(1000);
+    const restored=await evaluate(`({theme:document.documentElement.dataset.theme,version:document.querySelector('.app-head .app-version')?.textContent,error:document.querySelector('[role=alert]')?.textContent})`);
+    if(restored.theme!=='dark'||restored.version!=='v'+expected||restored.error)throw new Error('Settings did not survive reload: '+JSON.stringify(restored));
+    await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='설정').click()`);
+    const updateButton=await evaluate(`[...document.querySelectorAll('.modal button')].some(b=>b.textContent==='업데이트 확인')`);
+    if(!updateButton)throw new Error('No manual update check');
+    await evaluate(`document.querySelector('.modal [aria-label="닫기"]').click()`);
+    console.log('Version and persistent settings:',JSON.stringify({info,saved,restored,updateButton}));
+  }
   if (process.argv.includes('--check-evidence')) {
     // 실제 게임 대신 고정 그림을 주입한다. 별도 프로필에서 브라우저의 PNG/JPEG 인코딩,
     // IndexedDB 보관, 설정 화면의 캡처 열람까지 검사한다.

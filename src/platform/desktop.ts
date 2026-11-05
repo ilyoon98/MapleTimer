@@ -1,13 +1,26 @@
 export interface CaptureSource { id: string; name: string; thumbnail: string; recommended: boolean }
-export interface UpdateInfo { version: string }
+export interface UpdateState {
+  currentVersion: string;
+  status: "idle" | "checking" | "available" | "downloading" | "downloaded" | "current" | "error" | "disabled";
+  latestVersion: string | null;
+  progress: number | null;
+  error: string | null;
+  checkedAt: number | null;
+  revision: number;
+}
 declare global {
   interface Window {
     mapleDesktop?: {
       listSources(): Promise<CaptureSource[]>;
       selectSource(id: string): Promise<void>;
-      /** 아래 셋은 업데이트를 넣은 실행판에만 있다 */
-      updateStatus?(): Promise<UpdateInfo | null>;
-      onUpdateReady?(cb: (info: UpdateInfo) => void): void;
+      appInfo?(): Promise<{version: string; packaged: boolean}>;
+      settings?: {
+        read(key: string): {value: string | null; recovered?: boolean; error?: string};
+        write(key: string,value: string): {ok: boolean; error?: string};
+      };
+      updateStatus?(): Promise<UpdateState | null>;
+      checkForUpdates?(): Promise<UpdateState>;
+      onUpdateState?(cb: (info: UpdateState) => void): () => void;
       installUpdate?(): Promise<void>;
     };
   }

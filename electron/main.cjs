@@ -9,37 +9,27 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.setName('메이플 타이머 개인용');
+// 설치 위치·파일명·버전이 바뀌어도 같은 설정을 사용한다. 테스트의 별도 프로필은 존중한다.
+if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), '메이플 타이머 개인용'));
+const { SettingsRepository } = require('./settings.cjs');
+const settings = new SettingsRepository(path.join(app.getPath('userData'), 'settings'));
+const { createUpdateController } = require('./updates.cjs');
+let updates = createUpdateController({version:app.getVersion()});
 let main;
 let selected = null;
 const children = new Set();
+if(!app.requestSingleInstanceLock())app.quit();
+app.on('second-instance',()=>{if(main){if(main.isMinimized())main.restore();main.show();main.focus();}});
 const trusted = (event) => event.sender === main?.webContents && event.senderFrame === main.webContents.mainFrame
   && event.senderFrame.url === `${ORIGIN}/`;
 const sources = () => desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 240, height: 135 } });
 const ownIds = () => new Set(BrowserWindow.getAllWindows().map(w => w.getMediaSourceId().split(':').slice(0, 2).join(':')));
 
-/**
- * 자동 업데이트: 설치판(GitHub Releases)에서만. 켤 때와 6시간마다 새 버전을 찾아 뒤에서 받아 두고,
- * 다 받으면 화면에 한 줄로 알린다. 그냥 꺼도 다음에 켤 때 새 버전이 된다.
- */
-let updateReady = null;
 function setupUpdates() {
-  if (!app.isPackaged) return;
-  let autoUpdater;
-  try { ({ autoUpdater } = require('electron-updater')); } catch { return; }
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('update-downloaded', (info) => {
-    updateReady = { version: info.version };
-    main?.webContents.send('update:ready', updateReady);
-  });
-  autoUpdater.on('error', () => { /* 인터넷이 없거나 릴리스가 없으면 조용히 넘어간다 */ });
-  const check = () => autoUpdater.checkForUpdates().catch(() => {});
-  check();
-  setInterval(check, 6 * 60 * 60 * 1000);
-  ipcMain.handle('update:install', (event) => {
-    if (!trusted(event) || !updateReady) throw new Error('허용되지 않은 요청');
-    autoUpdater.quitAndInstall(true, true);
-  });
+  let updater=null;
+  if(app.isPackaged){try{updater=require('electron-updater').autoUpdater;}catch{}}
+  updates=createUpdateController({version:app.getVersion(),updater,notify:state=>main?.webContents.send('update:state',state)});
+  if(updater){void updates.check();const timer=setInterval(()=>void updates.check(),6*60*60*1000);timer.unref();}
 }
 
 app.whenReady().then(async () => {
@@ -61,7 +51,25 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('update:status', (event) => {
     if (!trusted(event)) throw new Error('허용되지 않은 요청');
-    return updateReady;
+    return updates.get();
+  });
+  ipcMain.handle('app:info',event=>{
+    if(!trusted(event))throw new Error('허용되지 않은 요청');
+    return {version:app.getVersion(),packaged:app.isPackaged};
+  });
+  ipcMain.handle('update:check',event=>{
+    if(!trusted(event))throw new Error('허용되지 않은 요청');return updates.check();
+  });
+  ipcMain.handle('update:install',event=>{
+    if(!trusted(event))throw new Error('허용되지 않은 요청');return updates.install();
+  });
+  ipcMain.on('settings:read',(event,key)=>{
+    try{event.returnValue=trusted(event)?settings.read(key):{value:null,error:'허용되지 않은 요청'};}
+    catch{event.returnValue={value:null,error:'설정 파일을 읽지 못했어요'};}
+  });
+  ipcMain.on('settings:write',(event,key,value)=>{
+    try{event.returnValue=trusted(event)?settings.write(key,value):{ok:false,error:'허용되지 않은 요청'};}
+    catch{event.returnValue={ok:false,error:'설정을 파일에 저장하지 못했어요'};}
   });
   ipcMain.handle('capture:list', async (event) => {
     if (!trusted(event)) throw new Error('허용되지 않은 요청');

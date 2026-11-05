@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { screenCapture } from "./capture/screenCapture";
 import { liveStore, startEngine, stopRingingAlerts } from "./engine/engine";
 import { profileStore, type PanelId } from "./state/profile";
+import { persistenceStatus } from "./state/createStore";
 import { fmtClock } from "./ui/common";
 import { closePicker, pickerStore } from "./ui/pickerStore";
 import { BoosterPanel } from "./ui/panels/BoosterPanel";
@@ -16,7 +17,7 @@ import { ReplayLoader } from "./dev/ReplayLoader";
 import { GuideModal } from "./ui/Guide";
 import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
-import { UpdateBanner } from "./ui/UpdateBanner";
+import { AppVersion, UpdateBanner } from "./ui/UpdateBanner";
 import { CapturePicker } from "./ui/CapturePicker";
 import { audioEngine } from "./alerts/audio";
 import { connectMaple, connectStore, startCapture } from "./ui/connect";
@@ -111,6 +112,7 @@ function AlertLog() {
 }
 
 export function App() {
+  const persistenceErrors=persistenceStatus.use(s=>s.errors);
   const order = profileStore.use((p) => p.panelOrder);
   const collapsed = profileStore.use((p) => p.collapsed);
   const masterVolume = profileStore.use((p) => p.masterVolume);
@@ -149,6 +151,7 @@ export function App() {
       <header className="app-head">
         <h1>메이플 타이머</h1>
         <span className="badge">개인용</span>
+        <AppVersion />
         <span className="spacer" />
         <button onClick={() => setModal("guide")}>사용 가이드</button>
         {pipSupported() && (
@@ -158,6 +161,9 @@ export function App() {
         <button onClick={() => setModal("settings")}>설정</button>
         <ShareChip />
       </header>
+      {Object.keys(persistenceErrors).length>0&&<section className="notice" role="alert">
+        <span>{Object.values(persistenceErrors)[0]}</span> <button onClick={()=>setModal("settings")}>설정 열기</button>
+      </section>}
 
       <div className="toolbar">
         <label className="volume">

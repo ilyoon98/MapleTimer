@@ -3,6 +3,7 @@ import { audioEngine } from "../alerts/audio";
 import { exportAlertEvidence } from "../state/alertEvidence";
 import { flushAlertEvidence } from "../engine/alertEvidence";
 import { AlertEvidenceViewer } from "./AlertEvidenceViewer";
+import { UpdateSettings } from "./UpdateBanner";
 import { screenCapture } from "../capture/screenCapture";
 import { buffSearchStats, clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
@@ -151,6 +152,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             ✕
           </button>
         </header>
+        <UpdateSettings />
         <section className="modal-section">
           <h4>일반</h4>
           <div className="field-row">

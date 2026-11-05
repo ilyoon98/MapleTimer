@@ -1,14 +1,14 @@
 {
   "name": "maple-timer",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run src && node --test electron/sources.test.cjs",
+    "test": "vitest run src && node --test electron/*.test.cjs",
     "desktop": "npm run build && electron .",
     "desktop:pack": "npm run build && electron-builder --win nsis --x64 --publish never",
     "desktop:release": "npm run build && electron-builder --win nsis --x64 --publish always"
@@ -48,7 +48,8 @@
       "oneClick": true,
       "perMachine": false,
       "artifactName": "MapleTimer-Setup-${version}.${ext}",
-      "shortcutName": "메이플 타이머"
+      "shortcutName": "메이플 타이머",
+      "deleteAppDataOnUninstall": false
     },
     "publish": [
       {
