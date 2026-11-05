@@ -31,7 +31,7 @@ function statusText(info:UpdateState|null){
     case "current":return "최신 버전입니다";
     case "error":return "업데이트 확인 실패 · 다시 시도해 주세요";
     case "disabled":return "개발 실행 · 설치판에서 자동 업데이트됩니다";
-    default:return "자동 업데이트 사용 중";
+    default:return "10분마다 새 버전 확인";
   }
 }
 export function UpdateSettings(){
@@ -42,6 +42,7 @@ export function UpdateSettings(){
     <div className="field-row"><h4>앱</h4><AppVersion/><span className="muted small" role="status">{statusText(info)}</span></div>
     <div className="field-row">
       <button onClick={check} disabled={!!busy||!desktop.checkForUpdates}>업데이트 확인</button>
+      <span className="muted small">10분마다 자동 확인</span>
       {info?.status==="downloaded"&&<button className="primary" onClick={()=>void desktop?.installUpdate?.()}>지금 업데이트</button>}
     </div>
   </section>;

@@ -5,6 +5,8 @@ import { stallRegion } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { profileStore, setRegion, type StallMode } from "../state/profile";
 import { openPicker } from "./pickerStore";
+import { openBuffLocation } from "./buffLocationStore";
+import { selectSkillBuffLocation } from "../state/skillBuffLocation";
 
 export const STALL_MODES: Record<StallMode, { label: string; guide: string[] }> = {
   exp: {
@@ -70,13 +72,16 @@ export function pickBuffbar() {
 }
 
 export function pickFavorites() {
+  openBuffLocation();
+}
+export function pickFavoritesManually() {
   openPicker({
     title: "버프 즐겨찾기 위치 선택",
     guide: ["즐겨찾기 버프 칸들을 넉넉하게 선택하세요. 두 스킬에 함께 적용돼요."],
     initial: profileStore.get().regions.favorites,
     onConfirm: ({ region }) => {
       setRegion("favorites", region);
-      profileStore.set((p) => ({ ...p, favoritesPosition: "manual" }));
+      profileStore.set((p) => selectSkillBuffLocation(p,"manual"));
     },
   });
 }

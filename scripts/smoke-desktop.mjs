@@ -117,29 +117,26 @@ try {
   if (process.argv.includes('--check-settings')) {
     const rows = await evaluate(`(() => {
       const panel = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('h2')?.textContent==='스킬 알림');
-      panel.querySelectorAll('details').forEach(d=>d.open=true);
+      panel.querySelectorAll('details.compact-settings').forEach(d=>d.open=true);
       return [...panel.querySelectorAll('.row-title')].map(r=>r.textContent);
     })()`);
     if (rows.length !== 2 || !rows[0].includes('솔 야누스') || !rows[1].includes('에르다 파운틴')) throw new Error('Unexpected skills: '+JSON.stringify(rows));
-    await evaluate(`document.querySelectorAll('select[aria-label$=" 감지 위치"]').forEach(s=>{s.value='favorites';s.dispatchEvent(new Event('change',{bubbles:true}));})`);
+    const original=await evaluate(`window.mapleDesktop.settings.read('maple-timer-personal.profile.v1').value`);
+    await evaluate(`document.querySelector('[aria-label="버프 위치 선택"]').click()`);
+    await evaluate(`[...document.querySelectorAll('.buff-location-choice')].find(b=>b.textContent.includes('좌측 하단')).click();[...document.querySelectorAll('.modal-buff-location button')].find(b=>b.textContent==='취소').click()`);
+    if(await evaluate(`window.mapleDesktop.settings.read('maple-timer-personal.profile.v1').value`)!==original)throw new Error('Cancel changed settings');
+    await evaluate(`document.querySelector('[aria-label="버프 위치 선택"]').click()`);
+    await evaluate(`[...document.querySelectorAll('.buff-location-choice')].find(b=>b.textContent.includes('좌측 하단')).click()`);
     await delay(100);
-    await evaluate(`(()=>{const s=document.querySelector('select[aria-label="즐겨찾기 위치 (두 스킬 공통)"]');s.value='left';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await evaluate(`document.querySelector('.modal-buff-location .primary').click()`);
+    const shared=await evaluate(`(()=>{const p=JSON.parse(window.mapleDesktop.settings.read('maple-timer-personal.profile.v1').value);return {positions:p.skills.map(s=>s.where),position:p.favoritesPosition,oldSelectors:document.querySelectorAll('select[aria-label$=" 감지 위치"]').length};})()`);
+    if(shared.position!=='left'||shared.oldSelectors!==0||shared.positions.some(p=>p!=='favorites'))throw new Error('Shared location not applied: '+JSON.stringify(shared));
+    await evaluate(`(()=>{const lead=document.querySelector('.panel .row .alert-settings-compact > .field-row select');lead.value='5';lead.dispatchEvent(new Event('change',{bubbles:true}));})()`);
     await delay(100);
-    const shared = await evaluate(`({positions:[...document.querySelectorAll('select[aria-label="즐겨찾기 위치 (두 스킬 공통)"]')].map(s=>s.value),picker:!!document.querySelector('.picker-stage')})`);
-    if (shared.positions.length !== 2 || shared.positions.some(p=>p!=='left') || shared.picker) throw new Error('Favorites needs a rectangle: '+JSON.stringify(shared));
-    await evaluate(`(()=>{
-      const row=document.querySelector('.panel .row');
-      const groups=row.querySelectorAll('.alert-group');
-      const lead=groups[0].querySelectorAll('select')[0];lead.value='5';lead.dispatchEvent(new Event('change',{bubbles:true}));
-    })()`);
+    await evaluate(`(()=>{const sound=document.querySelectorAll('.panel .row .alert-settings-compact > .field-row select')[1];sound.value='beep:double';sound.dispatchEvent(new Event('change',{bubbles:true}));})()`);
     await delay(100);
-    await evaluate(`(()=>{
-      const row=document.querySelector('.panel .row');
-      const sound=row.querySelectorAll('.alert-group')[1].querySelector('select');sound.value='beep:double';sound.dispatchEvent(new Event('change',{bubbles:true}));
-    })()`);
-    await delay(400);
-    const saved = await evaluate(`(()=>{const p=JSON.parse(localStorage.getItem('maple-timer-personal.profile.v1'));return {position:p.favoritesPosition,lead:p.skills[0].leadSec,sound:p.skills[0].alert.sound.kind,groups:[...document.querySelector('.panel .row').querySelectorAll('legend')].map(l=>l.textContent)};})()`);
-    if (saved.position !== 'left' || saved.lead !== 5 || saved.sound !== 'beep' || saved.groups.join(',') !== '알림,소리') throw new Error('Settings did not persist: '+JSON.stringify(saved));
+    const saved=await evaluate(`(()=>{const p=JSON.parse(window.mapleDesktop.settings.read('maple-timer-personal.profile.v1').value);return {position:p.favoritesPosition,lead:p.skills[0].leadSec,sound:p.skills[0].alert.sound.kind,extraOpen:document.querySelector('.panel .row .alert-extra').open,locationButtons:document.querySelectorAll('[aria-label="버프 위치 선택"]').length};})()`);
+    if(saved.position!=='left'||saved.lead!==5||saved.sound!=='beep'||saved.extraOpen||saved.locationButtons!==1)throw new Error('Compact settings failed: '+JSON.stringify(saved));
     const boosterButtons = await evaluate(`[...document.querySelectorAll('.panel')].find(p=>p.querySelector('h2')?.textContent==='부스터 종료 알림').querySelectorAll('.row-main button').length`);
     if (boosterButtons) throw new Error('Booster still needs manual setup');
     const settingsPng = await call('Page.captureScreenshot', { format:'png' });
@@ -150,6 +147,7 @@ try {
     await evaluate(`document.querySelector('.modal [aria-label="닫기"]').click()`);
     console.log('Simplified settings:', JSON.stringify({rows,shared,saved,heightPicker}));
   }
+  if(process.argv.includes('--capture-game'))await evaluate(`document.querySelector('[aria-label="모든 알림 소리 끄기"]')?.click()`);
   await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='메이플 연결').click()`);
   await delay(2000);
   const picker = await evaluate(`({open:!!document.querySelector('[aria-label="메이플 연결"]'), sources:document.querySelectorAll('.capture-sources button').length,error:document.querySelector('[role=alert]')?.textContent})`);
@@ -176,6 +174,19 @@ try {
     await delay(4000);
     capture = await evaluate(`({live:!!document.querySelector('.share-live'),text:document.querySelector('.share-chip')?.innerText, error:document.querySelector('[role=alert]')?.textContent})`);
     if (!capture.live || capture.error) throw new Error('Game capture failed: ' + JSON.stringify(capture));
+    if(process.argv.includes('--check-buff-location')){
+      await evaluate(`document.querySelector('[aria-label="버프 위치 선택"]').click()`);await delay(700);
+      const preview=await evaluate(`(()=>{const c=document.querySelector('.buff-location-stage canvas');return {width:c.width,height:c.height,choices:document.querySelectorAll('.buff-location-choice').length,placeholder:!!document.querySelector('.buff-location-placeholder'),alpha:c.getContext('2d').getImageData(0,0,1,1).data[3]};})()`);
+      if(preview.placeholder||preview.choices!==3||preview.width<320||preview.alpha!==255)throw new Error('No shared game preview: '+JSON.stringify(preview));
+      const rect=await evaluate(`(()=>{const r=document.querySelector('.modal-buff-location').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,scale:1};})()`);
+      const shot=await call('Page.captureScreenshot',{format:'png',clip:rect});await fs.writeFile('release/buff-location-live.png',Buffer.from(shot.data,'base64'));
+      await evaluate(`[...document.querySelectorAll('.buff-location-choice')].find(b=>b.textContent.includes('우측 하단')).click()`);await delay(100);
+      await evaluate(`document.querySelector('.modal-buff-location .primary').click()`);
+      const applied=await evaluate(`(()=>{const p=JSON.parse(window.mapleDesktop.settings.read('maple-timer-personal.profile.v1').value);return {position:p.favoritesPosition,skills:p.skills.map(s=>s.where)};})()`);
+      if(applied.position!=='right'||applied.skills.some(s=>s!=='favorites'))throw new Error('Preview selection not applied: '+JSON.stringify(applied));
+      console.log('Shared-screen buff location:',JSON.stringify({preview,applied}));
+    }
+
     if (process.argv.includes('--inspect-frame')) {
       await delay(11000);
       console.log('Auto setup:', await evaluate(`[...document.querySelectorAll('.panel')].filter(p=>/룬 알림|부스터/.test(p.querySelector('h2')?.textContent||'')).map(p=>p.innerText.slice(0,300))`));

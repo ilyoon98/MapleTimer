@@ -283,6 +283,15 @@ export class ScreenCapture {
   }
 
   /** 영역 선택 화면용 전체 프레임 스냅샷 */
+  drawPreview(canvas:HTMLCanvasElement):boolean {
+    if(this.state!=="live"||!this.width||!this.height)return false;
+    const w=Math.min(1280,this.width),h=Math.round(this.height*w/this.width);
+    if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
+    canvas.getContext("2d")!.drawImage(this.canvas,0,0,w,h);
+    return true;
+  }
+
+  /** 영역 선택 화면용 전체 프레임 스냅샷 */
   snapshot(refresh = true): HTMLCanvasElement | null {
     if (refresh ? !this.refresh() : !this.width || !this.height) return null;
     const c = document.createElement("canvas");

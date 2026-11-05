@@ -7,14 +7,18 @@ import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
 import { Panel, StatusDot, Toggle, fmtRemaining, NOT_CONNECTED } from "../common";
 import { gameIconUrl } from "../gameArt";
+import { addSkillAtCurrentLocation, currentSkillBuffLocation, SKILL_BUFF_LOCATIONS } from "../../state/skillBuffLocation";
 import { pickFavorites } from "../pickers";
 
 export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const skills = profileStore.use((p) => p.skills);
+  const p = profileStore.use(p=>p);
+  const location=currentSkillBuffLocation(p);
   const missing = SKILL_PRESETS.filter((preset) => !skills.some((s) => s.presetId === preset.id));
   return (
     <Panel id="skills" title="스킬 알림" icon={gameIconUrl("janus")} collapsed={collapsed} onToggleCollapse={onToggleCollapse}
-      actions={missing.map((preset) => <button key={preset.id} onClick={() => profileStore.set((p) => ({ ...p, skills: [...p.skills, newSkill(preset.id)] }))}>+ {shortName(preset.name)}</button>)}>
+      actions={missing.map((preset) => <button key={preset.id} onClick={() => profileStore.set((p) => addSkillAtCurrentLocation(p,newSkill(preset.id)))}>+ {shortName(preset.name)}</button>)}>
+      {skills.length>0&&<div className="skills-location"><span className="muted">버프 위치</span><button aria-label="버프 위치 선택" onClick={pickFavorites}>{location?SKILL_BUFF_LOCATIONS[location]:"스킬별 위치"} · 변경</button></div>}
       {skills.length === 0 && <div className="empty">사용할 스킬을 추가해 주세요.</div>}
       {skills.map((s) => <SkillRow key={s.id} skill={s} />)}
     </Panel>
@@ -49,20 +53,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
         }}>🗑</button></div>
       </div>
       <details className="row-sub compact-settings"><summary>설정</summary>
-        <div className="field-row">
-          <span className="field-label">감지 위치</span>
-          <select aria-label={`${s.name} 감지 위치`} value={onFavorites ? "favorites" : "bar"} onChange={(e) => updateSkill(s.id, { where: e.target.value as "bar" | "favorites" })}>
-            <option value="bar">기본 버프칸</option><option value="favorites">버프 즐겨찾기</option>
-          </select>
-          {onFavorites && <>
-            <select aria-label="즐겨찾기 위치 (두 스킬 공통)" value={p.favoritesPosition} onChange={(e) => profileStore.set((p) => ({ ...p, favoritesPosition: e.target.value as typeof p.favoritesPosition }))}>
-              <option value="left">좌측 하단</option><option value="right">우측 하단</option><option value="manual">직접 지정</option>
-            </select>
-            {p.favoritesPosition === "manual" && <button onClick={pickFavorites}>위치 선택</button>}
-            <span className="muted">두 스킬 공통 · 퀵슬롯 위에서 찾아요</span>
-          </>}
-        </div>
-        <AlertSettings value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} speech={leadText(shortName(s.name), s.leadSec)} lead={{ value: s.leadSec, onChange: (leadSec) => updateSkill(s.id, { leadSec }) }} />
+        <AlertSettings compact value={s.alert} onChange={(alert) => updateSkill(s.id, { alert })} speech={leadText(shortName(s.name), s.leadSec)} lead={{ value: s.leadSec, onChange: (leadSec) => updateSkill(s.id, { leadSec }) }} />
       </details>
     </div>
   );

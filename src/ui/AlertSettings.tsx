@@ -43,7 +43,9 @@ export function AlertSettings({
   onChange,
   speech,
   lead,
+  compact = false,
 }: {
+  compact?: boolean;
   value: AlertConfig;
   onChange: (v: AlertConfig) => void;
   speech: string;
@@ -62,46 +64,28 @@ export function AlertSettings({
   const maxVol = s.kind === "tts" ? 1 : 2;
   const vol = Math.round(Math.min(value.volume, maxVol) * 100);
 
-  return (
-    <div className="alert-settings">
-      <fieldset className="alert-group">
-        <legend>알림</legend>
-        {lead && (
-          <label className="alert-control">시점 <LeadSelect value={lead.value} onChange={lead.onChange} options={lead.options} /></label>
-        )}
-        <label className="alert-control">횟수
-          <select value={value.repeat.enabled ? "loop" : "once"} onChange={(e) => onChange({
-            ...value,
-            repeat: e.target.value === "loop" ? { enabled: true, intervalSec: 3, maxCount: null } : { ...value.repeat, enabled: false },
-          })}>
-            <option value="once">한 번</option><option value="loop">반복 · 3초마다</option>
-          </select>
-        </label>
-      </fieldset>
-      <fieldset className="alert-group">
-      <legend>소리</legend>
-      <label className="alert-control">
-      <span className="field-label">알림음</span>
-      <select value={key} onChange={(e) => pick(e.target.value)}>
-        <option value="tts">음성 읽기</option>
-        {BEEPS.map(([id, name]) => (
-          <option key={id} value={`beep:${id}`}>
-            비프음 · {name}
-          </option>
-        ))}
-        {sounds.map((x) => (
-          <option key={x.id} value={`custom:${x.id}`}>
-            내 소리 · {x.name}
-          </option>
-        ))}
-      </select>
-      </label>
-      <label className="alert-control">
-      <span className="field-label">볼륨</span>
-      <input type="range" min={0} max={maxVol * 100} step={5} value={vol} onChange={(e) => onChange({ ...value, volume: Number(e.target.value) / 100 })} />
-      <span className="mono">{vol}%</span>
-      </label>
-      </fieldset>
-    </div>
-  );
+  const sound = <label className="alert-control"><span className="field-label">소리</span>
+    <select value={key} onChange={e=>pick(e.target.value)}>
+      <option value="tts">음성 읽기</option>
+      {BEEPS.map(([id,name])=><option key={id} value={`beep:${id}`}>비프음 · {name}</option>)}
+      {sounds.map(x=><option key={x.id} value={`custom:${x.id}`}>내 소리 · {x.name}</option>)}
+    </select>
+  </label>;
+  const timing = lead&&<label className="alert-control">알림 <LeadSelect value={lead.value} onChange={lead.onChange} options={lead.options}/></label>;
+  const repeat = <label className="alert-control">횟수
+    <select value={value.repeat.enabled?"loop":"once"} onChange={e=>onChange({...value,repeat:e.target.value==="loop"?{enabled:true,intervalSec:3,maxCount:null}:{...value.repeat,enabled:false}})}>
+      <option value="once">한 번</option><option value="loop">반복 · 3초마다</option>
+    </select>
+  </label>;
+  const volume = <label className="alert-control"><span className="field-label">볼륨</span>
+    <input type="range" min={0} max={maxVol*100} step={5} value={vol} onChange={e=>onChange({...value,volume:Number(e.target.value)/100})}/><span className="mono">{vol}%</span>
+  </label>;
+  if(compact)return <div className="alert-settings alert-settings-compact">
+    <div className="field-row">{timing}{sound}</div>
+    <details className="alert-extra"><summary>{value.repeat.enabled?"반복 켬 · 볼륨":"반복·볼륨"}</summary><div className="field-row">{repeat}{volume}</div></details>
+  </div>;
+  return <div className="alert-settings">
+    <fieldset className="alert-group"><legend>알림</legend>{timing}{repeat}</fieldset>
+    <fieldset className="alert-group"><legend>소리</legend>{sound}{volume}</fieldset>
+  </div>;
 }

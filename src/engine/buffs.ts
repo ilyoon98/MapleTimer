@@ -1,6 +1,6 @@
 import { audioEngine } from "../alerts/audio";
 import { endingText } from "../alerts/speech";
-import { favoritesRegion, regionSignature } from "../capture/detectionRegions";
+import { autoBuffbarRegion, favoritesRegion, regionSignature } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { readDigits, segment } from "../cv/digits";
@@ -130,10 +130,7 @@ function minScoreOf(b: BuffEntry): number {
 }
 
 /** 위쪽 기본 버프칸: 사용자가 영역을 잡지 않는다. 화면 오른쪽 위(가로 절반, 세로 30%)를 본다 */
-export function autoBuffbarRegion(frameW: number, frameH: number): SavedRegion {
-  const x = Math.round(frameW * 0.5);
-  return { x, y: 0, w: frameW - x, h: Math.round(frameH * 0.3), frameW, frameH };
-}
+export { autoBuffbarRegion } from "../capture/detectionRegions";
 
 /** 아직 정하지 않은 즐겨찾기 위치: 어느 화면에도 맞지 않는 영역이라 찾지 않는다 */
 const NO_REGION: SavedRegion = { x: 0, y: 0, w: 1, h: 1, frameW: 0, frameH: 0 };

@@ -29,7 +29,7 @@ function setupUpdates() {
   let updater=null;
   if(app.isPackaged){try{updater=require('electron-updater').autoUpdater;}catch{}}
   updates=createUpdateController({version:app.getVersion(),updater,notify:state=>main?.webContents.send('update:state',state)});
-  if(updater){void updates.check();const timer=setInterval(()=>void updates.check(),6*60*60*1000);timer.unref();}
+  if(updater){void updates.check();const timer=setInterval(()=>void updates.check(),10*60*1000);timer.unref();}
 }
 
 app.whenReady().then(async () => {

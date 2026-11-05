@@ -1249,6 +1249,23 @@ input[type="text"] {
   padding-top: 0;
   border-top: none;
 }
+.skills-location { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); font-size:13px; }
+.alert-settings-compact { display:block; }
+.alert-settings-compact .field-row { gap:18px; }
+.alert-settings-compact .field-label { min-width:0; }
+.alert-extra > summary { cursor:pointer; color:var(--muted); font-size:12px; margin-top:8px; }
+.modal-buff-location { width:min(1000px,100%); }
+.buff-location-content { padding-top:12px; }
+.buff-location-stage { position:relative; width:min(100%,calc(54vh * var(--game-aspect))); aspect-ratio:var(--game-aspect); background:#101820; margin:0 auto 12px; border-radius:8px; overflow:hidden; }
+.buff-location-stage canvas { display:block; width:100%; height:100%; }
+.buff-location-placeholder { position:absolute; top:33%; width:100%; text-align:center; color:#c6d0d8; font-size:13px; pointer-events:none; }
+.buff-location-choice { position:absolute; border:2px dashed #a9b9c7; border-radius:0; background:#10203044; display:flex; align-items:center; justify-content:center; padding:6px; }
+.buff-location-choice:hover { background:#56b68733; }
+.buff-location-choice.is-selected { border:3px solid #56b687; background:#56b68733; }
+.buff-location-choice span { border-radius:6px; padding:6px 10px; color:#fff; background:#13241fee; font-size:14px; font-weight:600; }
+.buff-location-choice.is-selected span { background:#236b4f; }
+.buff-location-manual { position:absolute; pointer-events:none; border:3px solid #56b687; }
+.buff-location-footer { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .row-sub input[type="range"] {
   width: 140px;
 }

@@ -50,7 +50,7 @@ const SECTIONS: Array<{ id: string; title: string; body: ReactNode }> = [
     body: (
       <ul className="guide-list">
         <li>
-          <b>스킬 알림</b> — 솔 야누스·에르다 파운틴 남은 시간을 읽어요. 즐겨찾기로 옮겼다면 칸의 설정에서 '버프 즐겨찾기'
+          <b>스킬 알림</b> — '버프 위치'에서 게임 화면의 좌측·우측 하단을 누르면 두 스킬에 함께 적용돼요
         </li>
         <li>
           <b>룬 알림</b> — 미니맵에 룬이 뜨면 알려요

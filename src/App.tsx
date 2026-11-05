@@ -20,6 +20,8 @@ import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
 import { AppVersion, UpdateBanner } from "./ui/UpdateBanner";
 import { CapturePicker } from "./ui/CapturePicker";
+import { BuffLocationPicker } from "./ui/BuffLocationPicker";
+import { buffLocationStore } from "./ui/buffLocationStore";
 import { audioEngine } from "./alerts/audio";
 import { connectMaple, connectStore, startCapture } from "./ui/connect";
 
@@ -127,6 +129,7 @@ export function App() {
     else document.documentElement.dataset.theme = theme;
   }, [theme]);
   const picker = pickerStore.use((s) => s.req);
+  const pickingBuffLocation=buffLocationStore.use(s=>s.open);
   const pipOpen = pipStore.use((s) => s.open);
   const [modal, setModal] = useState<"settings" | "guide" | null>(null);
   const [editOrder, setEditOrder] = useState(false);
@@ -227,6 +230,7 @@ export function App() {
         화면은 이 PC 안에서만 분석해요 · 비공식 개인용 도구 · MapleStory © NEXON Korea
       </footer>
 
+      {pickingBuffLocation && <BuffLocationPicker />}
       {picker && (
         <RegionPicker
           title={picker.title}

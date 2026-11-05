@@ -3,6 +3,11 @@ import { regionValidFor, type SavedRegion } from "./types";
 
 export type FavoritesPosition = "left" | "right" | "manual";
 
+export function autoBuffbarRegion(frameW:number,frameH:number):SavedRegion {
+  const x=Math.round(frameW*.5);
+  return {x,y:0,w:frameW-x,h:Math.round(frameH*.3),frameW,frameH};
+}
+
 export function favoritesRegion(p: Pick<Profile, "favoritesPosition" | "regions">, frameW: number, frameH: number): SavedRegion | undefined {
   if (p.favoritesPosition === "manual") return p.regions.favorites;
   if (frameW <= 0 || frameH <= 0) return undefined;
