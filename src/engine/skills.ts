@@ -8,7 +8,7 @@ import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearne
 import { QuickslotCastDetector, ReferenceHealer, referenceToPixels } from "../detect/quickslotCast";
 import { preciseIcon, profileStore, shortName, updateSkill, type Profile, type SkillEntry } from "../state/profile";
 import { debugCrops, type SkillLive } from "./live";
-import { frameTime, learnFrom, runner, runners } from "./shared";
+import { frameTime, observation, learnFrom, runner, runners } from "./shared";
 
 /* ───────── 스킬 ───────── */
 interface SkillRuntime {
@@ -191,7 +191,7 @@ export function tickSkills(p: Profile, now: number, live: boolean) {
         } else if (trusted && unknownCast && rt.cycleStart == null && read.seconds <= s.cooldownSec + 1) {
           // 앱을 쿨타임 도중에 켰거나, 공유가 끊긴 사이 스킬을 쓴 경우:
           // 설정한 쿨타임으로 사용 시각을 거꾸로 추정 (3번 일치해야 인정. 시각은 그 화면이 찍힌 때 기준)
-          const agreed = rt.readCasts.add(frameTime(now) - (s.cooldownSec - read.seconds) * 1000 - 500);
+          const agreed = rt.readCasts.add(frameTime(now) - (s.cooldownSec - read.seconds) * 1000 - 500, observation(now));
           if (agreed != null) startCycle(agreed);
         } else if (!read) {
           rt.readCasts.reset();

@@ -13,7 +13,7 @@ import { PresenceTracker } from "../detect/presence";
 import type { SavedRegion } from "../capture/types";
 import { preciseIcon, profileStore, shortName, tts, type BuffEntry, type Profile } from "../state/profile";
 import { debugCrops, type BuffLive } from "./live";
-import { frameTime, learnFrom, prepared, preparedScales, runner, runners } from "./shared";
+import { frameTime, observation, learnFrom, prepared, preparedScales, runner, runners } from "./shared";
 import { pauseLinkedTimers, startLinkedTimers } from "./timers";
 
 /* ───────── 버프칸 감지 ───────── */
@@ -250,7 +250,7 @@ function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, 
     return;
   }
   rt.lastReadAt = now;
-  const agreed = rt.readEsts.add(frameTime(now) + read.seconds * 1000 + 500);
+  const agreed = rt.readEsts.add(frameTime(now) + read.seconds * 1000 + 500, observation(now));
   if (agreed == null) return;
   const { endsAt, change } = applyExpiry(rt.endsAt, agreed, 2500);
   if (change === "new" || change === "extended") {
@@ -356,6 +356,7 @@ export function tickBuffTimers(p: Profile, now: number) {
       endsAt: rt.endsAt,
       lastAlertAt: r.lastFiredAt,
       readText: rt.readText,
+      readAt: rt.lastReadAt || null,
     };
   }
   for (const id of buffRt.keys()) if (!p.buffs.some((b) => b.id === id)) buffRt.delete(id);

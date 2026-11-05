@@ -31,6 +31,11 @@ export function frameTime(now: number) {
   return screenCapture.drawnAt ?? now;
 }
 
+/** 지금 분석 중인 화면의 이름과 시각 (합의에서 같은 화면을 두 번 세지 않게) */
+export function observation(now: number) {
+  return { frame: `${screenCapture.sessionId}:${screenCapture.frameId}`, at: frameTime(now) };
+}
+
 /* ───────── 템플릿 캐시 ───────── */
 const templateCache = new WeakMap<StoredTemplate, PreparedTemplate>();
 

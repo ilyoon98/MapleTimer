@@ -1,27 +1,48 @@
+/** 숫자를 읽은 화면: 같은 화면을 여러 번 넣어도 한 표로만 센다 */
+export interface Observation {
+  /** 공유 세션과 프레임 번호로 만든 이름 (같으면 같은 화면) */
+  frame: string;
+  /** 그 화면이 찍힌 시각 */
+  at: number;
+}
+
 /**
  * 화면에서 읽은 숫자로 계산한 '시각' 추정값(사용 시각, 종료 시각 등)을
  * 최근 need 개가 서로 tolMs 안으로 맞을 때만 믿는다. 한두 번 잘못 읽은 값을 걸러내기 위함.
+ * 관측(obs)을 같이 주면: 같은 화면은 한 번만 세고, ttlMs 보다 오래된 표는 버린다
+ * (멈춘 화면을 여러 번 읽거나, 한참 전 표와 지금 표를 섞어 합의하지 않게).
  */
 export class EstimateConsensus {
-  private ests: number[] = [];
+  private ests: Array<{ v: number; at: number | null }> = [];
+  private lastFrame: string | null = null;
 
   constructor(
     private tolMs: number,
     private need = 3,
+    private ttlMs = 5000,
   ) {}
 
   reset() {
     this.ests = [];
+    this.lastFrame = null;
   }
 
   get count() {
     return this.ests.length;
   }
 
-  /** 추정값을 넣는다. 최근 need 개가 맞으면 그 평균을, 아니면 null */
-  add(est: number): number | null {
-    this.ests = [...this.ests.filter((e) => Math.abs(e - est) <= this.tolMs), est].slice(-this.need);
-    return this.ests.length >= this.need ? this.ests.reduce((a, b) => a + b, 0) / this.ests.length : null;
+  /** 추정값을 넣는다. 최근 need 개가 맞으면 그 평균을, 아니면 null (같은 화면을 또 넣으면 null) */
+  add(est: number, obs?: Observation): number | null {
+    if (obs) {
+      if (obs.frame === this.lastFrame) return null;
+      this.lastFrame = obs.frame;
+    }
+    const at = obs?.at ?? null;
+    this.ests = [
+      ...this.ests.filter((e) => Math.abs(e.v - est) <= this.tolMs && (at == null || e.at == null || at - e.at <= this.ttlMs)),
+      { v: est, at },
+    ].slice(-this.need);
+    return this.ests.length >= this.need ? this.ests.reduce((a, b) => a + b.v, 0) / this.ests.length : null;
   }
 }
 

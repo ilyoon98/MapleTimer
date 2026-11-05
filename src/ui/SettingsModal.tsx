@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
 import { screenCapture } from "../capture/screenCapture";
-import { clipSnapshot, liveStore } from "../engine/engine";
+import { clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
 import {
@@ -21,7 +21,6 @@ import {
 import { deletePreset, loadPreset, presetStore, savePreset } from "../state/presets";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
-import { clipUsage } from "../engine/clip";
 
 export function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -56,6 +55,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     return () => speechSynthesis.removeEventListener("voiceschanged", load);
   }, []);
   const [sounds, setSounds] = useState<CustomSound[]>([]);
+  const [savingDiag, setSavingDiag] = useState(false);
   const reload = async () => {
     setSounds(await listCustomSounds());
     await refreshCustomSounds();
@@ -77,45 +77,56 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   /** 지금 화면 + 설정(영역) + 학습 숫자 + 감지 상태를 파일 하나로 저장 (기준값 조정용) */
-  const exportDiagnostics = () => {
-    const frame = screenCapture.snapshot();
-    const live = liveStore.get();
-    const data = {
-      kind: "maple-timer-diagnostics",
-      savedAt: new Date().toISOString(),
-      clipUsage: clipUsage(),
-      userAgent: navigator.userAgent,
-      capture: {
-        state: screenCapture.state, width: screenCapture.width, height: screenCapture.height,
-        lastFrameAt: screenCapture.lastFrameAt, drawnAt: screenCapture.drawnAt,
-        error: screenCapture.error, visibility: document.visibilityState,
-      },
-      profile: profileStore.get(),
-      learnedDigits: digitStore.get(),
-      live: {
-        skills: live.skills,
-        rune: live.rune,
-        stall: live.stall,
-        buffs: live.buffs,
-        booster: live.booster,
-        log: live.log,
-        perf: live.perf,
-        captureStale: live.captureStale,
-        captureBlack: live.captureBlack,
-        screenTransition: live.screenTransition,
-      },
-      framePng: frame ? frame.toDataURL("image/png") : null,
-      // 최근 30초 동안 선택한 영역만 0.25초마다 (개발 모드에서 재생해 문제를 그대로 재현)
-      clip: clipSnapshot(profileStore.get()),
-    };
-    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    const d = new Date();
-    const p2 = (n: number) => String(n).padStart(2, "0");
-    a.download = `maple-diagnostics-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const exportDiagnostics = async () => {
+    if (savingDiag) return;
+    setSavingDiag(true);
+    try {
+      // 지금 화면과 상태는 누른 순간 것으로 먼저 잡아 두고, 30초 녹화 변환은 그 뒤에 천천히 한다
+      const frame = screenCapture.snapshot();
+      const live = liveStore.get();
+      const framePng = frame ? frame.toDataURL("image/png") : null;
+      const usage = clipUsage();
+      const clip = await clipSnapshot();
+      const data = {
+        kind: "maple-timer-diagnostics",
+        savedAt: new Date().toISOString(),
+        clipUsage: usage,
+        userAgent: navigator.userAgent,
+        capture: {
+          state: screenCapture.state, width: screenCapture.width, height: screenCapture.height,
+          lastFrameAt: screenCapture.lastFrameAt, drawnAt: screenCapture.drawnAt,
+          error: screenCapture.error, visibility: document.visibilityState,
+        },
+        profile: profileStore.get(),
+        learnedDigits: digitStore.get(),
+        live: {
+          skills: live.skills,
+          rune: live.rune,
+          stall: live.stall,
+          buffs: live.buffs,
+          booster: live.booster,
+          log: live.log,
+          perf: live.perf,
+        featurePerf: featurePerf(),
+          captureStale: live.captureStale,
+          captureBlack: live.captureBlack,
+          screenTransition: live.screenTransition,
+        },
+        framePng,
+        // 최근 30초 동안 선택한 영역만 0.25초마다 (개발 모드에서 재생해 문제를 그대로 재현)
+        clip,
+      };
+      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const d = new Date();
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      a.download = `maple-diagnostics-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } finally {
+      setSavingDiag(false);
+    }
   };
 
   const exportProfile = () => {
@@ -263,8 +274,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <section className="modal-section">
           <h4>숫자 학습</h4>
           <p className="muted small">
-            실제 게임에서 모은 숫자 모양이 기본으로 들어 있어서 학습 없이도 쿨타임·버프 숫자를 읽어요. 그래도 자꾸 못 읽으면, 쿨타임 10초 이상인
-            스킬을 한 번 쓴 뒤 숫자가 한 자리(9 이하)가 될 때까지 두세요. 이 PC 화면의 숫자 모양을 자동으로 더 배워요. 해상도나 UI 크기를
+            실제 게임에서 모은 숫자 모양이 기본으로 들어 있어서 학습 없이도 버프 남은 시간 숫자를 읽어요. 그래도 자꾸 못 읽으면, 남은 시간을 읽는
+            버프가 끝날 때까지 화면에 보이게 두세요. 이 PC 화면의 숫자 모양을 자동으로 더 배워요. 해상도나 UI 크기를
             바꿨다면 초기화 후 다시 배우세요.
           </p>
           <div className="field-row">
@@ -339,11 +350,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             하나로 저장돼요 (다운로드 폴더). 이 파일로 그 30초를 그대로 다시 돌려 보며 고칠 수 있어요.
           </p>
           <div className="field-row">
-            <button onClick={exportDiagnostics} disabled={screenCapture.state !== "live"}>
-              진단 파일 저장
+            <button onClick={() => void exportDiagnostics()} disabled={screenCapture.state !== "live" || savingDiag}>
+              {savingDiag ? "저장하는 중…" : "진단 파일 저장"}
             </button>
             <span className="muted small mono">
               감지 1회 평균 {perf.avgMs.toFixed(1)}ms · 최근 최대 {perf.maxMs.toFixed(1)}ms (0.25초마다 실행)
+              {" · "}녹화 {(clipUsage().bytes / 1048576).toFixed(1)}/{clipUsage().maxBytes / 1048576} MB, {clipUsage().frames}장
             </span>
           </div>
         </section>

@@ -95,3 +95,30 @@ describe("버프 아이콘이 사라질 때 종료 시각 남기기", () => {
     expect(keepEndAfterVanish(60_000, true, 10, 30_000)).toBe(false); // 30초 일찍 사라짐(취소)
   });
 });
+
+describe("EstimateConsensus: 같은 화면·오래된 표", () => {
+  it("같은 프레임을 100번 넣어도 합의가 되지 않는다", () => {
+    const c = new EstimateConsensus(1500);
+    for (let i = 0; i < 100; i++) expect(c.add(60_000, { frame: "1:7", at: 1000 })).toBeNull();
+    expect(c.count).toBe(1);
+  });
+  it("서로 다른 세 프레임이면 합의된다", () => {
+    const c = new EstimateConsensus(1500);
+    expect(c.add(60_000, { frame: "1:1", at: 0 })).toBeNull();
+    expect(c.add(60_000, { frame: "1:2", at: 250 })).toBeNull();
+    expect(c.add(60_000, { frame: "1:3", at: 500 })).toBe(60_000);
+  });
+  it("유효시간보다 오래된 표는 세지 않는다", () => {
+    const c = new EstimateConsensus(1500, 3, 5000);
+    c.add(60_000, { frame: "1:1", at: 0 });
+    c.add(60_000, { frame: "1:2", at: 250 });
+    expect(c.add(60_000, { frame: "1:3", at: 30_000 })).toBeNull();
+    expect(c.count).toBe(1);
+  });
+  it("초기화하면 같은 프레임 이름도 다시 받는다", () => {
+    const c = new EstimateConsensus(1500, 1);
+    expect(c.add(5, { frame: "2:1", at: 0 })).toBe(5);
+    c.reset();
+    expect(c.add(5, { frame: "2:1", at: 0 })).toBe(5);
+  });
+});

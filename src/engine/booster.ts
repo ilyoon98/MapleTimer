@@ -8,7 +8,7 @@ import { EstimateConsensus, applyBoosterReading, stepReadTimer } from "../detect
 import { activeTemplates } from "../detect/digitLearner";
 import { profileStore, type Profile } from "../state/profile";
 import { debugCrops, type BoosterLive } from "./live";
-import { frameTime, runner } from "./shared";
+import { frameTime, observation, runner } from "./shared";
 
 /* ───────── 부스터 종료 ───────── */
 interface BoosterRuntime {
@@ -56,7 +56,7 @@ export function tickBooster(p: Profile, now: number, live: boolean): BoosterLive
     const read = readSevenSegment(img) ?? readDigits(seg, activeTemplates());
     rt.readText = read?.text ?? null;
     if (read && read.seconds > 0 && read.seconds < 3600) {
-      const agreed = rt.ests.add(frameTime(now) + read.seconds * 1000);
+      const agreed = rt.ests.add(frameTime(now) + read.seconds * 1000, observation(now));
       if (agreed != null) {
         const { next, newCycle } = applyBoosterReading(rt, agreed, now, b.leadSec);
         rt.endsAt = next.endsAt;

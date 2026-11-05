@@ -56,7 +56,7 @@ export function SetupChecklist() {
     {
       done: learned === 10,
       text: learned === 10 ? "숫자 추가 학습 완료" : `숫자 추가 학습 ${learned}/10 (선택)`,
-      hint: "게임 숫자 모양이 기본으로 들어 있어 학습 없이도 읽어요. 숫자를 자꾸 못 읽을 때만 쿨 10초 이상 스킬로 학습",
+      hint: "게임 숫자 모양이 기본으로 들어 있어 학습 없이도 읽어요. 남은 시간을 읽는 버프가 끝날 때 자동으로 더 배워요",
       optional: true,
     },
     {

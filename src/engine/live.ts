@@ -41,6 +41,8 @@ export interface BuffLive {
   lastAlertAt: number | null;
   /** 아이콘에서 읽은 남은 시간 */
   readText: string | null;
+  /** 남은 시간 숫자를 마지막으로 읽은 시각 (없으면 null) */
+  readAt: number | null;
 }
 export interface BoosterLive {
   status: "off" | "no-share" | "no-region" | "searching" | "reading" | "running";

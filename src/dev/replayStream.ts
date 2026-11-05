@@ -48,7 +48,7 @@ export function createReplayStream(): MediaStream {
     ctx.fillStyle = `rgb(${f.mean},${f.mean},${f.mean})`;
     ctx.fillRect(0, 0, c.width, c.height);
     for (const [k, bmp] of Object.entries(bitmaps[i])) {
-      const r = clip.regions[k];
+      const r = f.rects?.[k] ?? clip.regions[k];
       if (r) ctx.drawImage(bmp, r.x, r.y);
     }
     if (!ended && i === clip.frames.length - 1) {
