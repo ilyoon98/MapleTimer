@@ -9,6 +9,7 @@ import { liveStore } from "../engine/live";
 import { preciseIcon, profileStore, type PanelId, type Profile } from "../state/profile";
 import { connectMaple } from "./connect";
 import { focusPanel } from "./focus";
+import { SPECIAL_CORE_ENABLED } from "../state/features";
 import { pickBuffbar, pickFavorites, pickMinimap, pickStallRegion } from "./pickers";
 
 export interface Issue {
@@ -77,6 +78,7 @@ export function computeIssues(p: Profile, cap: CaptureView, now: number, firstSe
   const buffs = p.buffs.filter((b) => b.enabled);
   // 버프 종료 알림·특수 코어 알림 칸에 따로 보여 준다
   for (const [kind, panel] of [["expiry", "buffs"], ["cooldown", "core"]] as const) {
+    if(kind==="cooldown"&&!SPECIAL_CORE_ENABLED)continue;
     const list = buffs.filter((b) => b.kind === kind);
     const noIcon = list.filter((b) => !b.template && !b.icon);
     if (noIcon.length)

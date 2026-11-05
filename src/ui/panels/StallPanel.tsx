@@ -6,6 +6,7 @@ import { AlertSettings } from "../AlertSettings";
 import { STALL_TEXT } from "../../alerts/speech";
 import { NumberInput, Panel, StatusDot, Toggle, fmtClock, NOT_CONNECTED } from "../common";
 import { STALL_MODES, pickStallRegion } from "../pickers";
+import { SPECIAL_CORE_ENABLED } from "../../state/features";
 
 const MODES = STALL_MODES;
 
@@ -25,7 +26,8 @@ function setStall(patch: Partial<StallSettings>) {
 
 export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const st = profileStore.use((p) => p.stall);
-  const buffs = profileStore.use((p) => p.buffs);
+  const allBuffs = profileStore.use((p) => p.buffs);
+  const buffs = allBuffs.filter(b=>SPECIAL_CORE_ENABLED||b.kind!=="cooldown");
   const p = profileStore.use((p) => p);
   const region = stallRegion(p, screenCapture.width, screenCapture.height);
   const live = liveStore.use((l) => l.stall);

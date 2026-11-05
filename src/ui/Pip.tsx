@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
+import { SPECIAL_CORE_ENABLED } from "../state/features";
 import { desktop } from "../platform/desktop";
 import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
@@ -304,7 +305,7 @@ function ModeSwitch() {
 
 function PipRoot() {
   const mode = profileStore.use((s) => s.pipMode);
-  return mode === "core" ? <CorePipView /> : <PipView />;
+  return SPECIAL_CORE_ENABLED && mode === "core" ? <CorePipView /> : <PipView />;
 }
 
 function PipView() {
@@ -331,7 +332,7 @@ function PipView() {
     });
   }
   for (const b of p.buffs) {
-    if (!b.enabled) continue;
+    if (!b.enabled || (!SPECIAL_CORE_ENABLED && b.kind === "cooldown")) continue;
     const l = live.buffs[b.id];
     const rem = l?.endsAt != null ? l.endsAt - now : null;
     const urgent = rem != null && rem <= b.leadSec * 1000;
@@ -426,7 +427,7 @@ function PipView() {
         <button title={p.muted ? "알림 소리 켜기" : "모든 알림 소리 끄기"} onClick={() => profileStore.set({ muted: !p.muted })}>
           {p.muted ? "🔇" : "🔊"}
         </button>
-        {p.buffs.some((b) => b.kind === "cooldown") && <ModeSwitch />}
+        {SPECIAL_CORE_ENABLED && p.buffs.some((b) => b.kind === "cooldown") && <ModeSwitch />}
       </div>
       {live.ringing.length > 0 && (
         <button className="ringing-btn" onClick={stopRingingAlerts}>

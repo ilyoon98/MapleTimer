@@ -5,6 +5,7 @@
 import { emitAlertLog, randomDelaySetting } from "../alerts/alertRunner";
 import { audioEngine } from "../alerts/audio";
 import { startAlertEvidence } from "./alertEvidence";
+import { activeProfile } from "../state/features";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
 import { ScreenTransitionDetector } from "../detect/screenTransition";
@@ -120,7 +121,7 @@ function tickInner(now: number) {
   }
   const prev = liveStore.get();
   const stats = live ? screenCapture.frameStats() : null;
-  if (frame.fresh || !live) timed("clip", now, () => recordClip(p, now, live, stats?.mean ?? null));
+  if (frame.fresh || !live) timed("clip", now, () => recordClip(activeProfile(p), now, live, stats?.mean ?? null));
 
   // 화면 전환 중(맵 이동·로딩으로 화면 전체가 어두워짐)에는 퀵슬롯·버프칸·부스터를 보지 않는다.
   // 실제 게임에서 화면이 어두워질 때 모든 퀵슬롯이 '스킬 사용'으로, 버프가 '사라짐'으로 잘못 잡혔다.
@@ -131,6 +132,7 @@ function tickInner(now: number) {
   if (watch && !wasWatching) resumeSkillWatch();
   wasWatching = watch;
 
+  p=activeProfile(p);
   const skills = timed("skills", now, () => tickSkills(p, now, watch && frame.fresh));
   // 같은 프레임을 건너뛰는 동안도 설정된 영역이 사라진 것처럼 표시하지 않는다.
   if (live && !frame.fresh) for (const id of Object.keys(skills)) skills[id].regionOk = prev.skills[id]?.regionOk ?? false;

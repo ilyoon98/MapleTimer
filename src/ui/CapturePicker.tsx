@@ -7,6 +7,8 @@ export function CapturePicker({ onSelect, onClose }: { onSelect(): Promise<void>
   const [selected, setSelected] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const featured = sources.find(s => s.recommended);
+  const ordered = featured ? [featured, ...sources.filter(s => s.id !== featured.id)] : sources;
   useEscape(() => { if (!busy) onClose(); });
   const load = async () => {
     setError('');
@@ -21,7 +23,8 @@ export function CapturePicker({ onSelect, onClose }: { onSelect(): Promise<void>
     <header className="modal-head"><h2>메이플 연결</h2><button onClick={onClose} disabled={busy}>닫기</button></header>
     <div className="modal-body">
       {!sources.some(s => s.recommended) && <p>메이플을 켜거나 공유할 화면을 선택해 주세요.</p>}
-      <div className="capture-sources">{sources.map(s => <button key={s.id} className={selected === s.id ? 'capture-selected' : ''}
+      <div className="capture-sources">{ordered.map(s => <button key={s.id}
+        className={[selected === s.id ? 'capture-selected' : '', s.id === featured?.id ? 'capture-featured' : ''].filter(Boolean).join(' ')}
         onClick={() => setSelected(s.id)} disabled={busy} aria-pressed={selected === s.id}>
         <img src={s.thumbnail} alt="" /><span>{s.recommended ? '추천 · ' : ''}{s.name}</span>
       </button>)}</div>

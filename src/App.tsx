@@ -3,6 +3,7 @@ import { screenCapture } from "./capture/screenCapture";
 import { liveStore, startEngine, stopRingingAlerts } from "./engine/engine";
 import { profileStore, type PanelId } from "./state/profile";
 import { persistenceStatus } from "./state/createStore";
+import { SPECIAL_CORE_ENABLED } from "./state/features";
 import { fmtClock } from "./ui/common";
 import { closePicker, pickerStore } from "./ui/pickerStore";
 import { BoosterPanel } from "./ui/panels/BoosterPanel";
@@ -114,6 +115,7 @@ function AlertLog() {
 export function App() {
   const persistenceErrors=persistenceStatus.use(s=>s.errors);
   const order = profileStore.use((p) => p.panelOrder);
+  const visibleOrder=order.filter(id=>SPECIAL_CORE_ENABLED||id!=="core");
   const collapsed = profileStore.use((p) => p.collapsed);
   const masterVolume = profileStore.use((p) => p.masterVolume);
   const muted = profileStore.use((p) => p.muted);
@@ -138,12 +140,12 @@ export function App() {
 
   const move = (id: PanelId, d: -1 | 1) =>
     profileStore.set((p) => {
-      const o = [...p.panelOrder];
+      const o = p.panelOrder.filter(id=>SPECIAL_CORE_ENABLED||id!=="core");
       const i = o.indexOf(id);
       const j = i + d;
       if (j < 0 || j >= o.length) return p;
       [o[i], o[j]] = [o[j], o[i]];
-      return { ...p, panelOrder: o };
+      return { ...p, panelOrder: [...o,...p.panelOrder.filter(id=>!o.includes(id))] };
     });
 
   return (
@@ -205,7 +207,7 @@ export function App() {
       <SetupChecklist />
 
       <main className="panels">
-        {order.map((id) => (
+        {visibleOrder.map((id) => (
           <div key={id} className="panel-slot" data-panel={id}>
             {editOrder && (
               <div className="order-controls">

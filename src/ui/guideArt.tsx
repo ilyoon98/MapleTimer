@@ -47,7 +47,7 @@ export function MockScreen() {
       </div>
       <div className="mock-zone" style={{ right: "1.5%", top: "4%", width: "30%", height: "13%" }}>
         <b>버프칸</b>
-        <span>스킬 · 버프 종료 · 특수 코어</span>
+        <span>스킬 · 버프 종료</span>
       </div>
       <div className="mock-char" />
       <div className="mock-zone" style={{ right: "1.5%", bottom: "9%", width: "26%", height: "17%" }}>

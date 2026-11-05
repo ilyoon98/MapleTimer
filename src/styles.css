@@ -1314,6 +1314,9 @@ input[type="text"] {
 .capture-sources img { width:100%; aspect-ratio:16/9; object-fit:contain; background:#111; }
 .capture-sources span { overflow-wrap:anywhere; }
 .capture-sources .capture-selected { outline:2px solid #56b687; outline-offset:-2px; }
+.capture-sources .capture-featured { grid-column:1/-1; }
+.capture-sources .capture-featured img { height:clamp(150px,28vh,240px); aspect-ratio:auto; }
+.capture-sources .capture-featured span { font-size:15px; font-weight:650; }
 .compact-settings > summary { cursor:pointer; color:var(--muted); padding:6px 0; }
 .compact-settings[open] > summary { margin-bottom:8px; }
 .capture-sources + .error { white-space:normal; }

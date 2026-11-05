@@ -49,6 +49,7 @@ try {
   }
   const initial = await evaluate(`({title:document.title,bridge:!!window.mapleDesktop, node:typeof require, panels:document.querySelectorAll('.panel').length, expanded:document.querySelectorAll('details.compact-settings[open]').length})`);
   if (!initial.bridge || initial.node !== 'undefined' || initial.panels < 1) throw new Error('Bad shell: ' + JSON.stringify(initial));
+  if(await evaluate(`!!document.querySelector('[data-panel="core"]')`))throw new Error('Special core panel is still visible');
   if (process.argv.includes('--check-persistence')) {
     const expected=JSON.parse(await fs.readFile('package.json','utf8')).version;
     const info=await evaluate(`window.mapleDesktop.appInfo()`);
@@ -153,6 +154,18 @@ try {
   await delay(2000);
   const picker = await evaluate(`({open:!!document.querySelector('[aria-label="메이플 연결"]'), sources:document.querySelectorAll('.capture-sources button').length,error:document.querySelector('[role=alert]')?.textContent})`);
   if (!picker.open || picker.error) throw new Error('Picker failed: ' + JSON.stringify(picker));
+  if (process.argv.includes('--check-featured')) {
+    const layout=await evaluate(`(()=>{
+      const first=document.querySelector('.capture-sources button');
+      const featured=document.querySelector('.capture-featured');
+      const other=document.querySelector('.capture-sources button:not(.capture-featured)');
+      return {firstFeatured:first===featured,selected:featured?.getAttribute('aria-pressed'),
+        featuredWidth:featured?.getBoundingClientRect().width,otherWidth:other?.getBoundingClientRect().width,
+        featuredImage:featured?.querySelector('img').getBoundingClientRect().height,otherImage:other?.querySelector('img').getBoundingClientRect().height};
+    })()`);
+    if(!layout.firstFeatured||layout.selected!=='true'||!(layout.featuredWidth>layout.otherWidth*1.5)||!(layout.featuredImage>layout.otherImage*1.5))throw new Error('Recommended game is not prominent: '+JSON.stringify(layout));
+    console.log('Recommended game layout:',JSON.stringify(layout));
+  }
   const png = await call('Page.captureScreenshot', { format: 'png' });
   await fs.writeFile('release/desktop-smoke.png', Buffer.from(png.data, 'base64'));
   let capture = 'not requested';
