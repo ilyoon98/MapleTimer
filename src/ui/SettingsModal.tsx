@@ -4,7 +4,7 @@ import { screenCapture } from "../capture/screenCapture";
 import { buffSearchStats, clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
-import { defaultProfile, migrate, profileStore, uid, type ThemeMode } from "../state/profile";
+import { defaultProfile, migrate, profileStore, uid } from "../state/profile";
 import { deletePreset, loadPreset, presetStore, savePreset } from "../state/presets";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
@@ -19,7 +19,6 @@ export function useEscape(onClose: () => void) {
 
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   useEscape(onClose);
-  const theme = profileStore.use((p) => p.theme);
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
   const randomDelay = profileStore.use((p) => p.randomDelay);
@@ -148,17 +147,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <section className="modal-section">
           <h4>일반</h4>
           <div className="field-row">
-            <span className="field-label">테마</span>
-            <select value={theme} onChange={(e) => profileStore.set({ theme: e.target.value as ThemeMode })}>
-              <option value="system">시스템 설정 따르기</option>
-              <option value="light">밝게</option>
-              <option value="dark">어둡게</option>
-            </select>
-          </div>
-          <div className="field-row">
             <span className="field-label">읽어주는 목소리</span>
             <select value={ttsVoice ?? ""} onChange={(e) => profileStore.set({ ttsVoice: e.target.value || null })}>
-              <option value="">자동 (크게 들리는 목소리 먼저)</option>
+              <option value="">자동</option>
               {voices.map((v) => (
                 <option key={v.voiceURI} value={v.voiceURI}>
                   {v.name} {v.localService ? "" : "(온라인)"}
@@ -185,21 +176,21 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               들어보기
             </button>
           </div>
-          {voices.length === 0 && <p className="muted small">한국어 목소리를 찾지 못했어요. Windows 설정 &gt; 시간 및 언어 &gt; 음성에서 한국어 음성을 추가할 수 있어요.</p>}
+          {voices.length === 0 && <p className="muted small">한국어 목소리가 없어요 · Windows 설정 &gt; 시간 및 언어 &gt; 음성에서 추가</p>}
           <div className="field-row">
-            <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="랜덤 지연: 첫 알림을 0~2초 사이로 무작위로 늦추기" />
+            <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="첫 알림을 0~2초 무작위로 늦추기" />
           </div>
           <div className="field-row">
             <Toggle
               checked={alertOnShareEnd}
               onChange={(v) => profileStore.set({ alertOnShareEnd: v })}
-              label="화면 공유가 끊기면 음성으로 알려주기 (게임 창이 닫히거나 최소화로 끊긴 경우)"
+              label="화면 공유가 끊기면 알려 주기"
             />
           </div>
         </section>
         <section className="modal-section">
           <h4>내 소리 파일</h4>
-          <p className="muted small">mp3 · m4a · wav · ogg (5MB 이하). 이 브라우저에만 저장돼요. 30초가 넘는 부분은 잘려서 재생돼요.</p>
+          <p className="muted small">알림음으로 쓸 소리 (mp3·wav 등, 5MB 이하)</p>
           <ul className="sound-list">
             {sounds.map((s) => (
               <li key={s.id}>

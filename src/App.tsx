@@ -214,8 +214,7 @@ export function App() {
       </main>
 
       <footer className="app-foot muted small">
-        공유한 화면은 이 브라우저 안에서만 분석되고 어디에도 전송되지 않아요. 설정은 이 브라우저에 저장돼요. · 비공식 개인용 도구 · MapleStory 및
-        관련 저작물의 권리는 ㈜넥슨코리아에 있습니다.
+        화면은 이 PC 안에서만 분석해요 · 비공식 개인용 도구 · MapleStory © NEXON Korea
       </footer>
 
       {picker && (

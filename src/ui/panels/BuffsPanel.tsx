@@ -22,8 +22,8 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
   const buffs = all.filter((b) => b.kind === kind);
   const region = profileStore.use((p) => p.regions.buffbar);
   const add = (id: BuffPresetId) => profileStore.set((p) => ({ ...p, buffs: [...p.buffs, newBuffPreset(id)] }));
-  // 아직 아무것도 등록 안 했으면 설정 방법을 펼쳐서 보여 준다
-  const [howto, setHowto] = useState(!isCore && buffs.length === 0);
+  // 설정 방법은 눌렀을 때만 (처음부터 펼쳐 두면 화면이 길어진다)
+  const [howto, setHowto] = useState(false);
 
   const pickRegion = pickBuffbar;
 
@@ -50,7 +50,7 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
       {howto && (
         <div className="howto-card">
           <div className="howto-head">
-            <b>버프 종료 알림 설정 방법</b>
+            <b>설정 방법</b>
             <button onClick={() => setHowto(false)}>닫기</button>
           </div>
           <BuffbarSteps />
@@ -58,7 +58,7 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
       )}
       {buffs.length === 0 && (
         <div className="empty">
-          {isCore ? "등록된 특수 코어가 없어요. 버프칸을 선택한 뒤 '+ 추가'를 눌러 주세요." : "등록된 버프가 없어요. 버프칸을 선택한 뒤 '+ 추가'를 눌러 주세요. 솔 야누스·에르다 파운틴은 스킬 알림의 (정밀)에서 골라요."}
+          {isCore ? "등록된 특수 코어가 없어요" : "등록된 버프가 없어요"} · <b>+ 추가</b> 로 넣어요
         </div>
       )}
       {buffs.map((b) => (

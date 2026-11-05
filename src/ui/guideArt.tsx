@@ -28,7 +28,7 @@ export function MockBuffBar({ mark }: { mark?: "bar" | "icon" | "time" }) {
       </div>
       {mark === "bar" && <span className="mock-note">버프칸 전체를 넉넉하게</span>}
       {mark === "icon" && <span className="mock-note">아이콘 하나만 테두리에 딱 맞게</span>}
-      {mark === "time" && <span className="mock-note">이 숫자를 읽어서 끝나는 시각을 맞춰요</span>}
+      {mark === "time" && <span className="mock-note">이 숫자를 읽어요</span>}
     </div>
   );
 }
@@ -47,12 +47,12 @@ export function MockScreen() {
       </div>
       <div className="mock-zone" style={{ right: "1.5%", top: "4%", width: "30%", height: "13%" }}>
         <b>버프칸</b>
-        <span>버프 종료 · 특수 코어</span>
+        <span>스킬 · 버프 종료 · 특수 코어</span>
       </div>
       <div className="mock-char" />
       <div className="mock-zone" style={{ right: "1.5%", bottom: "9%", width: "26%", height: "17%" }}>
-        <b>퀵슬롯 아이콘</b>
-        <span>스킬 알림</span>
+        <b>버프 즐겨찾기</b>
+        <span>스킬 알림 (옮겨 둔 경우)</span>
       </div>
       <div className="mock-zone mock-zone-exp" style={{ left: "1.5%", bottom: "2%", width: "97%", height: "5%" }}>
         <b>경험치 숫자</b>
@@ -67,21 +67,15 @@ export function BuffbarSteps() {
   return (
     <ol className="art-steps">
       <li>
-        <b>게임 설정:</b> 버프 즐겨찾기로 따로 옮겨 둔 버프(야누스 등)는 항목의 ▾ 에서 <b>찾는 곳 → 정한 자리만 보기</b>를 고르고 그 칸을 선택하세요.
-        나머지는 위쪽 버프칸에서 자동으로 찾아요. UI 설정의 퀵슬롯&amp;버프
-        시간표시는 <b>중앙, 크게</b>, 표시 방식은 <b>분 + 초</b>로 두세요.
-      </li>
-      <li>
-        <b>버프칸 선택:</b> 오른쪽 위 버프 아이콘이 뜨는 줄 전체를 잡아요. 버프가 늘어나도 들어가게 왼쪽으로 넉넉하게.
+        <b>버프칸 선택</b> — 오른쪽 위 버프 아이콘 줄 전체를 넉넉하게
         <MockBuffBar mark="bar" />
       </li>
       <li>
-        <b>아이콘 등록:</b> 감지할 버프가 걸려 있을 때 그 아이콘 하나만 테두리에 맞춰 잡아요. 이 모양으로 버프칸 안에서 위치가 바뀌어도 찾아요.
+        <b>+ 추가 → 아이콘 등록</b> — 그 버프가 걸려 있을 때 아이콘 하나만 딱 맞게
         <MockBuffBar mark="icon" />
       </li>
       <li>
-        <b>남은 시간 읽기:</b> 찾은 아이콘 위의 숫자를 읽어서 끝나는 시각을 맞추고, 알림 시점이 되면 알려요. 숫자를 못 읽으면 나타난 순간부터 지속시간을
-        세거나, 아이콘이 사라질 때 알려요.
+        <b>끝</b> — 아이콘 위 남은 시간을 읽어 끝나기 전에 알려요
         <MockBuffBar mark="time" />
       </li>
     </ol>
