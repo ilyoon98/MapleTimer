@@ -49,6 +49,52 @@ try {
   }
   const initial = await evaluate(`({title:document.title,bridge:!!window.mapleDesktop, node:typeof require, panels:document.querySelectorAll('.panel').length, expanded:document.querySelectorAll('details.compact-settings[open]').length})`);
   if (!initial.bridge || initial.node !== 'undefined' || initial.panels < 1) throw new Error('Bad shell: ' + JSON.stringify(initial));
+  if (process.argv.includes('--check-evidence')) {
+    // 실제 게임 대신 고정 그림을 주입한다. 별도 프로필에서 브라우저의 PNG/JPEG 인코딩,
+    // IndexedDB 보관, 설정 화면의 캡처 열람까지 검사한다.
+    const { build } = await import('esbuild');
+    const bundle = await build({stdin:{contents:`
+      export { startAlertEvidence,flushAlertEvidence } from './src/engine/alertEvidence';
+      export { exportAlertEvidence } from './src/state/alertEvidence';
+      export { profileStore } from './src/state/profile';
+      export { liveStore } from './src/engine/live';
+      export { AlertRunner } from './src/alerts/alertRunner';
+      export { audioEngine } from './src/alerts/audio';`,resolveDir:root},
+      bundle:true,format:'iife',globalName:'EvidenceSmoke',write:false,
+      define:{'import.meta.env.DEV':'false'},
+      plugins:[{name:'synthetic-capture',setup(b){
+        b.onResolve({filter:/capture\/screenCapture$/},()=>({path:'synthetic',namespace:'evidence'}));
+        b.onLoad({filter:/.*/,namespace:'evidence'},()=>({contents:'export const screenCapture = window.__evidenceCapture;'}));
+      }}]});
+    await evaluate(`(()=>{
+      const c=document.createElement('canvas');c.width=800;c.height=600;
+      const ctx=c.getContext('2d');ctx.fillStyle='#152530';ctx.fillRect(0,0,800,600);ctx.fillStyle='#ffcc00';ctx.font='40px monospace';ctx.fillText('10.00',310,120);
+      window.__evidenceCapture={state:'live',width:800,height:600,sessionId:9,frameId:22,drawnAt:1000,snapshot:()=>c,crop:r=>ctx.getImageData(r.x,r.y,r.w,r.h)};
+    })()`);
+    await evaluate(bundle.outputFiles[0].text);
+    const evidence = await evaluate(`(async()=>{
+      EvidenceSmoke.audioEngine.muted=true;
+      EvidenceSmoke.profileStore.set(p=>({...p,muted:true,regions:{...p.regions,booster:{x:300,y:80,w:230,h:65,frameW:800,frameH:600}}}));
+      EvidenceSmoke.startAlertEvidence();
+      const runner=new EvidenceSmoke.AlertRunner('부스터',()=>({sound:{kind:'beep',pattern:'single'},volume:1,repeat:{enabled:false,intervalSec:3,maxCount:1}}),'booster');
+      runner.trigger(1000);runner.tick(1000);
+      EvidenceSmoke.liveStore.set({booster:{status:'running',readText:'10',endsAt:11500,lastAlertAt:1000}});
+      await EvidenceSmoke.flushAlertEvidence();
+      const entries=await EvidenceSmoke.exportAlertEvidence();
+      const entry=entries[0];
+      return {count:entries.length,key:entry?.key,text:entry?.live.booster.readText,frame:entry?.frame?.startsWith('data:image/jpeg'),crop:entry?.crop?.image?.startsWith('data:image/png'),frameId:entry?.frameId};
+    })()`);
+    if(evidence.count!==1||evidence.key!=='booster'||evidence.text!=='10'||!evidence.frame||!evidence.crop||evidence.frameId!==22)throw new Error('Alert capture failed: '+JSON.stringify(evidence));
+    await call('Page.reload');await delay(1000);
+    await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='설정').click()`);
+    await delay(100);
+    await evaluate(`document.querySelector('details.modal-advanced').open=true;[...document.querySelectorAll('button')].find(b=>b.textContent==='알림 캡처 보기').click()`);
+    await delay(500);
+    const viewer = await evaluate(`({cards:document.querySelectorAll('.alert-evidence').length,images:[...document.querySelectorAll('.evidence-crop')].every(i=>i.complete&&i.naturalWidth>0)})`);
+    if(viewer.cards!==1||!viewer.images)throw new Error('Saved alert capture not displayed: '+JSON.stringify(viewer));
+    await evaluate(`document.querySelector('.modal [aria-label="닫기"]').click()`);
+    console.log('Alert evidence:',JSON.stringify({evidence,viewer}));
+  }
   if (process.argv.includes('--check-settings')) {
     const rows = await evaluate(`(() => {
       const panel = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('h2')?.textContent==='스킬 알림');

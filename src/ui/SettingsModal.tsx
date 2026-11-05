@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { audioEngine } from "../alerts/audio";
+import { exportAlertEvidence } from "../state/alertEvidence";
+import { flushAlertEvidence } from "../engine/alertEvidence";
+import { AlertEvidenceViewer } from "./AlertEvidenceViewer";
 import { screenCapture } from "../capture/screenCapture";
 import { buffSearchStats, clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
@@ -37,6 +40,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   }, []);
   const [sounds, setSounds] = useState<CustomSound[]>([]);
   const [savingDiag, setSavingDiag] = useState(false);
+  const [showAlertEvidence, setShowAlertEvidence] = useState(false);
   const reload = async () => {
     setSounds(await listCustomSounds());
     await refreshCustomSounds();
@@ -68,6 +72,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       const framePng = frame ? frame.toDataURL("image/png") : null;
       const usage = clipUsage();
       const clip = await clipSnapshot();
+      await flushAlertEvidence();
+      const alertEvidence = await exportAlertEvidence();
       const data = {
         kind: "maple-timer-diagnostics",
         savedAt: new Date().toISOString(),
@@ -97,6 +103,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         framePng,
         // 최근 30초 동안 선택한 영역만 0.25초마다 (개발 모드에서 재생해 문제를 그대로 재현)
         clip,
+        alertEvidence,
       };
       const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
       const a = document.createElement("a");
@@ -220,7 +227,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <div className="adv-row">
             <div className="adv-text">
               <b>진단 파일 저장</b>
-              <span className="muted small">알림이 이상하면 바로 눌러서 저장해 주세요. 최근 30초 화면이 같이 담겨 고칠 때 써요.</span>
+              <span className="muted small">최근 30초 화면과 알림 순간 캡처를 함께 저장해요.</span>
             </div>
             <button
               onClick={() => void exportDiagnostics()}
@@ -229,7 +236,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             >
               {savingDiag ? "저장하는 중…" : "저장"}
             </button>
+            <button onClick={() => setShowAlertEvidence(v=>!v)}>{showAlertEvidence?"캡처 접기":"알림 캡처 보기"}</button>
           </div>
+          {showAlertEvidence && <AlertEvidenceViewer />}
           <div className="adv-row">
             <div className="adv-text">
               <b>설정 옮기기</b>

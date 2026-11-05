@@ -4,6 +4,7 @@
  */
 import { emitAlertLog, randomDelaySetting } from "../alerts/alertRunner";
 import { audioEngine } from "../alerts/audio";
+import { startAlertEvidence } from "./alertEvidence";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
 import { ScreenTransitionDetector } from "../detect/screenTransition";
@@ -206,6 +207,7 @@ let started = false;
 export function startEngine() {
   if (started) return;
   started = true;
+  startAlertEvidence();
   screenCapture.viewportFor = (w,h) => profileStore.get().gameViewports[`${w}x${h}`];
   appTicker.subscribe(tick);
   screenCapture.onFrame(() => appTicker.pulse());

@@ -31,6 +31,15 @@ export interface AlertLogEntry {
   at: number;
   label: string;
 }
+export interface AlertFiredEvent extends AlertLogEntry {
+  key: string;
+  playIndex: number;
+}
+const firedListeners = new Set<(event: AlertFiredEvent) => void>();
+export function onAlertFired(listener: (event: AlertFiredEvent) => void) {
+  firedListeners.add(listener);
+  return () => firedListeners.delete(listener);
+}
 type LogListener = (e: AlertLogEntry) => void;
 const logListeners = new Set<LogListener>();
 export function onAlertLog(l: LogListener) {
@@ -62,6 +71,7 @@ export class AlertRunner {
   constructor(
     private label: string,
     private getConfig: () => AlertConfig,
+    private key = "",
   ) {}
 
   setSpeak(speak: (() => string) | null) {
@@ -114,6 +124,10 @@ export class AlertRunner {
     this.played++;
     this.lastFiredAt = now;
     emitAlertLog(this.label, now);
+    for (const listener of firedListeners) {
+      try { listener({ at: now, label: this.label, key: this.key, playIndex: this.played }); }
+      catch { /* 진단 캡처 실패가 소리 재생을 막지 않게 한다 */ }
+    }
     const repeatsLeft = (() => {
       if (!cfg.repeat.enabled) return false;
       if (cfg.repeat.maxCount == null) return true;

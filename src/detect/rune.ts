@@ -49,7 +49,9 @@ export function detectRuneByColor(img: Pixels, c: RuneColorRange): RuneBox[] {
     if (inHue && s >= c.satMin && v >= c.valMin) mask[i] = 1;
   }
   return connectedComponents(mask, img.width, img.height, c.minArea)
-    .filter((b) => b.w <= c.maxSide && b.h <= c.maxSide && b.w / b.h >= 0.4 && b.w / b.h <= 2.5)
+    // 룬은 거의 정방형인 마름모다. 마을의 분홍색 NPC 표식은 흰 테두리가 있어도
+    // 색상 덩어리가 5×9처럼 세로로 길어 기존 테두리 검사만으로는 구분하지 못했다.
+    .filter((b) => b.w <= c.maxSide && b.h <= c.maxSide && b.w / b.h >= 0.75 && b.w / b.h <= 1.4)
     .filter((b) => whiteRingFraction(img, mask, b) >= 0.5)
     .map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h, score: Math.min(1, b.area / (b.w * b.h)) }));
 }

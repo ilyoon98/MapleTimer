@@ -283,8 +283,8 @@ export class ScreenCapture {
   }
 
   /** 영역 선택 화면용 전체 프레임 스냅샷 */
-  snapshot(): HTMLCanvasElement | null {
-    if (!this.refresh()) return null;
+  snapshot(refresh = true): HTMLCanvasElement | null {
+    if (refresh ? !this.refresh() : !this.width || !this.height) return null;
     const c = document.createElement("canvas");
     c.width = this.width;
     c.height = this.height;

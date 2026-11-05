@@ -11,7 +11,7 @@ export const runners = new Map<string, AlertRunner>();
 export function runner(key: string, label: string, getCfg: () => AlertConfig, speak: () => string) {
   let r = runners.get(key);
   if (!r) {
-    r = new AlertRunner(label, getCfg);
+    r = new AlertRunner(label, getCfg, key);
     runners.set(key, r);
   }
   r.setLabel(label);

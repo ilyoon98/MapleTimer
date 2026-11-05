@@ -24,6 +24,17 @@ export function findMinimap(img: Pixels): Rect | null {
 
 /** 화면 상단 중앙의 디지털 숫자 띠를 찾고 실제 판독까지 성공해야 반환한다. */
 export function findBooster(img: Pixels): Rect | null {
+  // 부스터 숫자 위치는 고정이다. 1920×1080 실플레이에서 이 영역은 읽혔지만,
+  // 화면 전체의 노란 픽셀로 폭을 잡으면 겹친 퀘스트 글자까지 포함해 판독이 실패했다.
+  // 기본 UI와 해상도 비례 UI를 먼저 확인한다. 숫자 모양(초.소수 두 자리)까지
+  // 확인하므로 부스터가 없을 때 영역을 임의로 확정하지 않는다.
+  for (const scale of new Set([1, img.width / 960])) {
+    const r = { x: Math.round(img.width / 2 - 110 * scale), y: Math.round(90 * scale),
+      w: Math.round(230 * scale), h: Math.round(65 * scale) };
+    if (r.x < 0 || r.y + r.h > img.height || r.x + r.w > img.width) continue;
+    const read = readSevenSegment(cropPixels(img,r.x,r.y,r.w,r.h));
+    if (read && read.confidence >= 0.85) return r;
+  }
   const rows:number[]=[];
   for(let y=0;y<img.height;y++) {
     let n=0; for(let x=0;x<img.width;x++){const p=(y*img.width+x)*4;if(img.data[p]>=230&&img.data[p+1]>=140&&img.data[p+2]<140)n++;}

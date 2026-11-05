@@ -416,6 +416,11 @@ input[type="text"] {
   padding-top: 4px;
   border-top: 1px solid var(--line);
 }
+.alert-evidence-list { display: grid; gap: 10px; margin-top: 10px; }
+.alert-evidence { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.evidence-crop { display: block; max-width: 100%; height: auto; margin: 8px 0; image-rendering: pixelated; }
+.evidence-frame { display: block; width: 100%; margin: 8px 0; }
+.alert-evidence pre { max-height: 200px; overflow: auto; font-size: 11px; }
 .alert-group {
   display: flex;
   align-items: center;

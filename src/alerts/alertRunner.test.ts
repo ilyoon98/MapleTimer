@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const play = vi.fn(() => Promise.resolve());
 vi.mock("./audio", () => ({ audioEngine: { play } }));
 
-const { AlertRunner, randomDelaySetting } = await import("./alertRunner");
+const { AlertRunner, randomDelaySetting, onAlertFired, emitAlertLog } = await import("./alertRunner");
 
 const cfg = (enabled: boolean, maxCount: number | null) => () => ({
   sound: { kind: "beep" as const, pattern: "single" as const },
@@ -14,6 +14,17 @@ const cfg = (enabled: boolean, maxCount: number | null) => () => ({
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("AlertRunner", () => {
+  it("재생 시점에만 캡처 이벤트를 보내고 진단 오류가 소리를 막지 않는다", async () => {
+    const capture=vi.fn(),off=onAlertFired(capture),bad=onAlertFired(()=>{throw Error("캡처 실패");});
+    try {
+      const r=new AlertRunner("부스터",cfg(false,null),"booster");
+      r.trigger(1000);r.tick(999);emitAlertLog("숫자 학습 실패",999);
+      expect(capture).not.toHaveBeenCalled();
+      r.tick(1000);await flush();
+      expect(capture).toHaveBeenCalledWith({at:1000,label:"부스터",key:"booster",playIndex:1});
+      expect(play).toHaveBeenCalledTimes(1);
+    } finally { off();bad(); }
+  });
   beforeEach(() => {
     play.mockClear();
     randomDelaySetting.enabled = false;
