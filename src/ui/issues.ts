@@ -6,7 +6,7 @@ import { favoritesRegion, stallRegion } from "../capture/detectionRegions";
 import { screenCapture, type CaptureState } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
 import { liveStore } from "../engine/live";
-import { preciseIcon, profileStore, type Profile } from "../state/profile";
+import { preciseIcon, profileStore, type PanelId, type Profile } from "../state/profile";
 import { connectMaple } from "./connect";
 import { focusPanel } from "./focus";
 import { pickBuffbar, pickFavorites, pickMinimap, pickStallRegion } from "./pickers";
@@ -18,6 +18,8 @@ export interface Issue {
   /** PIP 처럼 좁은 곳에 쓰는 짧은 말 */
   short: string;
   action?: { label: string; run: () => void };
+  /** 이 문제를 보여 줄 기능 칸 (없으면 맨 위 안내 줄: 연결·화면 문제) */
+  panel?: PanelId;
 }
 
 export interface CaptureView {
@@ -64,33 +66,33 @@ export function computeIssues(p: Profile, cap: CaptureView, now: number, firstSe
   const ok = (r: Parameters<typeof regionValidFor>[0]) => regionValidFor(r, w, h);
 
   if (p.skills.some((s) => s.enabled && preciseIcon(s) && s.where === "favorites") && !ok(favoritesRegion(p, w, h)))
-    out.push({ key: "favorites", text: "버프 즐겨찾기 위치를 정해 주세요", short: "즐겨찾기 위치 필요", action: { label: "위치 정하기", run: pickFavorites } });
+    out.push({ key: "favorites", panel: "skills", text: "버프 즐겨찾기 위치를 정해 주세요", short: "즐겨찾기 위치 필요", action: { label: "위치 정하기", run: pickFavorites } });
 
   if (lasting("minimap", p.rune.enabled && !ok(p.regions.minimap), AUTO_FIND_GRACE_MS))
-    out.push({ key: "minimap", text: "미니맵을 못 찾았어요", short: "미니맵 못 찾음", action: { label: "직접 지정", run: pickMinimap } });
+    out.push({ key: "minimap", panel: "rune", text: "미니맵을 못 찾았어요", short: "미니맵 못 찾음", action: { label: "직접 지정", run: pickMinimap } });
 
   if (p.stall.enabled && !ok(stallRegion(p, w, h)))
-    out.push({ key: "stall", text: "사냥 멈춤을 볼 영역을 정해 주세요", short: "사냥 멈춤 영역 필요", action: { label: "영역 정하기", run: pickStallRegion } });
+    out.push({ key: "stall", panel: "stall", text: "사냥 멈춤을 볼 영역을 정해 주세요", short: "사냥 멈춤 영역 필요", action: { label: "영역 정하기", run: pickStallRegion } });
 
   const buffs = p.buffs.filter((b) => b.enabled);
-  const noIcon = buffs.filter((b) => !b.template && !b.icon);
-  if (noIcon.length)
-    out.push({
-      key: "buff-icon",
-      text: noIcon.length === 1 ? `'${noIcon[0].name}' 아이콘을 등록해 주세요` : `버프 아이콘 ${noIcon.length}개를 등록해 주세요`,
-      short: "버프 아이콘 필요",
-      action: { label: "설정 열기", run: () => focusPanel(noIcon[0].kind === "cooldown" ? "core" : "buffs") },
-    });
-  if (buffs.some((b) => !b.slot) && !ok(p.regions.buffbar))
-    out.push({ key: "buffbar", text: "버프칸 영역을 정해 주세요", short: "버프칸 영역 필요", action: { label: "영역 정하기", run: pickBuffbar } });
-  const badSlot = buffs.find((b) => b.slot && !ok(b.slot));
-  if (badSlot)
-    out.push({
-      key: "buff-slot",
-      text: `'${badSlot.name}' 위치를 다시 정해 주세요`,
-      short: "버프 위치 필요",
-      action: { label: "설정 열기", run: () => focusPanel(badSlot.kind === "cooldown" ? "core" : "buffs") },
-    });
+  // 버프 종료 알림·특수 코어 알림 칸에 따로 보여 준다
+  for (const [kind, panel] of [["expiry", "buffs"], ["cooldown", "core"]] as const) {
+    const list = buffs.filter((b) => b.kind === kind);
+    const noIcon = list.filter((b) => !b.template && !b.icon);
+    if (noIcon.length)
+      out.push({
+        key: `${panel}-icon`,
+        panel,
+        text: noIcon.length === 1 ? `'${noIcon[0].name}' 아이콘을 등록해 주세요` : `아이콘 ${noIcon.length}개를 등록해 주세요`,
+        short: "버프 아이콘 필요",
+        action: { label: "보기", run: () => focusPanel(panel) },
+      });
+    if (list.some((b) => !b.slot) && !ok(p.regions.buffbar))
+      out.push({ key: `${panel}-bar`, panel, text: "버프칸을 정해 주세요", short: "버프칸 영역 필요", action: { label: "영역 정하기", run: pickBuffbar } });
+    const badSlot = list.find((b) => b.slot && !ok(b.slot));
+    if (badSlot)
+      out.push({ key: `${panel}-slot`, panel, text: `'${badSlot.name}' 위치를 다시 정해 주세요`, short: "버프 위치 필요", action: { label: "보기", run: () => focusPanel(panel) } });
+  }
   return done(out);
 }
 

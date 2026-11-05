@@ -5,8 +5,19 @@ import { appTicker } from "../core/ticker";
 import { desktop } from "../platform/desktop";
 import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
 import { createStore } from "../state/createStore";
-import { PIP_ALERT_COLORS, PIP_SIZES, profileStore, shortName, type PipAlertColor } from "../state/profile";
-import { fmtRemaining } from "./common";
+import {
+  PIP_ALERT_COLORS,
+  PIP_EMPHASIS,
+  PIP_SIZES,
+  PIP_TEXT,
+  defaultProfile,
+  profileStore,
+  shortName,
+  type PipAlertColor,
+  type PipEmphasis,
+  type PipText,
+} from "../state/profile";
+import { Toggle, fmtRemaining } from "./common";
 import { useIssues } from "./issues";
 import { pauseTimer, startTimer } from "./panels/TimersPanel";
 
@@ -25,6 +36,9 @@ let overlay: Window | null = null;
 
 export const pipSupported = () => !!desktop || !!window.documentPictureInPicture;
 
+/** 이보다 작게 저장하지 않는다 (잘못 줄어든 채로 다시 열리지 않게) */
+const MIN_PIP = { width: 200, height: 160 };
+
 /** 게임 위에 항상 떠 있는 작은 타이머 창 (Chrome Document Picture-in-Picture) */
 export async function openPip() {
   if (!desktop && !window.documentPictureInPicture) {
@@ -35,7 +49,9 @@ export async function openPip() {
   if (!desktop && window.documentPictureInPicture?.window) return;
   let pip: Window;
   try {
-    const size = PIP_SIZES[profileStore.get().pipSize] ?? PIP_SIZES.medium;
+    // 끌어서 맞춘 크기가 있으면 그대로, 없으면 기본 크기
+    const saved = profileStore.get().pipWindow;
+    const size = saved ?? PIP_SIZES[profileStore.get().pipSize] ?? PIP_SIZES.medium;
     if (desktop) {
       const popup = window.open('about:blank', 'maple-overlay', `width=${size.width},height=${size.height}`);
       if (!popup) throw new Error('타이머 창을 열지 못했어요.');
@@ -60,6 +76,15 @@ export async function openPip() {
   pipStore.set({ open: true });
   // 보이는 PIP 창의 타이머도 감지를 깨운다. 원래 탭의 워커 신호가 늦어져도 계속 확인한다.
   const heartbeat = pip.setInterval(() => appTicker.pulse(), 250);
+  // 창 가장자리를 끌어 크기를 바꾸면 기억해 둔다 (다음에 열 때 같은 크기)
+  let sizeTimer = 0;
+  pip.addEventListener("resize", () => {
+    pip.clearTimeout(sizeTimer);
+    sizeTimer = pip.setTimeout(() => {
+      const width = pip.innerWidth, height = pip.innerHeight;
+      if (width >= MIN_PIP.width && height >= MIN_PIP.height) profileStore.set({ pipWindow: { width, height } });
+    }, 400);
+  });
   pip.addEventListener("pagehide", () => {
     pip.clearInterval(heartbeat);
     pipRoot?.unmount();
@@ -117,6 +142,124 @@ interface Item {
   title?: string;
 }
 
+/** PIP 모양 (창 크기·글자 크기·알림색 등) 을 PIP 안에서 바로 고친다 */
+function pipStyle(p: { pipAlertColor: PipAlertColor; pipText: PipText }): React.CSSProperties {
+  return { ...alertColorStyle(p.pipAlertColor), "--pip-text": PIP_TEXT[p.pipText]?.scale ?? 1 } as React.CSSProperties;
+}
+
+function Choice<K extends string>({ value, options, onChange }: { value: K; options: Array<[K, string]>; onChange: (k: K, e: React.MouseEvent) => void }) {
+  return (
+    <div className="pip-choice" role="group">
+      {options.map(([k, label]) => (
+        <button key={k} className={value === k ? "on" : ""} aria-pressed={value === k} onClick={(e) => onChange(k, e)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PipSettings({ onClose }: { onClose: () => void }) {
+  const p = profileStore.use((s) => s);
+  const reset = () => {
+    const d = defaultProfile();
+    profileStore.set({ pipText: d.pipText, pipEmphasis: d.pipEmphasis, pipAlertColor: d.pipAlertColor, pipBackground: d.pipBackground });
+  };
+  return (
+    <div className="pip-settings">
+      <div className="pip-settings-head">
+        <b>PIP 모양</b>
+        <span className="spacer" />
+        <button className="pip-btn" onClick={onClose} aria-label="닫기">
+          ✕
+        </button>
+      </div>
+      <PipPreview emphasis={p.pipEmphasis} />
+      <label>글자 크기</label>
+      <Choice value={p.pipText} options={(Object.keys(PIP_TEXT) as PipText[]).map((k) => [k, PIP_TEXT[k].label])} onChange={(k) => profileStore.set({ pipText: k })} />
+      <label>알림이 울릴 때</label>
+      <Choice
+        value={p.pipEmphasis}
+        options={(Object.keys(PIP_EMPHASIS) as PipEmphasis[]).map((k) => [k, PIP_EMPHASIS[k].split(" ")[0]])}
+        onChange={(k) => profileStore.set({ pipEmphasis: k })}
+      />
+      <div className="pip-colors">
+        {(Object.keys(PIP_ALERT_COLORS) as PipAlertColor[]).map((k) => (
+          <button
+            key={k}
+            className={`pip-color ${p.pipAlertColor === k ? "on" : ""}`}
+            style={{ "--chip": PIP_ALERT_COLORS[k].color ?? "var(--alert)" } as React.CSSProperties}
+            aria-label={PIP_ALERT_COLORS[k].label}
+            title={PIP_ALERT_COLORS[k].label}
+            aria-pressed={p.pipAlertColor === k}
+            onClick={() => profileStore.set({ pipAlertColor: k })}
+          />
+        ))}
+      </div>
+      <Toggle checked={p.pipBackground} onChange={(v) => profileStore.set({ pipBackground: v })} label="배경에 게임 화면" />
+      <button className="pip-reset" onClick={reset}>
+        기본 모양으로
+      </button>
+    </div>
+  );
+}
+
+/** 미리 보기 내용 (실제 PIP 와 같은 줄 모양) */
+function PreviewRows({ emphasis }: { emphasis: PipEmphasis }) {
+  return (
+    <>
+      <div className="pip-preview-text">
+        <div className="pip-item pip-running">
+          <span className="pip-name">솔 야누스 새벽</span>
+          <span className="pip-time mono">1:12</span>
+        </div>
+      </div>
+      <div className="pip-preview-caption">알림이 울릴 때</div>
+      <div className={`pip-preview-ring pip-ringing pip-emph-${emphasis}`}>
+        <div className="pip-preview-text">
+          <div className="pip-item pip-alert">
+            <span className="pip-name">에르다 파운틴</span>
+            <span className="pip-time mono">0:09</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const MAX_TEXT_SCALE = Math.max(...Object.values(PIP_TEXT).map((t) => t.scale));
+
+/**
+ * 고른 글자 크기·알림 모양·알림색이 실제로 어떻게 보이는지.
+ * 가장 큰 글자로 그린 보이지 않는 사본이 같은 자리에서 높이를 잡아 두어,
+ * 글자 크기를 바꿔도 아래 버튼들이 밀리지 않는다 (누르던 버튼이 손 밑에서 도망가지 않게).
+ */
+function PipPreview({ emphasis }: { emphasis: PipEmphasis }) {
+  return (
+    <div className="pip-preview-box" aria-label="미리 보기">
+      <div className="pip-preview pip-preview-sizer" aria-hidden style={{ "--pip-text": MAX_TEXT_SCALE } as React.CSSProperties}>
+        <PreviewRows emphasis="subtle" />
+      </div>
+      <div className="pip-preview">
+        <PreviewRows emphasis={emphasis} />
+      </div>
+    </div>
+  );
+}
+
+/** 오른쪽 위 ⚙ : 누르면 PIP 모양 설정 */
+function PipGear() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="pip-gear" onClick={() => setOpen(!open)} aria-label="PIP 모양 설정" title="PIP 모양 설정">
+        ⚙
+      </button>
+      {open && <PipSettings onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 /** 알림이 안 울릴 수 있는 문제를 한 줄로 (가장 급한 것 하나만). 고치는 건 본 창에서 */
 function PipIssue() {
   const issue = useIssues()[0];
@@ -138,8 +281,9 @@ function CorePipView() {
   const soon = core != null && rem != null && rem > 0 && rem <= core.leadSec * 1000;
   const ready = rem == null || rem <= 0;
   return (
-    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={alertColorStyle(p.pipAlertColor)}>
+    <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={pipStyle(p)}>
       <PipBackground />
+      <PipGear />
       <PipIssue />
       <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
       <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
@@ -167,67 +311,62 @@ function PipView() {
   const live = liveStore.use((s) => s);
   const p = profileStore.use((s) => s);
   const now = live.now;
-  const show = p.pipShow;
   const items: Item[] = [];
 
-  if (show.skills)
-    for (const s of p.skills) {
-      if (!s.enabled) continue;
-      const l = live.skills[s.id];
-      const rem = l?.expiresAt != null ? l.expiresAt - now : null;
-      const urgent = rem != null && rem <= s.leadSec * 1000;
-      items.push({
-        key: s.id,
-        name: shortName(s.name),
-        remaining: rem,
-        urgent,
-        tone: urgent ? "alert" : rem != null ? "running" : "waiting",
-        alertIn: rem != null ? rem - s.leadSec * 1000 : null,
-        onClick: () => manualSkillCast(s.id),
-        title: "누르면 지금 스킬을 쓴 것으로 타이머를 시작해요",
-      });
-    }
-  if (show.buffs)
-    for (const b of p.buffs) {
-      if (!b.enabled) continue;
-      const l = live.buffs[b.id];
-      const rem = l?.endsAt != null ? l.endsAt - now : null;
-      const urgent = rem != null && rem <= b.leadSec * 1000;
-      items.push({
-        key: b.id,
-        name: b.name,
-        remaining: rem,
-        urgent,
-        tone: urgent ? "alert" : rem != null || l?.present ? "running" : "waiting",
-        alertIn: rem != null ? rem - b.leadSec * 1000 : null,
-        text: rem == null ? (b.kind === "cooldown" ? "사용 가능" : l?.present ? "있음" : "없음") : undefined,
-      });
-    }
-  if (show.booster && p.booster.enabled && live.booster.endsAt != null) {
+  // 본 창에서 켠 기능은 모두 보여 준다 (PIP 에서 따로 고르지 않는다)
+  for (const s of p.skills) {
+    if (!s.enabled) continue;
+    const l = live.skills[s.id];
+    const rem = l?.expiresAt != null ? l.expiresAt - now : null;
+    const urgent = rem != null && rem <= s.leadSec * 1000;
+    items.push({
+      key: s.id,
+      name: shortName(s.name),
+      remaining: rem,
+      urgent,
+      tone: urgent ? "alert" : rem != null ? "running" : "waiting",
+      alertIn: rem != null ? rem - s.leadSec * 1000 : null,
+      onClick: () => manualSkillCast(s.id),
+      title: "누르면 지금 스킬을 쓴 것으로 타이머를 시작해요",
+    });
+  }
+  for (const b of p.buffs) {
+    if (!b.enabled) continue;
+    const l = live.buffs[b.id];
+    const rem = l?.endsAt != null ? l.endsAt - now : null;
+    const urgent = rem != null && rem <= b.leadSec * 1000;
+    items.push({
+      key: b.id,
+      name: b.name,
+      remaining: rem,
+      urgent,
+      tone: urgent ? "alert" : rem != null || l?.present ? "running" : "waiting",
+      alertIn: rem != null ? rem - b.leadSec * 1000 : null,
+      text: rem == null ? (b.kind === "cooldown" ? "사용 가능" : l?.present ? "있음" : "없음") : undefined,
+    });
+  }
+  if (p.booster.enabled && live.booster.endsAt != null) {
     const rem = live.booster.endsAt - now;
     const urgent = rem <= p.booster.leadSec * 1000;
     items.push({ key: "booster", name: "부스터", remaining: rem, urgent, tone: urgent ? "alert" : "running", alertIn: rem - p.booster.leadSec * 1000 });
   }
-  if (show.timers)
-    for (const t of p.timers) {
-      if (!t.enabled) continue;
-      const rem = t.endsAt != null ? t.endsAt - now : t.pausedRemainingMs;
-      const urgent = t.endsAt != null && rem != null && rem <= t.leadSec * 1000;
-      items.push({
-        key: t.id,
-        name: shortName(t.name),
-        remaining: rem,
-        urgent,
-        tone: urgent ? "alert" : t.endsAt != null ? "running" : "waiting",
-        alertIn: t.endsAt != null && rem != null ? rem - t.leadSec * 1000 : null,
-      });
-    }
+  for (const t of p.timers) {
+    if (!t.enabled) continue;
+    const rem = t.endsAt != null ? t.endsAt - now : t.pausedRemainingMs;
+    const urgent = t.endsAt != null && rem != null && rem <= t.leadSec * 1000;
+    items.push({
+      key: t.id,
+      name: shortName(t.name),
+      remaining: rem,
+      urgent,
+      tone: urgent ? "alert" : t.endsAt != null ? "running" : "waiting",
+      alertIn: t.endsAt != null && rem != null ? rem - t.leadSec * 1000 : null,
+    });
+  }
   const order = { alert: 0, running: 1, waiting: 2 };
   items.sort((a, b) => order[a.tone] - order[b.tone] || (a.remaining ?? Infinity) - (b.remaining ?? Infinity));
   // 아직 안 울린 알림 중 가장 먼저 울릴 것
-  const next = show.next
-    ? items.filter((it) => it.alertIn != null && it.alertIn > 0).sort((a, b) => a.alertIn! - b.alertIn!)[0]
-    : undefined;
+  const next = items.filter((it) => it.alertIn != null && it.alertIn > 0).sort((a, b) => a.alertIn! - b.alertIn!)[0];
 
   const runeText =
     live.rune.status === "present" ? "룬 있음!" : live.rune.status === "off" ? "꺼짐" : live.rune.status === "searching" ? "찾는 중" : "—";
@@ -241,8 +380,9 @@ function PipView() {
           : "—";
 
   return (
-    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={alertColorStyle(p.pipAlertColor)}>
+    <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={pipStyle(p)}>
       <PipBackground />
+      <PipGear />
       <PipIssue />
       {next && (
         <div className="pip-next">
@@ -251,10 +391,10 @@ function PipView() {
           <span className="pip-next-time mono">{fmtRemaining(next.alertIn)}</span>
         </div>
       )}
-      {(show.rune || show.stall) && (
+      {(p.rune.enabled || p.stall.enabled) && (
         <div className="pip-status">
-          {show.rune && <span className={`pip-chip ${live.rune.status === "present" ? "pip-chip-alert" : ""}`}>룬 · {runeText}</span>}
-          {show.stall && <span className={`pip-chip ${live.stall.status === "stalled" ? "pip-chip-alert" : ""}`}>사냥 · {stallText}</span>}
+          {p.rune.enabled && <span className={`pip-chip ${live.rune.status === "present" ? "pip-chip-alert" : ""}`}>룬 · {runeText}</span>}
+          {p.stall.enabled && <span className={`pip-chip ${live.stall.status === "stalled" ? "pip-chip-alert" : ""}`}>사냥 · {stallText}</span>}
         </div>
       )}
       <div className="pip-list">

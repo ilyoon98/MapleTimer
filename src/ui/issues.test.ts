@@ -47,4 +47,11 @@ describe("준비 안내", () => {
     expect(keys(quiet({ stall: { ...b.stall, enabled: true, mode: "exp" } }), live)).toEqual([]);
     expect(keys(quiet({ stall: { ...b.stall, enabled: true, mode: "mana" } }), live)).toEqual(["stall"]);
   });
+  it("기능 칸 문제는 그 칸에, 연결·화면 문제는 맨 위에 보여 준다", () => {
+    const b = defaultProfile();
+    const p = quiet({ stall: { ...b.stall, enabled: true, mode: "mana" }, favoritesPosition: "manual", skills: b.skills.map((s) => ({ ...s, where: "favorites" as const })) });
+    const list = computeIssues(p, live, 0, new Map());
+    expect(Object.fromEntries(list.map((i) => [i.key, i.panel]))).toEqual({ favorites: "skills", stall: "stall" });
+    expect(computeIssues(p, { ...live, stale: true }, 0, new Map())[0].panel).toBeUndefined();
+  });
 });

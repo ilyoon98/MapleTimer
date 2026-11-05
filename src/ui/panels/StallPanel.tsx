@@ -4,14 +4,14 @@ import { liveStore } from "../../engine/engine";
 import { STALL_DEFAULT_SEC, STALL_RANGE, profileStore, setRegion, type StallMode, type StallSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { STALL_TEXT } from "../../alerts/speech";
-import { NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtClock, NOT_CONNECTED } from "../common";
 import { STALL_MODES, pickStallRegion } from "../pickers";
 
 const MODES = STALL_MODES;
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
-  "no-share": { tone: "warn", text: "화면 공유 필요" },
+  "no-share": NOT_CONNECTED,
   "no-region": { tone: "info", text: "영역 찾는 중 · 필요하면 직접 지정" },
   waiting: { tone: "info", text: "첫 변화 기다리는 중" },
   watching: { tone: "ok", text: "감시 중" },
@@ -35,7 +35,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
   const pickRegion = pickStallRegion;
 
   return (
-    <Panel title="사냥 멈춤 알림" icon="🐾" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <Panel id="stall" title="사냥 멈춤 알림" icon="🐾" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div className={`row ${st.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={st.enabled} onChange={(v) => setStall({ enabled: v })} />

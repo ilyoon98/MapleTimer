@@ -1315,3 +1315,154 @@ input[type="text"] {
 .capture-sources button { min-width:0; }
 .capture-sources span { max-width:100%; white-space:normal; }
 .modal-head h2 { margin:0; flex:1; font-size:20px; }
+/* PIP 글자 크기: 글자가 있는 부분만 키운다 */
+.pip-issue,
+.pip-next,
+.pip-status,
+.pip-list,
+.pip-core-name,
+.pip-core-time,
+.pip-core-state {
+  zoom: var(--pip-text, 1);
+}
+/* PIP 오른쪽 위 ⚙ 와 PIP 모양 설정 */
+.pip-issue,
+.pip-next,
+.pip-status {
+  margin-right: 30px;
+}
+.pip > .pip-gear:not(.pip-bg):not(.pip-bg-shade) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.75;
+}
+.pip > .pip-gear:hover {
+  opacity: 1;
+}
+.pip > .pip-settings:not(.pip-bg):not(.pip-bg-shade) {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: var(--bg);
+  overflow: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.pip-settings-head {
+  display: flex;
+  align-items: center;
+}
+.pip-settings label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.pip-choice {
+  display: flex;
+  gap: 4px;
+}
+.pip-choice button {
+  flex: 1;
+  padding: 4px 6px;
+}
+.pip-choice button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+.pip-colors {
+  display: flex;
+  gap: 6px;
+}
+.pip-color {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--chip);
+  border: 2px solid transparent;
+}
+.pip-color.on {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg) inset;
+}
+.pip-reset {
+  margin-top: 4px;
+  align-self: flex-start;
+  font-size: 12px;
+}
+/* 설정 > 문제가 생겼을 때 · 백업 (접혀 있음) */
+.modal-advanced > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.modal-advanced[open] > summary {
+  margin-bottom: 6px;
+}
+.adv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.adv-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adv-row input {
+  width: 110px;
+}
+/* 기능 칸 안의 문제 안내: 제목줄 바로 아래 한 줄 */
+.notice-panel {
+  margin: 0 12px 8px;
+  padding: 4px 10px;
+}
+/* PIP 모양 미리 보기: 실제 PIP 와 같은 줄 모양을 고른 글자 크기·알림 모양·색으로 */
+.pip-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+.pip-preview-text {
+  zoom: var(--pip-text, 1);
+}
+/* 보이는 미리 보기와 가장 큰 글자의 사본을 같은 칸에 겹친다: 칸 높이는 늘 가장 큰 글자 기준 */
+.pip-preview-box {
+  display: grid;
+}
+.pip-preview-box > .pip-preview {
+  grid-area: 1 / 1;
+}
+.pip-preview-sizer {
+  visibility: hidden;
+  pointer-events: none;
+}
+.pip-preview-caption {
+  font-size: 11px;
+  color: var(--muted);
+}
+.pip-preview-ring {
+  padding: 6px;
+  border-radius: 10px;
+}

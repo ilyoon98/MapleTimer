@@ -2,11 +2,11 @@ import { liveStore } from "../../engine/engine";
 import { profileStore, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { Panel, StatusDot, Toggle, fmtClock, fmtRemaining } from "../common";
+import { Panel, StatusDot, Toggle, fmtClock, fmtRemaining, NOT_CONNECTED } from "../common";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
-  "no-share": { tone: "warn", text: "화면 공유 필요" },
+  "no-share": NOT_CONNECTED,
   "no-region": { tone: "info", text: "부스터 자동 탐색 중" },
   searching: { tone: "info", text: "타이머 찾는 중" },
   reading: { tone: "info", text: "숫자 확인 중" },

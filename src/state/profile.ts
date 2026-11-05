@@ -256,17 +256,13 @@ export const PIP_SIZES: Record<PipSize, { label: string; width: number; height: 
   medium: { label: "보통", width: 360, height: 320 },
   large: { label: "크게", width: 520, height: 420 },
 };
-/** PIP 에 보여 줄 항목 ('next' = 가장 먼저 울릴 알림을 맨 위에 크게) */
-export type PipItemKind = "next" | "skills" | "rune" | "stall" | "buffs" | "booster" | "timers";
-export const PIP_ITEMS: Array<{ id: PipItemKind; label: string }> = [
-  { id: "next", label: "다음 알림 크게" },
-  { id: "skills", label: "스킬" },
-  { id: "rune", label: "룬" },
-  { id: "stall", label: "사냥 멈춤" },
-  { id: "buffs", label: "버프칸" },
-  { id: "booster", label: "부스터" },
-  { id: "timers", label: "일반 타이머" },
-];
+/** PIP 글자 크기 */
+export type PipText = "small" | "normal" | "large";
+export const PIP_TEXT: Record<PipText, { label: string; scale: number }> = {
+  small: { label: "작게", scale: 0.85 },
+  normal: { label: "보통", scale: 1 },
+  large: { label: "크게", scale: 1.25 },
+};
 /** PIP 알림색 (기본은 테마의 빨강) */
 export type PipAlertColor = "theme" | "orange" | "yellow" | "green" | "blue" | "purple";
 export const PIP_ALERT_COLORS: Record<PipAlertColor, { label: string; color: string | null }> = {
@@ -295,9 +291,11 @@ export interface Profile {
   /** 화면 공유가 끊기면 알림 */
   alertOnShareEnd: boolean;
   pipSize: PipSize;
+  /** 사용자가 끌어서 맞춘 PIP 창 크기 (다음에 열 때 그대로). 없으면 pipSize */
+  pipWindow: { width: number; height: number } | null;
+  pipText: PipText;
   /** PIP 표시: 사냥(전체 목록) / 특수 코어(크게 하나) */
   pipMode: "hunting" | "core";
-  pipShow: Record<PipItemKind, boolean>;
   pipEmphasis: PipEmphasis;
   pipAlertColor: PipAlertColor;
   /** PIP 배경에 공유 중인 게임 화면 깔기 */
@@ -333,8 +331,9 @@ export function defaultProfile(): Profile {
     theme: "system",
     alertOnShareEnd: true,
     pipSize: "medium",
+    pipWindow: null,
+    pipText: "normal",
     pipMode: "hunting",
-    pipShow: { next: true, skills: true, rune: true, stall: true, buffs: true, booster: true, timers: true },
     pipEmphasis: "normal",
     pipAlertColor: "theme",
     pipBackground: false,
@@ -400,7 +399,6 @@ export function migrate(raw: unknown): Profile {
       color: sameColor(p.rune?.color, OLD_DEFAULT_RUNE_COLOR) ? { ...d.rune.color } : { ...d.rune.color, ...p.rune?.color },
     },
     booster: { ...d.booster, ...p.booster },
-    pipShow: { ...d.pipShow, ...p.pipShow },
     skills: (p.skills ?? d.skills).filter((s) => SKILL_PRESETS.some((preset) => preset.id === s.presetId)),
     favoritesPosition: p.favoritesPosition === "left" || p.favoritesPosition === "right" || p.favoritesPosition === "manual"
       ? p.favoritesPosition : p.regions?.favorites ? "manual" : "right",

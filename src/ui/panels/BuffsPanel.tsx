@@ -1,10 +1,11 @@
+import { screenCapture } from "../../capture/screenCapture";
 import { useState } from "react";
 import { storeTemplate, trimToIconBorder } from "../../cv/match";
 import { liveStore } from "../../engine/engine";
 import { BUFF_PRESETS, newBuffPreset, profileStore, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
-import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, NOT_CONNECTED } from "../common";
 import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
 import { pickBuffbar } from "../pickers";
@@ -28,6 +29,7 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
 
   return (
     <Panel
+      id={isCore ? "core" : "buffs"}
       title={isCore ? "특수 코어 알림" : "버프 종료 알림"}
       icon={isCore ? "💠" : gameIconUrl("fountain")}
       badge={isCore ? <span className="badge badge-beta">개발 중</span> : undefined}
@@ -108,7 +110,8 @@ function BuffRow({ buff: b, hasRegion: hasBar }: { buff: BuffEntry; hasRegion: b
 
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
   if (!b.enabled) status = { tone: "idle", text: "꺼짐" };
-  else if (!live?.regionOk) status = { tone: "warn", text: hasRegion ? "화면 공유 필요" : "버프칸 선택 필요" };
+  else if (screenCapture.state !== "live") status = NOT_CONNECTED;
+  else if (!live?.regionOk) status = { tone: "warn", text: hasRegion ? "위치 다시 선택" : "버프칸 선택 필요" };
   else if (!b.template) status = { tone: "warn", text: "아이콘 등록 필요" };
   else if (isCore && remaining != null && remaining > 0) status = { tone: remaining <= b.leadSec * 1000 ? "alert" : "ok", text: "쿨타임" };
   else if (isCore) status = { tone: "info", text: "사용 가능" };

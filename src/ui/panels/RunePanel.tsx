@@ -2,13 +2,13 @@ import { liveStore } from "../../engine/engine";
 import { profileStore, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { RUNE_TEXT } from "../../alerts/speech";
-import { DebugCrop, Panel, StatusDot, Toggle, fmtClock } from "../common";
+import { DebugCrop, Panel, StatusDot, Toggle, fmtClock, NOT_CONNECTED } from "../common";
 import { RUNE_ICON } from "../gameArt";
 import { pickMinimap } from "../pickers";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
-  "no-share": { tone: "warn", text: "화면 공유 필요" },
+  "no-share": NOT_CONNECTED,
   "no-region": { tone: "info", text: "미니맵 자동 탐색 중" },
   searching: { tone: "ok", text: "미니맵에서 룬 찾는 중" },
   candidate: { tone: "info", text: "룬 후보 확인 중" },
@@ -29,7 +29,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
   const pickRegion = pickMinimap;
 
   return (
-    <Panel title="룬 알림" icon={RUNE_ICON} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <Panel id="rune" title="룬 알림" icon={RUNE_ICON} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div className={`row ${rune.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={rune.enabled} onChange={(v) => setRune({ enabled: v })} />

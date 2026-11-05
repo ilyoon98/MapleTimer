@@ -4,20 +4,7 @@ import { screenCapture } from "../capture/screenCapture";
 import { buffSearchStats, clipSnapshot, clipUsage, featurePerf, liveStore } from "../engine/engine";
 import { deleteCustomSound, listCustomSounds, putCustomSound, type CustomSound } from "../alerts/customSounds";
 import { digitStore, importLearnedDigits, learnedDigitCount, resetLearnedDigits } from "../detect/digitLearner";
-import {
-  PIP_ALERT_COLORS,
-  type PipAlertColor,
-  PIP_EMPHASIS,
-  PIP_ITEMS,
-  PIP_SIZES,
-  defaultProfile,
-  migrate,
-  profileStore,
-  uid,
-  type PipEmphasis,
-  type PipSize,
-  type ThemeMode,
-} from "../state/profile";
+import { defaultProfile, migrate, profileStore, uid, type ThemeMode } from "../state/profile";
 import { deletePreset, loadPreset, presetStore, savePreset } from "../state/presets";
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
@@ -35,12 +22,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const theme = profileStore.use((p) => p.theme);
   const alertOnShareEnd = profileStore.use((p) => p.alertOnShareEnd);
   const learned = digitStore.use((d) => learnedDigitCount(d));
-  const pipSize = profileStore.use((p) => p.pipSize);
-  const pipShow = profileStore.use((p) => p.pipShow);
   const randomDelay = profileStore.use((p) => p.randomDelay);
-  const pipAlertColor = profileStore.use((p) => p.pipAlertColor);
-  const pipBackground = profileStore.use((p) => p.pipBackground);
-  const pipEmphasis = profileStore.use((p) => p.pipEmphasis);
   const perf = liveStore.use((s) => s.perf);
   const presets = presetStore.use((s) => s.presets);
   const [presetName, setPresetName] = useState("");
@@ -205,63 +187,6 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           </div>
           {voices.length === 0 && <p className="muted small">한국어 목소리를 찾지 못했어요. Windows 설정 &gt; 시간 및 언어 &gt; 음성에서 한국어 음성을 추가할 수 있어요.</p>}
           <div className="field-row">
-            <span className="field-label">PIP 크기</span>
-            <select value={pipSize} onChange={(e) => profileStore.set({ pipSize: e.target.value as PipSize })}>
-              {(Object.keys(PIP_SIZES) as PipSize[]).map((k) => (
-                <option key={k} value={k}>
-                  {PIP_SIZES[k].label} ({PIP_SIZES[k].width}×{PIP_SIZES[k].height})
-                </option>
-              ))}
-            </select>
-            <span className="muted small">다음에 PIP 를 열 때 적용돼요</span>
-          </div>
-          <div className="field-row">
-            <span className="field-label">PIP 표시</span>
-            {PIP_ITEMS.map((it) => (
-              <Toggle
-                key={it.id}
-                checked={pipShow[it.id]}
-                onChange={(v) => profileStore.set((p) => ({ ...p, pipShow: { ...p.pipShow, [it.id]: v } }))}
-                label={it.label}
-              />
-            ))}
-          </div>
-          <div className="field-row">
-            <span className="field-label">PIP 강조</span>
-            <select value={pipEmphasis} onChange={(e) => profileStore.set({ pipEmphasis: e.target.value as PipEmphasis })}>
-              {(Object.keys(PIP_EMPHASIS) as PipEmphasis[]).map((k) => (
-                <option key={k} value={k}>
-                  {PIP_EMPHASIS[k]}
-                </option>
-              ))}
-            </select>
-            <span className="muted small">알림이 울릴 때 PIP 창 모양</span>
-          </div>
-          <div className="field-row">
-            <span className="field-label">PIP 알림색</span>
-            {(Object.keys(PIP_ALERT_COLORS) as PipAlertColor[]).map((k) => {
-              const c = PIP_ALERT_COLORS[k];
-              return (
-                <button
-                  key={k}
-                  className={`color-chip ${pipAlertColor === k ? "color-chip-on" : ""}`}
-                  style={{ "--chip": c.color ?? "var(--alert)" } as React.CSSProperties}
-                  aria-pressed={pipAlertColor === k}
-                  onClick={() => profileStore.set({ pipAlertColor: k })}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="field-row">
-            <Toggle
-              checked={pipBackground}
-              onChange={(v) => profileStore.set({ pipBackground: v })}
-              label="PIP 배경에 공유 중인 게임 화면 깔기 (화면을 공유하면 보여요)"
-            />
-          </div>
-          <div className="field-row">
             <Toggle checked={randomDelay} onChange={(v) => profileStore.set({ randomDelay: v })} label="랜덤 지연: 첫 알림을 0~2초 사이로 무작위로 늦추기" />
           </div>
           <div className="field-row">
@@ -270,22 +195,6 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               onChange={(v) => profileStore.set({ alertOnShareEnd: v })}
               label="화면 공유가 끊기면 음성으로 알려주기 (게임 창이 닫히거나 최소화로 끊긴 경우)"
             />
-          </div>
-        </section>
-        <section className="modal-section">
-          <h4>숫자 학습</h4>
-          <p className="muted small">
-            실제 게임에서 모은 숫자 모양이 기본으로 들어 있어서 학습 없이도 버프 남은 시간 숫자를 읽어요. 그래도 자꾸 못 읽으면, 남은 시간을 읽는
-            버프가 끝날 때까지 화면에 보이게 두세요. 이 PC 화면의 숫자 모양을 자동으로 더 배워요. 해상도나 UI 크기를
-            바꿨다면 초기화 후 다시 배우세요.
-          </p>
-          <div className="field-row">
-            <span>
-              학습한 숫자: <b>{learned}/10</b>
-            </span>
-            <button className="danger" onClick={() => confirm("학습한 숫자 모양을 지울까요?") && resetLearnedDigits()}>
-              숫자 학습 초기화
-            </button>
           </div>
         </section>
         <section className="modal-section">
@@ -315,69 +224,85 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <input type="file" accept="audio/*" multiple onChange={(e) => addSound(e.target.files)} />
           </label>
         </section>
-        <section className="modal-section">
-          <h4>프리셋 (사냥용 / 보스용 등)</h4>
-          <p className="muted small">지금 설정(영역·알림·등록한 아이콘 포함)을 이름 붙여 저장하고, 상황에 맞게 바꿔 쓸 수 있어요.</p>
-          <div className="field-row">
-            <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="예: 사냥, 보스" />
+        <details className="modal-section modal-advanced">
+          <summary>문제가 생겼을 때 · 백업</summary>
+          <div className="adv-row">
+            <div className="adv-text">
+              <b>진단 파일 저장</b>
+              <span className="muted small">알림이 이상하면 바로 눌러서 저장해 주세요. 최근 30초 화면이 같이 담겨 고칠 때 써요.</span>
+            </div>
             <button
+              onClick={() => void exportDiagnostics()}
+              disabled={screenCapture.state !== "live" || savingDiag}
+              title={`감지 1회 평균 ${perf.avgMs.toFixed(1)}ms · 녹화 ${(clipUsage().bytes / 1048576).toFixed(1)}MB`}
+            >
+              {savingDiag ? "저장하는 중…" : "저장"}
+            </button>
+          </div>
+          <div className="adv-row">
+            <div className="adv-text">
+              <b>설정 옮기기</b>
+              <span className="muted small">다른 PC 로 옮기거나 미리 저장해 둘 때</span>
+            </div>
+            <button onClick={exportProfile}>파일로 저장</button>
+            <label className="file-btn">
+              불러오기
+              <input type="file" accept="application/json" onChange={(e) => importProfile(e.target.files)} />
+            </label>
+          </div>
+          <div className="adv-row">
+            <div className="adv-text">
+              <b>상황별 설정</b>
+              <span className="muted small">사냥용·보스용처럼 지금 설정을 이름 붙여 두고 바꿔 쓰기</span>
+            </div>
+            <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="예: 보스" />
+            <button
+              disabled={!presetName.trim()}
               onClick={() => {
                 savePreset(presetName);
                 setPresetName("");
               }}
             >
-              지금 설정 저장
+              저장
             </button>
           </div>
-          <ul className="sound-list">
-            {presets.map((pr) => (
-              <li key={pr.id}>
-                <span className="grow">
-                  {pr.name} <span className="muted small">({new Date(pr.savedAt).toLocaleString()})</span>
-                </span>
-                <button onClick={() => confirm(`'${pr.name}' 프리셋으로 바꿀까요? 지금 설정은 덮어써져요.`) && loadPreset(pr.id)}>불러오기</button>
-                <button className="danger" onClick={() => confirm(`'${pr.name}' 프리셋을 지울까요?`) && deletePreset(pr.id)}>
-                  삭제
-                </button>
-              </li>
-            ))}
-            {presets.length === 0 && <li className="muted">저장된 프리셋이 없어요</li>}
-          </ul>
-        </section>
-        <section className="modal-section">
-          <h4>진단</h4>
-          <p className="muted small">
-            감지가 잘 안 될 때, 문제가 생긴 직후에 눌러 주세요. 지금 게임 화면, <b>최근 30초 동안의 감지 영역</b>, 설정, 학습한 숫자, 감지 수치가 파일
-            하나로 저장돼요 (다운로드 폴더). 이 파일로 그 30초를 그대로 다시 돌려 보며 고칠 수 있어요.
-          </p>
-          <div className="field-row">
-            <button onClick={() => void exportDiagnostics()} disabled={screenCapture.state !== "live" || savingDiag}>
-              {savingDiag ? "저장하는 중…" : "진단 파일 저장"}
-            </button>
-            <span className="muted small mono">
-              감지 1회 평균 {perf.avgMs.toFixed(1)}ms · 최근 최대 {perf.maxMs.toFixed(1)}ms (0.25초마다 실행)
-              {" · "}녹화 {(clipUsage().bytes / 1048576).toFixed(1)}/{clipUsage().maxBytes / 1048576} MB, {clipUsage().frames}장
-            </span>
+          {presets.length > 0 && (
+            <ul className="sound-list">
+              {presets.map((pr) => (
+                <li key={pr.id}>
+                  <span className="grow">{pr.name}</span>
+                  <button onClick={() => confirm(`'${pr.name}' 설정으로 바꿀까요? 지금 설정은 덮어써져요.`) && loadPreset(pr.id)}>바꾸기</button>
+                  <button className="danger" onClick={() => confirm(`'${pr.name}' 을(를) 지울까요?`) && deletePreset(pr.id)}>
+                    삭제
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="adv-row">
+            <div className="adv-text">
+              <b>숫자 읽기</b>
+              <span className="muted small">게임 숫자 모양이 들어 있어서 따로 할 일은 없어요. 이 PC 에 맞춰 자동으로 더 배워요{learned ? ` (${learned}/10)` : ""}.</span>
+            </div>
+            {learned > 0 && (
+              <button onClick={() => confirm("이 PC 에서 더 배운 숫자 모양을 지울까요? (기본 숫자 모양은 그대로예요)") && resetLearnedDigits()}>배운 것 지우기</button>
+            )}
           </div>
-        </section>
-        <section className="modal-section">
-          <h4>설정 백업</h4>
-          <div className="field-row">
-            <button onClick={exportProfile}>설정 파일로 내보내기</button>
-            <label className="file-btn">
-              설정 파일 불러오기
-              <input type="file" accept="application/json" onChange={(e) => importProfile(e.target.files)} />
-            </label>
+          <div className="adv-row">
+            <div className="adv-text">
+              <b>처음 상태로</b>
+              <span className="muted small">모든 설정·영역·등록한 아이콘을 지워요</span>
+            </div>
             <button
               className="danger"
               onClick={() => {
                 if (confirm("모든 설정을 처음 상태로 되돌릴까요? (선택한 영역·등록한 아이콘도 지워져요)")) profileStore.set(() => defaultProfile());
               }}
             >
-              설정 초기화
+              초기화
             </button>
           </div>
-        </section>
+        </details>
       </div>
     </div>
   );

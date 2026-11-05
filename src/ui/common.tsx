@@ -1,3 +1,5 @@
+import type { PanelId } from "../state/profile";
+import { PanelIssues } from "./SetupChecklist";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { debugCrops, liveStore } from "../engine/engine";
 
@@ -86,6 +88,7 @@ export function NumberInput({
 }
 
 export function Panel({
+  id,
   title,
   icon,
   badge,
@@ -94,6 +97,8 @@ export function Panel({
   onToggleCollapse,
   children,
 }: {
+  /** 기능 칸 이름: 그 칸의 문제 안내를 칸 안에 보여 준다 */
+  id?: PanelId;
   title: string;
   /** 제목 앞 아이콘 (게임 아이콘 그림 주소 또는 그림 문자) */
   icon?: string;
@@ -120,6 +125,7 @@ export function Panel({
         {badge}
         <div className="panel-actions">{actions}</div>
       </header>
+      {id && <PanelIssues id={id} />}
       {!collapsed && <div className="panel-body">{children}</div>}
     </section>
   );
@@ -145,6 +151,9 @@ export function LeadSelect({ value, onChange, options = LEADS }: { value: number
 export function ItemIcon({ src, fallback = "•" }: { src?: string | null; fallback?: string }) {
   return <span className="item-icon">{src ? <img src={src} alt="" /> : <span>{fallback}</span>}</span>;
 }
+
+/** 연결 전 상태: 위쪽 안내 줄이 연결을 알려 주므로 줄마다 되풀이하지 않는다 */
+export const NOT_CONNECTED = { tone: "idle", text: "—" } as const;
 
 export function StatusDot({ tone, children }: { tone: "ok" | "warn" | "alert" | "idle" | "info"; children: ReactNode }) {
   return <span className={`status status-${tone}`}>{children}</span>;

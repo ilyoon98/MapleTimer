@@ -5,7 +5,7 @@ import { liveStore } from "../../engine/engine";
 import { SKILL_PRESETS, newSkill, profileStore, setRegion, shortName, updateSkill, type SkillEntry } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
-import { Panel, StatusDot, Toggle, fmtRemaining } from "../common";
+import { Panel, StatusDot, Toggle, fmtRemaining, NOT_CONNECTED } from "../common";
 import { gameIconUrl } from "../gameArt";
 import { pickFavorites } from "../pickers";
 
@@ -13,7 +13,7 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   const skills = profileStore.use((p) => p.skills);
   const missing = SKILL_PRESETS.filter((preset) => !skills.some((s) => s.presetId === preset.id));
   return (
-    <Panel title="스킬 알림" icon={gameIconUrl("janus")} collapsed={collapsed} onToggleCollapse={onToggleCollapse}
+    <Panel id="skills" title="스킬 알림" icon={gameIconUrl("janus")} collapsed={collapsed} onToggleCollapse={onToggleCollapse}
       actions={missing.map((preset) => <button key={preset.id} onClick={() => profileStore.set((p) => ({ ...p, skills: [...p.skills, newSkill(preset.id)] }))}>+ {shortName(preset.name)}</button>)}>
       {skills.length === 0 && <div className="empty">사용할 스킬을 추가해 주세요.</div>}
       {skills.map((s) => <SkillRow key={s.id} skill={s} />)}
@@ -31,7 +31,7 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const remaining = live?.expiresAt != null ? live.expiresAt - now : null;
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
   if (!s.enabled) status = { tone: "idle", text: "꺼짐" };
-  else if (!sharing) status = { tone: "warn", text: "화면 공유 필요" };
+  else if (!sharing) status = NOT_CONNECTED;
   else if (onFavorites && !favOk) status = { tone: "warn", text: "즐겨찾기 위치 확인 필요" };
   else if (remaining != null && remaining <= s.leadSec * 1000) status = { tone: "alert", text: remaining > 0 ? "곧 종료" : "종료됨" };
   else if (remaining != null) status = { tone: "ok", text: "지속 중" };
