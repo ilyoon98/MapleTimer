@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { audioEngine } from "./alerts/audio";
 import { screenCapture } from "./capture/screenCapture";
 import { liveStore, startEngine, stopRingingAlerts } from "./engine/engine";
 import { profileStore, type PanelId } from "./state/profile";
@@ -18,7 +17,8 @@ import { GuideModal } from "./ui/Guide";
 import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
 import { CapturePicker } from "./ui/CapturePicker";
-import { desktop } from "./platform/desktop";
+import { audioEngine } from "./alerts/audio";
+import { connectMaple, connectStore, startCapture } from "./ui/connect";
 
 const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => void }) => React.ReactNode> = {
   skills: (p) => <SkillsPanel {...p} />,
@@ -57,35 +57,18 @@ function ShareChip() {
   const cap = useCaptureState();
   const stale = liveStore.use((s) => s.captureStale);
   const black = liveStore.use((s) => s.captureBlack);
-  const [err, setErr] = useState<string | null>(null);
-  const [picking, setPicking] = useState(false);
+  const err = connectStore.use((s) => s.error);
+  const picking = connectStore.use((s) => s.picking);
+  const setErr = (error: string | null) => connectStore.set({ error });
+  const closePicking = () => connectStore.set({ picking: false });
   const [viewportPick, setViewportPick] = useState(false);
-  const start = async () => {
-    setErr(null);
-    audioEngine.unlock();
-    try {
-      await screenCapture.start();
-    } catch (e) {
-      const name = (e as Error).name;
-      if (name !== "NotAllowedError") setErr((e as Error).message);
-      if (desktop) throw e;
-    }
-  };
+  const start = startCapture;
   if (cap.state === "live")
     return (
       <div className={`share-chip share-live ${stale || black ? "share-stale" : ""}`}>
-        <span className="dot" />{" "}
-        {black ? (
-          <span title="게임 창만 공유하면 검게 나오는 경우가 있어요. '다른 창 선택' → '전체 화면' 탭에서 모니터를 고르세요.">
-            화면이 검게 나와요 → '다른 창 선택'에서 전체 화면 선택
-          </span>
-        ) : stale ? (
-          "화면이 멈춤 (게임 창 최소화?)"
-        ) : (
-          "화면 공유 중"
-        )}{" "}
-        {cap.w > 0 && <span className="mono">{cap.w}×{cap.h}</span>}
-        <button onClick={() => desktop ? setPicking(true) : void start()}>다른 창 선택</button>
+        <span className="dot" /> {black ? "화면이 검음" : stale ? "화면 멈춤" : "연결됨"}
+        {cap.w > 0 && <span className="mono muted" title="공유 중인 게임 화면 크기">{cap.w}×{cap.h}</span>}
+        <button onClick={connectMaple}>다른 창 선택</button>
         <button onClick={() => screenCapture.stop("user")}>중지</button>
         <button onClick={() => setViewportPick(true)}>게임 영역</button>
         {viewportPick && <RegionPicker raw title="게임 영역 맞추기" guide={['검은 여백과 창 테두리를 빼고 게임 화면만 선택하세요.']} onClose={() => setViewportPick(false)}
@@ -95,18 +78,18 @@ function ShareChip() {
             profileStore.set(p=>({...p,gameViewports:{...p.gameViewports,[size]:{x:region.x,y:region.y,w:region.w,h:region.h}}}));
             setViewportPick(false);
           }} />}
-        {picking && <CapturePicker onSelect={start} onClose={() => setPicking(false)} />}
+        {picking && <CapturePicker onSelect={start} onClose={closePicking} />}
       </div>
     );
   return (
     <div className="share-chip share-off">
-      <span className="dot" /> {cap.state === "starting" ? "선택 대기 중…" : cap.state === "ended" ? "화면 공유가 끝났어요" : "화면 공유 필요"}
-      <button className="primary" onClick={() => desktop ? setPicking(true) : void start()} disabled={cap.state === "starting"}>
+      <span className="dot" /> {cap.state === "starting" ? "선택 대기 중…" : cap.state === "ended" ? "공유 끊김" : "연결 안 됨"}
+      <button className="primary" onClick={connectMaple} disabled={cap.state === "starting"}>
         메이플 연결
       </button>
       {err && <span className="error">{err}</span>}
       {cap.state === "ended" && screenCapture.error && <span className="error">{screenCapture.error}</span>}
-      {picking && <CapturePicker onSelect={start} onClose={() => setPicking(false)} />}
+      {picking && <CapturePicker onSelect={start} onClose={closePicking} />}
     </div>
   );
 }
@@ -215,7 +198,7 @@ export function App() {
 
       <main className="panels">
         {order.map((id) => (
-          <div key={id} className="panel-slot">
+          <div key={id} className="panel-slot" data-panel={id}>
             {editOrder && (
               <div className="order-controls">
                 <button onClick={() => move(id, -1)}>▲</button>

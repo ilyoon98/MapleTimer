@@ -1,10 +1,10 @@
 import { liveStore } from "../../engine/engine";
-import { profileStore, setRegion, type RuneSettings } from "../../state/profile";
+import { profileStore, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { RUNE_TEXT } from "../../alerts/speech";
 import { DebugCrop, Panel, StatusDot, Toggle, fmtClock } from "../common";
 import { RUNE_ICON } from "../gameArt";
-import { openPicker } from "../pickerStore";
+import { pickMinimap } from "../pickers";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
@@ -26,16 +26,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
   const live = liveStore.use((l) => l.rune);
   const st = STATUS[live.status];
 
-  const pickRegion = () =>
-    openPicker({
-      title: "미니맵 영역 선택",
-      guide: [
-        "미니맵의 헤더·버튼·필터 창은 빼고, 안쪽 지도 부분만 선택하세요.",
-        "맵마다 미니맵 크기가 달라요. 마을이 아닌 실제 사냥터에서 선택해 주세요.",
-      ],
-      initial: region,
-      onConfirm: ({ region }) => setRegion("minimap", region),
-    });
+  const pickRegion = pickMinimap;
 
   return (
     <Panel title="룬 알림" icon={RUNE_ICON} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>

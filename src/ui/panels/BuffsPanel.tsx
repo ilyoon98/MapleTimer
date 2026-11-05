@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { storeTemplate, trimToIconBorder } from "../../cv/match";
 import { liveStore } from "../../engine/engine";
-import { BUFF_PRESETS, newBuffPreset, profileStore, setRegion, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
+import { BUFF_PRESETS, newBuffPreset, profileStore, updateBuff, type BuffEntry, type BuffPresetId } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
 import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { gameIconUrl } from "../gameArt";
 import { openPicker } from "../pickerStore";
+import { pickBuffbar } from "../pickers";
 import { BuffbarSteps } from "../guideArt";
 
 
@@ -23,16 +24,7 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
   // 아직 아무것도 등록 안 했으면 설정 방법을 펼쳐서 보여 준다
   const [howto, setHowto] = useState(!isCore && buffs.length === 0);
 
-  const pickRegion = () =>
-    openPicker({
-      title: "우상단 버프칸 영역 선택",
-      guide: [
-        "화면 오른쪽 위 버프 아이콘들이 뜨는 영역 전체를 넉넉하게 선택하세요.",
-        "인게임 설정: UI 크기 [최적 비율], 퀵슬롯&버프 시간표시 [중앙, 크게], 버프 정렬 옵션 모두 켜기를 권장해요.",
-      ],
-      initial: region,
-      onConfirm: ({ region }) => setRegion("buffbar", region),
-    });
+  const pickRegion = pickBuffbar;
 
   return (
     <Panel

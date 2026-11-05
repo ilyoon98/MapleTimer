@@ -223,48 +223,41 @@ input[type="text"] {
   padding: 1px 6px;
 }
 
-.checklist {
-  background: var(--card);
+.notice {
+  background: var(--warn-soft);
   border: 1px solid var(--warn);
   border-radius: 12px;
   margin-bottom: 12px;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.checklist-done {
-  border-color: var(--accent);
-}
-.checklist-head {
+.notice-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 14px;
-  cursor: pointer;
-  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 32px;
+  font-size: 14px;
 }
-.checklist-done .checklist-head b {
-  color: var(--accent);
-}
-.checklist-items {
-  list-style: none;
-  margin: 0;
-  padding: 0 14px 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 4px 16px;
+.notice-mark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--warn);
+  color: var(--bg);
+  font-weight: 800;
   font-size: 13px;
+  display: grid;
+  place-items: center;
 }
-.ck-mark {
-  display: inline-block;
-  width: 18px;
-  font-weight: 700;
+.notice-text {
+  flex: 1;
+  min-width: 0;
 }
-.ck-done .ck-mark {
-  color: var(--accent);
-}
-.ck-todo .ck-mark {
-  color: var(--warn);
-}
-.ck-optional {
-  color: var(--muted);
+.notice-row button {
+  flex: none;
 }
 .panels {
   display: flex;
@@ -830,6 +823,18 @@ input[type="text"] {
   50% {
     background: var(--bg);
   }
+}
+.pip-issue {
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pip-next {
   display: flex;

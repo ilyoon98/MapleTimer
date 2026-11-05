@@ -5,31 +5,9 @@ import { STALL_DEFAULT_SEC, STALL_RANGE, profileStore, setRegion, type StallMode
 import { AlertSettings } from "../AlertSettings";
 import { STALL_TEXT } from "../../alerts/speech";
 import { NumberInput, Panel, StatusDot, Toggle, fmtClock } from "../common";
-import { openPicker } from "../pickerStore";
+import { STALL_MODES, pickStallRegion } from "../pickers";
 
-const MODES: Record<StallMode, { label: string; guide: string[] }> = {
-  exp: {
-    label: "경험치 인식",
-    guide: [
-      "화면 아래 경험치바에서 경험치 숫자와 % 가 보이는 부분을 선택하세요.",
-      "사냥 중 경험치가 오르면 이 영역이 바뀌고, 일정 시간 안 바뀌면 멈춘 것으로 봐요.",
-    ],
-  },
-  cooldown: {
-    label: "쿨타임 인식",
-    guide: [
-      "사냥 중 계속 쓰는 짧은 쿨타임 스킬의 퀵슬롯 아이콘을 선택하세요.",
-      "아이콘(쿨타임 표시)이 일정 시간 안 바뀌면 멈춘 것으로 봐요.",
-    ],
-  },
-  mana: {
-    label: "마나 인식",
-    guide: [
-      "MP 숫자와 MP 바만 선택하세요 (HP 는 빼고).",
-      "MP 가 일정 시간 안 바뀌면 멈춘 것으로 봐요. 마을에서 MP 가 자연 회복되면 변화로 칠 수 있어요.",
-    ],
-  },
-};
+const MODES = STALL_MODES;
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
   off: { tone: "idle", text: "꺼짐" },
@@ -54,16 +32,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
   const s = STATUS[live.status];
   const [lo, hi] = STALL_RANGE[st.mode];
 
-  const pickRegion = () =>
-    openPicker({
-      title: st.mode === "exp" ? "경험치 숫자 높이 선택" : `사냥 멈춤 · ${MODES[st.mode].label} 영역 선택`,
-      selection: st.mode === "exp" ? "experience-height" : undefined,
-      guide: st.mode === "exp" ? ["경험치 숫자가 있는 높이를 클릭하세요. 가로는 중앙 40%로 맞춰져요."] : MODES[st.mode].guide,
-      initial: region,
-      onConfirm: ({ region }) => st.mode === "exp"
-        ? setStall({ expHeightRatio: 1 - (region.y + region.h / 2) / region.frameH })
-        : setRegion("stall", region),
-    });
+  const pickRegion = pickStallRegion;
 
   return (
     <Panel title="사냥 멈춤 알림" icon="🐾" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>

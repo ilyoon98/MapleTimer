@@ -7,6 +7,7 @@ import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine"
 import { createStore } from "../state/createStore";
 import { PIP_ALERT_COLORS, PIP_SIZES, profileStore, shortName, type PipAlertColor } from "../state/profile";
 import { fmtRemaining } from "./common";
+import { useIssues } from "./issues";
 import { pauseTimer, startTimer } from "./panels/TimersPanel";
 
 declare global {
@@ -116,6 +117,17 @@ interface Item {
   title?: string;
 }
 
+/** 알림이 안 울릴 수 있는 문제를 한 줄로 (가장 급한 것 하나만). 고치는 건 본 창에서 */
+function PipIssue() {
+  const issue = useIssues()[0];
+  if (!issue) return null;
+  return (
+    <div className="pip-issue" title={issue.text}>
+      ⚠ {issue.short}
+    </div>
+  );
+}
+
 /** 보스용: 특수 코어 쿨타임 하나만 크게 */
 function CorePipView() {
   const live = liveStore.use((s) => s);
@@ -128,6 +140,7 @@ function CorePipView() {
   return (
     <div className={`pip pip-core ${soon ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={alertColorStyle(p.pipAlertColor)}>
       <PipBackground />
+      <PipIssue />
       <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
       <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
       <div className="pip-core-state muted">{!core ? "특수 코어 알림에서 '+ 추가'를 눌러 주세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
@@ -230,6 +243,7 @@ function PipView() {
   return (
     <div className={`pip ${live.ringing.length ? "pip-ringing" : ""} pip-${p.pipSize} pip-emph-${p.pipEmphasis} ${p.pipBackground ? "pip-with-bg" : ""}`} style={alertColorStyle(p.pipAlertColor)}>
       <PipBackground />
+      <PipIssue />
       {next && (
         <div className="pip-next">
           <span className="pip-next-label">다음 알림</span>

@@ -7,7 +7,7 @@ import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
 import { Panel, StatusDot, Toggle, fmtRemaining } from "../common";
 import { gameIconUrl } from "../gameArt";
-import { openPicker } from "../pickerStore";
+import { pickFavorites } from "../pickers";
 
 export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const skills = profileStore.use((p) => p.skills);
@@ -29,15 +29,6 @@ function SkillRow({ skill: s }: { skill: SkillEntry }) {
   const onFavorites = s.where === "favorites";
   const favOk = sharing && regionValidFor(favoritesRegion(p, screenCapture.width, screenCapture.height), screenCapture.width, screenCapture.height);
   const remaining = live?.expiresAt != null ? live.expiresAt - now : null;
-  const pickFavorites = () => openPicker({
-    title: "버프 즐겨찾기 위치 선택",
-    guide: ["즐겨찾기 버프 칸들을 넉넉하게 선택하세요. 두 스킬에 함께 적용돼요."],
-    initial: p.regions.favorites,
-    onConfirm: ({ region }) => {
-      setRegion("favorites", region);
-      profileStore.set((p) => ({ ...p, favoritesPosition: "manual" }));
-    },
-  });
   let status: { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string };
   if (!s.enabled) status = { tone: "idle", text: "꺼짐" };
   else if (!sharing) status = { tone: "warn", text: "화면 공유 필요" };
