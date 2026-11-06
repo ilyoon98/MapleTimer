@@ -20,6 +20,7 @@ import { SettingsModal } from "./ui/SettingsModal";
 import { SetupChecklist } from "./ui/SetupChecklist";
 import { AppVersion, UpdateBanner } from "./ui/UpdateBanner";
 import { CapturePicker } from "./ui/CapturePicker";
+import { DownloadButton } from "./ui/DownloadButton";
 import { BuffLocationPicker } from "./ui/BuffLocationPicker";
 import { buffLocationStore } from "./ui/buffLocationStore";
 import { audioEngine } from "./alerts/audio";
@@ -165,6 +166,7 @@ export function App() {
         <ThemeButton />
         <button onClick={() => setModal("settings")}>설정</button>
         <ShareChip />
+        <DownloadButton />
       </header>
       {Object.keys(persistenceErrors).length>0&&<section className="notice" role="alert">
         <span>{Object.values(persistenceErrors)[0]}</span> <button onClick={()=>setModal("settings")}>설정 열기</button>

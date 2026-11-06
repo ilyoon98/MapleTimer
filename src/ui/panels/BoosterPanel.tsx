@@ -1,3 +1,4 @@
+import { panelIcon } from "../gameArt";
 import { liveStore } from "../../engine/engine";
 import { profileStore, type BoosterSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
@@ -25,7 +26,7 @@ export function BoosterPanel({ collapsed, onToggleCollapse }: { collapsed: boole
   const remaining = live.endsAt != null ? live.endsAt - now : null;
 
   return (
-    <Panel title="부스터 종료 알림" icon="🚀" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <Panel title="부스터 종료 알림" icon={panelIcon("booster", "🚀")} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div className={`row ${b.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={b.enabled} onChange={(v) => setBooster({ enabled: v })} />

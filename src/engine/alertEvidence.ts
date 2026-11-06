@@ -2,7 +2,7 @@ import { onAlertFired, type AlertFiredEvent } from "../alerts/alertRunner";
 import { screenCapture } from "../capture/screenCapture";
 import { stallRegion } from "../capture/detectionRegions";
 import { regionValidFor, type SavedRegion } from "../capture/types";
-import { saveAlertEvidence } from "../state/alertEvidence";
+import { saveAlertEvidence, type EvidenceVerdict } from "../state/alertEvidence";
 import { profileStore, type Profile } from "../state/profile";
 import { buffRegion, preciseSkillBuffs } from "./buffs";
 import { liveStore } from "./live";
@@ -22,10 +22,10 @@ const pending = new Set<Promise<void>>();
 const encode=(canvas:HTMLCanvasElement,type="image/png")=>new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,type,.85));
 
 /** 알림 시점의 공유 게임만 보관한다. 창 띄우기·다운로드·전체 모니터 캡처는 하지 않는다. */
-export function captureAlertEvidence(event: AlertFiredEvent) {
-  if (screenCapture.state !== "live" || pending.size >= 3) return;
+export function captureAlertEvidence(event: AlertFiredEvent, verdict: EvidenceVerdict | null = null) {
+  if (screenCapture.state !== "live" || pending.size >= 3) return false;
   const full=screenCapture.snapshot(false);
-  if(!full)return;
+  if(!full)return false;
   const p=profileStore.get(),w=screenCapture.width,h=screenCapture.height;
   const region=alertRegion(event.key,p,w,h);
   const crop=regionValidFor(region,w,h)?screenCapture.crop(region):null;
@@ -48,11 +48,17 @@ export function captureAlertEvidence(event: AlertFiredEvent) {
     const [frame,image]=await Promise.all([overviewJob,cropJob]);
     await saveAlertEvidence({...event,id:`${sessionId}:${event.at}:${event.key}:${event.playIndex}`,
       frameId,sessionId,drawnAt,frameWidth:w,frameHeight:h,muted:p.muted,masterVolume:p.masterVolume,
-      frame,crop:image&&region?{rect:{x:region.x,y:region.y,w:region.w,h:region.h},image}:null,live:readings});
+      frame,crop:image&&region?{rect:{x:region.x,y:region.y,w:region.w,h:region.h},image}:null,live:readings,verdict});
   }).catch(()=>{});
   pending.add(work);void work.finally(()=>pending.delete(work));
+  return true;
+}
+
+/** '방금 놓쳤어요': 알림이 안 울린 그 순간의 화면을 '놓침'으로 남긴다 */
+export function captureMissedAlert(key: string, label: string) {
+  return captureAlertEvidence({ at: Date.now(), key, label, playIndex: 0 }, "missed");
 }
 
 let started=false;
-export function startAlertEvidence(){if(!started){started=true;onAlertFired(captureAlertEvidence);}}
+export function startAlertEvidence(){if(!started){started=true;onAlertFired(e=>{captureAlertEvidence(e);});}}
 export async function flushAlertEvidence(){await Promise.all([...pending]);}

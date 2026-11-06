@@ -5,6 +5,8 @@ import { appTicker } from "../core/ticker";
 import { SPECIAL_CORE_ENABLED } from "../state/features";
 import { desktop } from "../platform/desktop";
 import { liveStore, manualSkillCast, stopRingingAlerts } from "../engine/engine";
+import { captureMissedAlert } from "../engine/alertEvidence";
+import { preciseBuffId } from "../engine/buffs";
 import { createStore } from "../state/createStore";
 import {
   PIP_ALERT_COLORS,
@@ -12,6 +14,7 @@ import {
   PIP_SIZES,
   PIP_TEXT,
   defaultProfile,
+  preciseIcon,
   profileStore,
   shortName,
   type PipAlertColor,
@@ -261,6 +264,50 @@ function PipGear() {
   );
 }
 
+/** 울려야 했는데 안 울린 알림: 켜 둔 기능 중 하나를 누르면 그 순간 화면을 '놓침'으로 남긴다 */
+export function missedOptions(p: ReturnType<typeof profileStore.get>): Array<{ key: string; label: string }> {
+  const out: Array<{ key: string; label: string }> = [];
+  for (const s of p.skills) if (s.enabled) out.push({ key: preciseIcon(s) ? `buff:${preciseBuffId(s.id)}` : `skill:${s.id}`, label: shortName(s.name) });
+  for (const b of p.buffs) if (b.enabled && (SPECIAL_CORE_ENABLED || b.kind !== "cooldown")) out.push({ key: `buff:${b.id}`, label: b.name });
+  if (p.booster.enabled) out.push({ key: "booster", label: "부스터" });
+  if (p.rune.enabled) out.push({ key: "rune", label: "룬" });
+  if (p.stall.enabled) out.push({ key: "stall", label: "사냥 멈춤" });
+  return out;
+}
+
+function PipMissed() {
+  const p = profileStore.use((s) => s);
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(null), 1500);
+    return () => clearTimeout(t);
+  }, [done]);
+  const options = missedOptions(p);
+  if (screenCapture.state !== "live" || !options.length) return null;
+  const pick = (o: { key: string; label: string }) => {
+    setOpen(false);
+    setDone(captureMissedAlert(o.key, `놓침: ${o.label}`) ? `'${o.label}' 남겼어요` : "지금은 못 남겨요");
+  };
+  return (
+    <>
+      <button className="pip-missed" onClick={() => setOpen(!open)} title="알림이 안 울렸으면 눌러서 그 순간을 남겨요">
+        {done ?? "놓침"}
+      </button>
+      {open && (
+        <div className="pip-missed-menu" role="menu" aria-label="안 울린 알림">
+          <div className="pip-missed-head">어떤 알림이 안 울렸나요?</div>
+          {options.map((o) => (
+            <button key={o.key} role="menuitem" onClick={() => pick(o)}>{o.label}</button>
+          ))}
+          <button className="pip-missed-cancel" onClick={() => setOpen(false)}>닫기</button>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** 알림이 안 울릴 수 있는 문제를 한 줄로 (가장 급한 것 하나만). 고치는 건 본 창에서 */
 function PipIssue() {
   const issue = useIssues()[0];
@@ -428,6 +475,7 @@ function PipView() {
           {p.muted ? "🔇" : "🔊"}
         </button>
         {SPECIAL_CORE_ENABLED && p.buffs.some((b) => b.kind === "cooldown") && <ModeSwitch />}
+        <PipMissed />
       </div>
       {live.ringing.length > 0 && (
         <button className="ringing-btn" onClick={stopRingingAlerts}>

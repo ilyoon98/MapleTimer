@@ -2,6 +2,9 @@ import type { AlertFiredEvent } from "../alerts/alertRunner";
 import type { Rect } from "../capture/types";
 import type { LiveState } from "../engine/live";
 
+/** 사람이 남기는 정답: 맞게 울림 / 잘못 울림 / 울려야 했는데 안 울림 */
+export type EvidenceVerdict = "right" | "wrong" | "missed";
+
 export interface AlertEvidence extends AlertFiredEvent {
   id: string;
   frameId: number;
@@ -15,6 +18,7 @@ export interface AlertEvidence extends AlertFiredEvent {
   frame: Blob | null;
   crop: { rect: Rect; image: Blob } | null;
   live: Pick<LiveState, "skills" | "rune" | "stall" | "booster" | "buffs" | "captureStale" | "captureBlack">;
+  verdict?: EvidenceVerdict | null;
 }
 
 export const EVIDENCE_MAX_COUNT = 30;
@@ -63,6 +67,19 @@ export async function saveAlertEvidence(entry: AlertEvidence) {
       };
     });
   } catch { /* 저장을 못 해도 이번 실행 중에는 메모리에서 확인할 수 있다 */ }
+}
+
+/** 맞아요/틀렸어요 표시. 같은 표시를 다시 누르면 지운다 (null) */
+export async function markAlertEvidence(id: string, verdict: EvidenceVerdict | null) {
+  memory = memory.map(e => e.id === id ? { ...e, verdict } : e);
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve,reject)=>{
+      const tx = db.transaction(STORE,"readwrite"),store=tx.objectStore(STORE),req=store.get(id);
+      tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+      req.onsuccess=()=>{ if(req.result) store.put({ ...req.result, verdict }); };
+    });
+  } catch { /* 메모리에는 남았다 */ }
 }
 
 export async function listAlertEvidence(): Promise<AlertEvidence[]> {

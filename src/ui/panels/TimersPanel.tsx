@@ -1,3 +1,4 @@
+import { panelIcon } from "../gameArt";
 import { useState } from "react";
 import { liveStore, resetTimerAlert } from "../../engine/engine";
 import { leadText } from "../../alerts/speech";
@@ -26,7 +27,7 @@ export function TimersPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   return (
     <Panel
       title="일반 타이머"
-      icon="⏰"
+      icon={panelIcon("timers", "⏰")}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       actions={

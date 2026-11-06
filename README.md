@@ -27,6 +27,7 @@
 
 알림이 울릴 때 게임 화면·해당 감지 영역·판독값을 자동으로 남깁니다. **알림 캡처 보기**에서 확인하거나 진단 파일에 함께 저장할 수 있습니다.
 기록은 이 PC 안에 최대 30건·24 MiB만 보관합니다. 플레이 중 팝업이나 별도 파일 창은 뜨지 않습니다.
+각 캡처에 **맞아요 / 틀렸어요** 를 눌러 두고, 울려야 했는데 안 울렸으면 PIP 아래 **놓침** 을 눌러 그 기능을 고르세요. 이 표시가 진단 파일에 같이 담겨 자동 분석에 쓰입니다.
 
 0.3.1: 마을의 가는 분홍 표식을 룬으로 잘못 읽는 문제와, 퀘스트 글자가 겹치면 부스터 위치 탐색이 실패하는 문제를 수정했습니다.
 
@@ -61,6 +62,7 @@ npm run desktop:pack   # 설치 파일 만들기 → release/
 ```
 
 - `npm run desktop:release` — 설치 파일을 만들어 GitHub Releases 에 올립니다 (환경 변수 `GH_TOKEN` 필요). 올리기 전에 `package.json` 의 `version` 을 올리세요. 앱은 `latest.yml` 을 보고 새 버전을 받습니다.
+- `npm run evidence:check -- <진단 파일 또는 폴더>` — 알림 캡처를 지금 감지 코드로 다시 읽어 기능별로 정리합니다 (맞음·틀림·놓침, 연달아 울림·검은 화면 같은 의심). '틀림'·'놓침' 기록은 `src/detect/fixtures/evidence/` 에 회귀 테스트로 저장되고, `npm test` 가 매번 확인합니다. 부스터 '틀림'은 실제 남은 초를 `expected.value` 에 채워야 돌고, 고쳐서 통과하면 `fixed: true` 로 바꿉니다.
 - `node scripts/smoke-desktop.mjs` — 앱 자동 점검 (`--check-settings --fresh-profile`, 설치 결과는 `--packaged`).
 - `http://localhost:5173/?demo` — 개발 모드 전용 가짜 게임 화면 (`k` 스킬, `s` 경험치 멈춤, `b` 버프 켜고 끄기).
 - `http://localhost:5173/?replay` — 진단 파일의 30초 녹화를 화면 공유처럼 재생.

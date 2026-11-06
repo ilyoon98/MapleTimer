@@ -1,3 +1,4 @@
+import { panelIcon } from "../gameArt";
 import { screenCapture } from "../../capture/screenCapture";
 import { stallRegion } from "../../capture/detectionRegions";
 import { liveStore } from "../../engine/engine";
@@ -37,7 +38,7 @@ export function StallPanel({ collapsed, onToggleCollapse }: { collapsed: boolean
   const pickRegion = pickStallRegion;
 
   return (
-    <Panel id="stall" title="사냥 멈춤 알림" icon="🐾" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <Panel id="stall" title="사냥 멈춤 알림" icon={panelIcon("stall", "🐾")} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div className={`row ${st.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={st.enabled} onChange={(v) => setStall({ enabled: v })} />

@@ -120,7 +120,7 @@ export function Panel({
         <button className="collapse-btn" onClick={onToggleCollapse} aria-label={collapsed ? "펼치기" : "접기"}>
           {collapsed ? "▸" : "▾"}
         </button>
-        {icon && <ItemIcon src={icon.startsWith("data:") ? icon : null} fallback={icon} />}
+        {icon && <ItemIcon src={/^(data:|\/|https?:)/.test(icon) ? icon : null} fallback={icon} />}
         <h2>{title}</h2>
         {badge}
         <div className="panel-actions">{actions}</div>
