@@ -393,10 +393,17 @@ function PipView() {
       text: rem == null ? (b.kind === "cooldown" ? "사용 가능" : l?.present ? "있음" : "없음") : undefined,
     });
   }
-  if (p.booster.enabled && live.booster.endsAt != null) {
-    const rem = live.booster.endsAt - now;
-    const urgent = rem <= p.booster.leadSec * 1000;
-    items.push({ key: "booster", name: "부스터", remaining: rem, urgent, tone: urgent ? "alert" : "running", alertIn: rem - p.booster.leadSec * 1000 });
+  // 본 창에서 켜 두면 부스터가 없어도 줄을 남겨 지금 상태를 보여 준다
+  if (p.booster.enabled) {
+    if (live.booster.endsAt != null) {
+      const rem = live.booster.endsAt - now;
+      const urgent = rem <= p.booster.leadSec * 1000;
+      items.push({ key: "booster", name: "부스터", remaining: rem, urgent, tone: urgent ? "alert" : "running", alertIn: rem - p.booster.leadSec * 1000 });
+    } else {
+      const st = live.booster.status;
+      const text = st === "no-region" ? "찾는 중" : st === "reading" ? "읽는 중" : st === "searching" ? "없음" : "—";
+      items.push({ key: "booster", name: "부스터", remaining: null, urgent: false, tone: "waiting", alertIn: null, text });
+    }
   }
   for (const t of p.timers) {
     if (!t.enabled) continue;
@@ -454,7 +461,7 @@ function PipView() {
             title={it.title}
           >
             <span className="pip-name">{it.name}</span>
-            <span className="pip-time mono">{it.text ?? fmtRemaining(it.remaining)}</span>
+            <span className={`pip-time ${it.text ? "pip-time-word" : "mono"}`}>{it.text ?? fmtRemaining(it.remaining)}</span>
             {p.timers.some((t) => t.id === it.key) && <PipTimerButton id={it.key} />}
           </div>
         ))}

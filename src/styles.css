@@ -759,6 +759,12 @@ input[type="text"] {
 .pip-clickable {
   cursor: pointer;
 }
+/* '찾는 중'·'없음' 같은 상태 글자는 숫자보다 작고 흐리게 */
+.pip .pip-time.pip-time-word {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
 .pip-clickable:hover {
   border-color: var(--accent);
 }
