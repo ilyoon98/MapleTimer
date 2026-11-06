@@ -6,7 +6,7 @@ import { SKILL_PRESETS, newSkill, profileStore, setRegion, shortName, updateSkil
 import { AlertSettings } from "../AlertSettings";
 import { leadText } from "../../alerts/speech";
 import { Panel, StatusDot, Toggle, fmtRemaining, NOT_CONNECTED } from "../common";
-import { gameIconUrl } from "../gameArt";
+import { gameIconUrl, panelIcon } from "../gameArt";
 import { addSkillAtCurrentLocation, currentSkillBuffLocation, SKILL_BUFF_LOCATIONS } from "../../state/skillBuffLocation";
 import { pickFavorites } from "../pickers";
 
@@ -16,7 +16,7 @@ export function SkillsPanel({ collapsed, onToggleCollapse }: { collapsed: boolea
   const location=currentSkillBuffLocation(p);
   const missing = SKILL_PRESETS.filter((preset) => !skills.some((s) => s.presetId === preset.id));
   return (
-    <Panel id="skills" title="스킬 알림" icon={gameIconUrl("janus")} collapsed={collapsed} onToggleCollapse={onToggleCollapse}
+    <Panel id="skills" title="스킬 알림" icon={panelIcon("skills", gameIconUrl("janus"))} collapsed={collapsed} onToggleCollapse={onToggleCollapse}
       actions={missing.map((preset) => <button key={preset.id} onClick={() => profileStore.set((p) => addSkillAtCurrentLocation(p,newSkill(preset.id)))}>+ {shortName(preset.name)}</button>)}>
       {skills.length>0&&<div className="skills-location"><span className="muted">버프 위치</span><button aria-label="버프 위치 선택" onClick={pickFavorites}>{location?SKILL_BUFF_LOCATIONS[location]:"스킬별 위치"} · 변경</button></div>}
       {skills.length === 0 && <div className="empty">사용할 스킬을 추가해 주세요.</div>}

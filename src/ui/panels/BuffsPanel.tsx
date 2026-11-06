@@ -6,7 +6,7 @@ import { BUFF_PRESETS, newBuffPreset, profileStore, updateBuff, type BuffEntry, 
 import { AlertSettings } from "../AlertSettings";
 import { doneText, leadText } from "../../alerts/speech";
 import { NumberInput, Panel, StatusDot, Toggle, fmtRemaining, NOT_CONNECTED } from "../common";
-import { gameIconUrl } from "../gameArt";
+import { gameIconUrl, panelIcon } from "../gameArt";
 import { openPicker } from "../pickerStore";
 import { pickBuffbar } from "../pickers";
 import { BuffbarSteps } from "../guideArt";
@@ -31,7 +31,7 @@ export function BuffsPanel({ kind, collapsed, onToggleCollapse }: { kind: "expir
     <Panel
       id={isCore ? "core" : "buffs"}
       title={isCore ? "특수 코어 알림" : "버프 종료 알림"}
-      icon={isCore ? "💠" : gameIconUrl("fountain")}
+      icon={isCore ? "💠" : panelIcon("buffs", gameIconUrl("fountain"))}
       badge={isCore ? <span className="badge badge-beta">개발 중</span> : undefined}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}

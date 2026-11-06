@@ -3,10 +3,11 @@ import type { StoredTemplate } from "../cv/match";
 
 /**
  * 칸 제목 앞 게임 아이콘: src/assets/icons/<이름>.png (또는 .webp) 를 넣으면 그 그림, 없으면 그림 문자.
- *   timers.png 일반 타이머(재물 획득의 비약) · booster.png 부스터(VIP 부스터) · stall.png 사냥 멈춤
+ *   skills 스킬(솔 야누스) · buffs 버프 종료(에르다) · timers 일반 타이머(재물 획득의 비약) · booster 부스터(VIP 부스터) · stall 사냥 멈춤(EXP) · rune 룬
+ *   (칸 제목용 그림일 뿐, 감지에 쓰는 아이콘은 cv/gameIcons.ts 그대로)
  */
 const PANEL_ICONS = import.meta.glob<string>("../assets/icons/*.{png,webp}", { eager: true, query: "?url", import: "default" });
-export function panelIcon(name: "timers" | "booster" | "stall", fallback: string): string {
+export function panelIcon(name: "skills" | "buffs" | "timers" | "booster" | "stall" | "rune", fallback: string): string {
   return PANEL_ICONS[`../assets/icons/${name}.png`] ?? PANEL_ICONS[`../assets/icons/${name}.webp`] ?? fallback;
 }
 

@@ -3,7 +3,7 @@ import { profileStore, type RuneSettings } from "../../state/profile";
 import { AlertSettings } from "../AlertSettings";
 import { RUNE_TEXT } from "../../alerts/speech";
 import { DebugCrop, Panel, StatusDot, Toggle, fmtClock, NOT_CONNECTED } from "../common";
-import { RUNE_ICON } from "../gameArt";
+import { RUNE_ICON, panelIcon } from "../gameArt";
 import { pickMinimap } from "../pickers";
 
 const STATUS: Record<string, { tone: "ok" | "warn" | "alert" | "idle" | "info"; text: string }> = {
@@ -29,7 +29,7 @@ export function RunePanel({ collapsed, onToggleCollapse }: { collapsed: boolean;
   const pickRegion = pickMinimap;
 
   return (
-    <Panel id="rune" title="룬 알림" icon={RUNE_ICON} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <Panel id="rune" title="룬 알림" icon={panelIcon("rune", RUNE_ICON)} collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div className={`row ${rune.enabled ? "" : "row-off"}`}>
         <div className="row-main">
           <Toggle checked={rune.enabled} onChange={(v) => setRune({ enabled: v })} />

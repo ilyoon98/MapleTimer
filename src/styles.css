@@ -1331,7 +1331,7 @@ input[type="text"] {
 .item-icon img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   image-rendering: pixelated;
 }
 /* 칸 제목줄을 누르면 접히게 */
