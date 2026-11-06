@@ -63,7 +63,8 @@ npm test               # 단위 테스트
 npm run desktop:pack   # 설치 파일 만들기 → release/
 ```
 
-- `npm run desktop:release` — 설치 파일을 만들어 GitHub Releases 에 올립니다 (환경 변수 `GH_TOKEN` 필요). 올리기 전에 `package.json` 의 `version` 을 올리세요. 앱은 `latest.yml` 을 보고 새 버전을 받습니다.
+- **배포**: README 에 `0.3.x: 바뀐 점` 한 줄을 적고 `npm version patch` (버전 올리기 + 커밋 + `v0.3.x` 태그) → `git push --follow-tags`. 태그가 올라가면 GitHub Actions(`.github/workflows/release.yml`)가 Windows 에서 테스트 → 설치 파일 만들기 → Releases 에 `.exe`·`.blockmap`·`latest.yml` 을 올리고, README 의 그 줄을 릴리스 설명으로 씁니다. 따로 토큰이 필요 없습니다. 앱은 `latest.yml` 을 보고 새 버전을 받습니다.
+- `npm run desktop:release` — 같은 일을 이 PC 에서 직접 (환경 변수 `GH_TOKEN` 필요).
 - `npm run evidence:check -- <진단 파일 또는 폴더>` — 알림 캡처를 지금 감지 코드로 다시 읽어 기능별로 정리합니다 (맞음·틀림·놓침, 연달아 울림·검은 화면 같은 의심). '틀림'·'놓침' 기록은 `src/detect/fixtures/evidence/` 에 회귀 테스트로 저장되고, `npm test` 가 매번 확인합니다. 부스터 '틀림'은 실제 남은 초를 `expected.value` 에 채워야 돌고, 고쳐서 통과하면 `fixed: true` 로 바꿉니다.
 - `node scripts/smoke-desktop.mjs` — 앱 자동 점검 (`--check-settings --fresh-profile`, 설치 결과는 `--packaged`).
 - `http://localhost:5173/?demo` — 개발 모드 전용 가짜 게임 화면 (`k` 스킬, `s` 경험치 멈춤, `b` 버프 켜고 끄기).

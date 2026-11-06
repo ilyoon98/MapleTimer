@@ -1,0 +1,71 @@
+# 자동 배포: v0.3.6 같은 버전 태그를 올리면 GitHub 의 Windows 컴퓨터가
+# 테스트 → 설치 파일 만들기 → Releases 에 설치 파일·blockmap·latest.yml 올리기를 한다.
+# (설치된 앱은 latest.yml 을 보고 새 버전을 받는다)
+name: 앱 배포
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 태그와 package.json 버전이 같은지 확인
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "태그($GITHUB_REF_NAME)와 package.json 버전(v$version)이 달라요" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: 테스트
+        run: npm test
+
+      - name: 설치 파일 만들어 Releases 에 올리기
+        run: npm run desktop:release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 릴리스 제목·설명 채우기
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          note=$(grep -m1 "^$version: " README.md | sed "s/^$version: //" || true)
+          {
+            echo "설치: 아래 \`MapleTimer-Setup-$version.exe\` 를 받아 실행하세요. 이미 설치했으면 앱이 알아서 바뀌어요."
+            if [ -n "$note" ]; then echo; echo "$note"; fi
+          } > notes.md
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "메이플 타이머 $version" --notes-file notes.md
+
+      - name: 올라간 파일 확인
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          assets=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          echo "$assets"
+          for f in "MapleTimer-Setup-$version.exe" "MapleTimer-Setup-$version.exe.blockmap" latest.yml; do
+            echo "$assets" | grep -qx "$f" || { echo "빠진 파일: $f" >&2; exit 1; }
+          done
