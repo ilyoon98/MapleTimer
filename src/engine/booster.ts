@@ -2,10 +2,9 @@ import { endingText } from "../alerts/speech";
 import { regionSignature } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
-import { readDigits, segment } from "../cv/digits";
+import { segment } from "../cv/digits";
 import { readSevenSegment } from "../cv/sevenSegment";
 import { EstimateConsensus, applyBoosterReading, stepReadTimer } from "../detect/consensus";
-import { activeTemplates } from "../detect/digitLearner";
 import { profileStore, type Profile } from "../state/profile";
 import { debugCrops, type BoosterLive } from "./live";
 import { frameTime, observation, runner } from "./shared";
@@ -52,8 +51,10 @@ export function tickBooster(p: Profile, now: number, live: boolean): BoosterLive
     debugCrops.set("booster", img);
     const seg = segment(img);
     lastBoosterSegment = seg;
-    // 실제 게임의 부스터 숫자는 디지털 시계 모양이라 막대 판독기로 먼저 읽고, 안 되면 학습한 글꼴로
-    const read = readSevenSegment(img) ?? readDigits(seg, activeTemplates());
+    // 실제 게임의 부스터 숫자는 디지털 시계 모양이라 막대 판독기로만 읽는다.
+    // 예전에는 못 읽으면 일반 숫자 판독기로 한 번 더 읽었는데, 부스터가 없을 때 배경을 '14' 같은 숫자로
+    // 잘못 읽어 거짓 알림이 났다(진단 기록 2026-11-08 01:22). 막대 판독기는 'SS.cc' 모양이 아니면 아예 안 읽는다
+    const read = readSevenSegment(img);
     rt.readText = read?.text ?? null;
     if (read && read.seconds > 0 && read.seconds < 3600) {
       const agreed = rt.ests.add(frameTime(now) + read.seconds * 1000, observation(now));

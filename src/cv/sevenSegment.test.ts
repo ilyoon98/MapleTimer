@@ -33,7 +33,7 @@ function render(text: string, opts: { quest?: boolean; questTop?: boolean; label
   };
   let blur = false; // 소수점 아래가 빠르게 바뀌며 흐릿하게 찍힌 모습: 막대 7개가 모두 반쯤 켜진다
   const rect = (x0: number, y0: number, x1: number, y1: number) => {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!blur || (x + y) % 2) put(x, y, lit(y));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!blur || y % 6 < 3) put(x, y, lit(y)); // 흐린 칸은 3줄 켜짐·3줄 꺼짐 줄무늬
   };
   let x = opts.labels ? 40 : 12;
   if (opts.labels) for (let y = TOP + 4; y < TOP + 16; y++) for (let lx = 6; lx < 34; lx += 3) put(lx, y, [240, 240, 240]); // '남은시간'

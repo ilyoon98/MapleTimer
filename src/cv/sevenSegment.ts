@@ -70,6 +70,16 @@ interface Column {
 }
 
 export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): DigitRead | null {
+  // 가는 획을 지운 그림과 원래 그림으로 둘 다 읽는다. 둘 다 'SS.cc' 모양이어야만 읽은 것으로 친다.
+  // 지운 그림을 먼저 믿되, 퀘스트 글자 테두리가 '4' 의 막대를 2px 로 깎으면 지운 그림에서는 '4' 가 사라져
+  // 49 가 9 로 읽히므로, 원래 그림이 같은 끝자리에 앞자리를 더 읽었으면 원래 그림을 쓴다
+  const opened = readWith(img, true, debug);
+  const raw = readWith(img, false, debug);
+  if (opened && raw && raw.text.length > opened.text.length && raw.text.endsWith(opened.text)) return raw;
+  return opened ?? raw;
+}
+
+function readWith(img: Pixels, open: boolean, debug?: (msg: string) => void): DigitRead | null {
   const W = img.width,
     H = img.height,
     d = img.data;
@@ -84,6 +94,12 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
     mask[i] = 1;
     if (d[p] - d[p + 2] >= 80) warm[i] = 1;
   }
+  // 퀘스트 알림 글자가 밝은 노랑인 맵('어둠이 내리는 나무줄기 3')에서는 글자 획이 막대처럼 켜져 보여서,
+  // 0 의 가운데에 걸리면 9 로, 점(.)에 붙으면 점을 못 찾았다. 글자 획은 2~3px, 숫자 막대는 5~6px 이라
+  // 3×3 으로 깎았다가 다시 불려(열기) 가는 획만 지운다. 글자 칸·점 찾기에만 쓰고, 막대가 켜졌는지는 원래 그림으로 센다
+  // (퀘스트 글자의 검은 테두리가 막대 가장자리를 덮으면 막대가 2px 만 남아 열기에서 같이 지워진다)
+  const rawMask = mask.slice();
+  if (open) mask.set(openMask(mask, W, H));
   // 숫자 막대는 4픽셀 넘게 두껍다. 1~2픽셀 가는 선(상자 뒤로 비치는 'MULTIKILL' 그림 등)과
   // 영역 가장자리에 걸린 덩어리는 숫자가 아닌데, 숫자 칸에 붙으면 칸 너비가 틀어진다
   const comps = components8(mask, W, H).filter(
@@ -129,6 +145,7 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
   const top = median(full.map((c) => c.y0));
   const bottom = median(full.map((c) => c.y1));
   const bandH = bottom - top + 1;
+  debug?.(`${open ? "[열기]" : "[원본]"} 줄 ${top}~${bottom} · 덩어리 ${cols.map((c) => `${c.x0}-${c.x1}/${c.y0}-${c.y1}`).join(" ")}`);
 
   // 켜진 비율. 퀘스트 글자에 대부분 가려져 알 수 없으면 NaN
   const lit = (x0: number, x1: number, y0: number, y1: number) => {
@@ -138,7 +155,7 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
     for (let y = Math.max(0, y0); y <= Math.min(H - 1, y1); y++)
       for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++, all++) {
         if (hidden[y * W + x]) continue;
-        on += mask[y * W + x] | dim[y * W + x];
+        on += rawMask[y * W + x] | dim[y * W + x];
         n++;
       }
     return n >= all * 0.3 && n ? on / n : NaN;
@@ -196,7 +213,8 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
         } else if (digit !== best && cost < second) second = cost;
       }
       debug?.(`x${c.x0} fills ${fills.map((f) => f.toFixed(2)).join(" ")} → ${best} cost ${bestCost.toFixed(2)} 2nd ${second.toFixed(2)}`);
-      if (bestCost > 1 || second - bestCost < 1) unknown();
+      // 차이가 딱 1 인 경우가 소수 계산 오차로 0.9999… 가 되어 버려지지 않게 약간 여유
+      if (bestCost > 1 || second - bestCost < 0.95) unknown();
       else toks.push({ x: c.x0, ch: String(best), cost: bestCost });
     } else if (w <= bandH * 0.3 && h <= bandH * 0.25 && c.y1 >= bottom - bandH * 0.12) {
       toks.push({ x: c.x0, ch: ".", cost: 0 });
@@ -221,4 +239,28 @@ export function readSevenSegment(img: Pixels, debug?: (msg: string) => void): Di
 function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   return s[s.length >> 1];
+}
+
+/** 3×3 열기: 깎기(주변 9칸이 모두 켜진 칸만 남김) 후 불리기. 굵기 3px 미만인 선이 사라진다 */
+function openMask(m: Uint8Array, W: number, H: number): Uint8Array {
+  const eroded = new Uint8Array(W * H);
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < W - 1; x++) {
+      let all = 1;
+      for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1; dx++) if (!m[(y + dy) * W + x + dx]) { all = 0; break; }
+      eroded[y * W + x] = all;
+    }
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!m[y * W + x]) continue;
+      let any = 0;
+      for (let dy = -1; dy <= 1 && !any; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < W && ny < H && eroded[ny * W + nx]) { any = 1; break; }
+        }
+      out[y * W + x] = any;
+    }
+  return out;
 }
