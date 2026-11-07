@@ -439,19 +439,12 @@ function PipView() {
       <PipBackground />
       <PipGear />
       <PipIssue />
-      {next && (
-        <div className="pip-next">
-          <span className="pip-next-label">다음 알림</span>
-          <span className="pip-next-name">{next.name}</span>
-          <span className="pip-next-time mono">{fmtRemaining(next.alertIn)}</span>
-        </div>
-      )}
-      {(p.rune.enabled || p.stall.enabled) && (
-        <div className="pip-status">
-          {p.rune.enabled && <span className={`pip-chip ${live.rune.status === "present" ? "pip-chip-alert" : ""}`}>룬 · {runeText}</span>}
-          {p.stall.enabled && <span className={`pip-chip ${live.stall.status === "stalled" ? "pip-chip-alert" : ""}`}>사냥 · {stallText}</span>}
-        </div>
-      )}
+      {/* 다음 알림 칸은 늘 같은 자리에 둔다 (없을 때 사라지면 아래 줄들이 들썩여서 불편) */}
+      <div className={`pip-next ${next ? "" : "pip-next-empty"}`}>
+        <span className="pip-next-label">다음 알림</span>
+        <span className="pip-next-name">{next?.name ?? "없음"}</span>
+        <span className="pip-next-time mono">{next ? fmtRemaining(next.alertIn) : "--"}</span>
+      </div>
       <div className="pip-list">
         {items.map((it) => (
           <div
@@ -465,7 +458,20 @@ function PipView() {
             {p.timers.some((t) => t.id === it.key) && <PipTimerButton id={it.key} />}
           </div>
         ))}
-        {items.length === 0 && <div className="muted">표시할 항목이 없어요</div>}
+        {/* 룬·사냥 멈춤도 다른 줄처럼 한 줄씩, 맨 아래 같은 자리에 (정렬로 자리가 바뀌지 않게) */}
+        {p.rune.enabled && (
+          <div className={`pip-item ${live.rune.status === "present" ? "pip-alert" : "pip-waiting"}`}>
+            <span className="pip-name">룬</span>
+            <span className="pip-time pip-time-word">{runeText}</span>
+          </div>
+        )}
+        {p.stall.enabled && (
+          <div className={`pip-item ${live.stall.status === "stalled" ? "pip-alert" : "pip-waiting"}`}>
+            <span className="pip-name">사냥 멈춤</span>
+            <span className="pip-time pip-time-word">{stallText}</span>
+          </div>
+        )}
+        {items.length === 0 && !p.rune.enabled && !p.stall.enabled && <div className="muted">표시할 항목이 없어요</div>}
       </div>
       <div className="pip-foot">
         <span>볼륨</span>

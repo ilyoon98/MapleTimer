@@ -1530,3 +1530,7 @@ input[type="text"] {
 .notice-update .notice-mark {
   background: var(--accent);
 }
+/* PIP: 다음 알림이 없을 때도 자리를 지키되 흐리게 */
+.pip-next-empty {
+  opacity: 0.55;
+}
