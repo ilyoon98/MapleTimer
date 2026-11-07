@@ -124,7 +124,7 @@ export function isBuffPresent(id: string) {
  * (실제 게임: 즐겨찾기 칸의 야누스가 0.90~0.92, 끝나기 직전 깜빡일 때 0.87)
  */
 function minScoreOf(b: BuffEntry): number {
-  // 프로그램에 넣어 둔 게임 아이콘: 실제 화면에서 야누스 0.79~0.83(숫자 빼고 비교), 다른 아이콘은 0.60 이하
+  // 프로그램에 넣어 둔 게임 아이콘: 실제 화면에서 야누스 0.80~0.92(가운데 숫자 자리 빼고 비교, 끝나기 직전 포함), 다른 곳은 0.60 이하
   if (b.icon) return 0.72;
   return b.slot ? Math.min(b.minScore, 0.85) : b.minScore;
 }

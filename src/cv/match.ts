@@ -16,6 +16,11 @@ export interface StoredTemplate {
    * - full: 아이콘 전체
    */
   matchMode?: "ring" | "noText" | "full";
+  /**
+   * 비교에서 뺄 상자 (아이콘 크기에 대한 비율 [왼, 위, 오른, 아래]). 프로그램에 넣어 둔 게임 아이콘은
+   * 가운데에 남은 시간 숫자가 크게 찍혀 그 값('79' 와 '9')에 따라 점수가 0.8 → 0.6 으로 떨어지므로 숫자 자리를 뺀다
+   */
+  ignoreBox?: [number, number, number, number];
 }
 
 export function templateMode(t: StoredTemplate): "ring" | "noText" | "full" {
@@ -155,6 +160,11 @@ export function prepareTemplate(stored: StoredTemplate): PreparedTemplate {
     // 글자를 빼고 남은 픽셀이 너무 적으면 테두리 방식으로 되돌린다
     if (mask.reduce((a, b) => a + b, 0) < mask.length * 0.3) mask = ringMask(t.width, t.height);
   } else mask = new Uint8Array(t.width * t.height).fill(1);
+  if (t.ignoreBox) {
+    const [l, u, r, d] = t.ignoreBox;
+    for (let y = Math.round(t.height * u); y < Math.round(t.height * d); y++)
+      for (let x = Math.round(t.width * l); x < Math.round(t.width * r); x++) mask[y * t.width + x] = 0;
+  }
   const prepared = prepareGray(gray, mask, px);
   // 큰 템플릿은 절반 크기 버전도 만들어 1차 탐색에 쓴다
   if (t.width >= 16 && t.height >= 16) {

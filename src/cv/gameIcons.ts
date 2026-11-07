@@ -7,11 +7,11 @@ import type { StoredTemplate } from "./match";
  * 칸에 따라 크기가 조금 달라서 찾을 때는 크기를 조금씩 바꿔 가며 비교한다.
  * 숫자 부분은 빼고 비교한다 (남은 시간이 계속 바뀌므로). RGBA 를 base64 로 저장.
  */
-function decode(width: number, height: number, b64: string): StoredTemplate {
+function decode(width: number, height: number, b64: string, ignoreBox?: StoredTemplate["ignoreBox"]): StoredTemplate {
   const bin = atob(b64);
   const rgba = new Array<number>(bin.length);
   for (let i = 0; i < bin.length; i++) rgba[i] = bin.charCodeAt(i);
-  return { width, height, rgba, ringOnly: false, matchMode: "noText" };
+  return { width, height, rgba, ringOnly: false, matchMode: "noText", ignoreBox };
 }
 
 export type GameIconId = "janus" | "fountain";
@@ -197,6 +197,12 @@ const FOUNTAIN =
 
 let cache: Record<GameIconId, StoredTemplate> | null = null;
 export function gameIcon(id: GameIconId): StoredTemplate {
-  cache ??= { janus: decode(45, 46, JANUS), fountain: decode(43, 43, FOUNTAIN) };
+  cache ??= {
+    // 야누스는 가운데 숫자 자리(남은 시간 '9'·'10'·'79')도 뺀다. 실제 알림 캡처 17장에서 끝나기 직전 점수가
+    // 0.59~0.70 (기준 0.72 아래라 아이콘을 놓침) → 0.80~0.92 로 올랐고, 다른 곳의 최고 점수는 0.60 그대로였다.
+    // 파운틴은 아직 실제 화면 기록이 없어 그대로 둔다
+    janus: decode(45, 46, JANUS, [0.2, 0.28, 0.8, 0.72]),
+    fountain: decode(43, 43, FOUNTAIN),
+  };
   return cache[id];
 }
