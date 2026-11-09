@@ -765,6 +765,11 @@ input[type="text"] {
   font-weight: 600;
   color: var(--muted);
 }
+/* 룬 있음!·멈춤! 처럼 울리는 줄의 상태 글자는 흐리게 하지 않고 알림색으로 */
+.pip .pip-alert .pip-time.pip-time-word {
+  color: var(--alert);
+  font-weight: 700;
+}
 .pip-clickable:hover {
   border-color: var(--accent);
 }
