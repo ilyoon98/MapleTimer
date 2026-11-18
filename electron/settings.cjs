@@ -1,9 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const PIP_STATE_KEY = 'maple-timer-personal.pip.v1';
 const KEYS = new Map([
   ['maple-timer-personal.profile.v1', 'profile.json'],
   ['maple-timer-personal.digits.v2', 'digits.json'],
   ['maple-timer-personal.presets.v1', 'presets.json'],
+  [PIP_STATE_KEY, 'pip.json'],
 ]);
 const MAX_BYTES = 16 * 1024 * 1024;
 
@@ -51,4 +53,4 @@ class SettingsRepository {
     return {ok:true};
   }
 }
-module.exports={SettingsRepository};
+module.exports={SettingsRepository,PIP_STATE_KEY};

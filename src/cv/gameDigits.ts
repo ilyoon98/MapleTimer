@@ -1,4 +1,5 @@
 import { GH, GW, type DigitTemplates } from "./digits";
+import compactBuffDigits from "./compactBuffDigits.json";
 
 /**
  * 실제 게임 화면에서 모은 버프·쿨타임 숫자(노란 글자, 검은 테두리)의 평균 모양.
@@ -23,4 +24,14 @@ let cache: DigitTemplates | null = null;
 export function gameDigitTemplates(): DigitTemplates {
   cache ??= ENCODED.map((e) => (e.length === GW * GH ? [Float32Array.from(e, (ch) => parseInt(ch, 36) / 35)] : []));
   return cache;
+}
+
+// 작은 야누스 아이콘에서 캡처한 글리프를 여러 크기로 보간해 정규화한 평균 모양이다.
+// 초 단위 숫자만 담고 있으며 일반 버프나 퀵슬롯의 글꼴 판정에는 쓰지 않는다.
+let compactCache: DigitTemplates | null = null;
+export function compactBuffDigitTemplates(): DigitTemplates {
+  compactCache ??= compactBuffDigits.map((variants) =>
+    variants.map((variant) => Float32Array.from(variant, (ch) => parseInt(ch, 36) / 35)),
+  );
+  return compactCache;
 }

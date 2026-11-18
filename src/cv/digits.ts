@@ -1,4 +1,4 @@
-import { type Pixels } from "./image";
+import { resizeRgba, type Pixels } from "./image";
 
 /**
  * 아이콘 위에 찍힌 쿨타임/남은 시간 숫자 읽기.
@@ -378,6 +378,40 @@ export function readDigits(seg: Segmented, templates: DigitTemplates, minScore =
   }
   const seconds = parseClock(text);
   return seconds == null ? null : { text, seconds, confidence: conf };
+}
+
+/** 버프는 초 또는 분:초로 표시된다. 글자 사이에 잡힌 작은 점은 버프 숫자의 일부가 아니다. */
+function buffTimeSegments(icon: Pixels): Segmented {
+  const seg = segment(icon);
+  return { ...seg, tokens: seg.tokens.filter((token) => token !== ".") };
+}
+
+/** 작은 버프 아이콘의 숫자는 보간한 뒤 글자 격자로 정규화한다. */
+export function readBuffDigits(icon: Pixels, templates: DigitTemplates, compactTemplates?: DigitTemplates): { seg: Segmented; read: DigitRead | null } {
+  const seg = buffTimeSegments(icon);
+  const read = readDigits(seg, templates);
+  if (read || Math.max(icon.width, icon.height) >= 40) return { seg, read };
+
+  const segmentAtScale = (scale: number) => {
+    const width = Math.round(icon.width * scale), height = Math.round(icon.height * scale);
+    return buffTimeSegments({ width, height, data: resizeRgba(icon.data, icon.width, icon.height, width, height) });
+  };
+  const enlarged = segmentAtScale(2);
+  if (compactTemplates && Math.min(icon.width, icon.height) < 32) {
+    const [glyph] = enlarged.glyphs;
+    // 두 자리 중 하나가 흐려진 경우를 한 자리 남은 시간으로 잘못 읽지 않는다.
+    const centered = enlarged.glyphs.length !== 1 || Math.abs(glyph.x + glyph.w / 2 - icon.width) <= icon.width * 0.21;
+    if (centered) {
+      const compactRead = readDigits(enlarged, compactTemplates);
+      if (compactRead) return { seg: enlarged, read: compactRead };
+    }
+  }
+  const enlargedRead = readDigits(enlarged, templates);
+  if (enlargedRead) return { seg: enlarged, read: enlargedRead };
+
+  const fallback = segmentAtScale(2.25);
+  const retry = readDigits(fallback, templates);
+  return retry ? { seg: fallback, read: retry } : { seg: enlarged, read: null };
 }
 
 /** "1:05" → 65, "43" → 43, "1:02:03" → 3723, "45.23" → 45.23 (부스터 타이머) */

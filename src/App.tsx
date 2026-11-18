@@ -12,7 +12,7 @@ import { RunePanel } from "./ui/panels/RunePanel";
 import { SkillsPanel } from "./ui/panels/SkillsPanel";
 import { StallPanel } from "./ui/panels/StallPanel";
 import { TimersPanel } from "./ui/panels/TimersPanel";
-import { closePip, openPip, pipStore, pipSupported } from "./ui/Pip";
+import { closePip, openPip, pipStore, pipSupported, restorePip } from "./ui/Pip";
 import { RegionPicker } from "./ui/RegionPicker";
 import { ReplayLoader } from "./dev/ReplayLoader";
 import { GuideModal } from "./ui/Guide";
@@ -24,7 +24,7 @@ import { DownloadButton } from "./ui/DownloadButton";
 import { BuffLocationPicker } from "./ui/BuffLocationPicker";
 import { buffLocationStore } from "./ui/buffLocationStore";
 import { audioEngine } from "./alerts/audio";
-import { connectMaple, connectStore, startCapture } from "./ui/connect";
+import { connectMaple, connectStore, stopCapture } from "./ui/connect";
 
 const PANELS: Record<PanelId, (p: { collapsed: boolean; onToggleCollapse: () => void }) => React.ReactNode> = {
   skills: (p) => <SkillsPanel {...p} />,
@@ -64,39 +64,39 @@ function ShareChip() {
   const stale = liveStore.use((s) => s.captureStale);
   const black = liveStore.use((s) => s.captureBlack);
   const err = connectStore.use((s) => s.error);
-  const picking = connectStore.use((s) => s.picking);
+  const picking = connectStore.use((s) => s.picking === "main");
+  const connecting = connectStore.use((s) => s.connecting);
   const setErr = (error: string | null) => connectStore.set({ error });
-  const closePicking = () => connectStore.set({ picking: false });
   const [viewportPick, setViewportPick] = useState(false);
-  const start = startCapture;
-  if (cap.state === "live")
-    return (
-      <div className={`share-chip share-live ${stale || black ? "share-stale" : ""}`}>
-        <span className="dot" /> {black ? "화면이 검음" : stale ? "화면 멈춤" : "연결됨"}
-        {cap.w > 0 && <span className="mono muted" title="공유 중인 게임 화면 크기">{cap.w}×{cap.h}</span>}
-        <button onClick={connectMaple}>다른 창 선택</button>
-        <button onClick={() => screenCapture.stop("user")}>중지</button>
-        <button onClick={() => setViewportPick(true)}>게임 영역</button>
-        {viewportPick && <RegionPicker raw title="게임 영역 맞추기" guide={['검은 여백과 창 테두리를 빼고 게임 화면만 선택하세요.']} onClose={() => setViewportPick(false)}
-          onConfirm={({region})=>{
-            if(region.w<320||region.h<240){setErr('게임 화면 전체를 선택해 주세요.');return;}
-            const size=`${screenCapture.sourceWidth}x${screenCapture.sourceHeight}`;
-            profileStore.set(p=>({...p,gameViewports:{...p.gameViewports,[size]:{x:region.x,y:region.y,w:region.w,h:region.h}}}));
-            setViewportPick(false);
-          }} />}
-        {picking && <CapturePicker onSelect={start} onClose={closePicking} />}
-      </div>
-    );
   return (
-    <div className="share-chip share-off">
-      <span className="dot" /> {cap.state === "starting" ? "선택 대기 중…" : cap.state === "ended" ? "공유 끊김" : "연결 안 됨"}
-      <button className="primary" onClick={connectMaple} disabled={cap.state === "starting"}>
-        메이플 연결
-      </button>
-      {err && <span className="error">{err}</span>}
-      {cap.state === "ended" && screenCapture.error && <span className="error">{screenCapture.error}</span>}
-      {picking && <CapturePicker onSelect={start} onClose={closePicking} />}
-    </div>
+    <>
+      {cap.state === "live" ? (
+        <div className={`share-chip share-live ${stale || black ? "share-stale" : ""}`}>
+          <span className="dot" /> {black ? "화면이 검음" : stale ? "화면 멈춤" : "연결됨"}
+          {cap.w > 0 && <span className="mono muted" title="공유 중인 게임 화면 크기">{cap.w}×{cap.h}</span>}
+          <button onClick={connectMaple} disabled={connecting}>다른 창 선택</button>
+          <button onClick={stopCapture} disabled={connecting}>중지</button>
+          <button onClick={() => setViewportPick(true)}>게임 영역</button>
+          {viewportPick && <RegionPicker raw title="게임 영역 맞추기" guide={['검은 여백과 창 테두리를 빼고 게임 화면만 선택하세요.']} onClose={() => setViewportPick(false)}
+            onConfirm={({region})=>{
+              if(region.w<320||region.h<240){setErr('게임 화면 전체를 선택해 주세요.');return;}
+              const size=`${screenCapture.sourceWidth}x${screenCapture.sourceHeight}`;
+              profileStore.set(p=>({...p,gameViewports:{...p.gameViewports,[size]:{x:region.x,y:region.y,w:region.w,h:region.h}}}));
+              setViewportPick(false);
+            }} />}
+        </div>
+      ) : (
+        <div className="share-chip share-off">
+          <span className="dot" /> {cap.state === "starting" ? "선택 대기 중…" : cap.state === "ended" ? "공유 끊김" : "연결 안 됨"}
+          <button className="primary" onClick={connectMaple} disabled={connecting || cap.state === "starting"}>
+            메이플 연결
+          </button>
+          {err && <span className="error">{err}</span>}
+          {cap.state === "ended" && screenCapture.error && <span className="error">{screenCapture.error}</span>}
+        </div>
+      )}
+      {picking && <CapturePicker surface="main" />}
+    </>
   );
 }
 
@@ -137,6 +137,7 @@ export function App() {
 
   useEffect(() => {
     startEngine();
+    void restorePip();
     const unlock = () => audioEngine.unlock();
     window.addEventListener("pointerdown", unlock);
     return () => window.removeEventListener("pointerdown", unlock);

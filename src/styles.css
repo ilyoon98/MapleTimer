@@ -782,17 +782,24 @@ input[type="text"] {
   gap: 6px;
   font-size: 12px;
 }
-.pip-foot .pip-missed { font-size: 12px; padding: 2px 8px; white-space: nowrap; }
+.pip-capture-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  position: relative;
+  font-size: 12px;
+}
+.pip-capture-actions .pip-missed { font-size: 12px; padding: 2px 8px; white-space: nowrap; }
 .pip-missed-menu {
-  position: fixed;
-  right: 8px;
-  bottom: 44px;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
   z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 140px;
-  max-height: calc(100vh - 56px);
+  max-height: calc(100vh - 78px);
   overflow: auto;
   padding: 8px;
   border: 1px solid var(--line);
@@ -1376,6 +1383,37 @@ input[type="text"] {
 .capture-sources button { min-width:0; }
 .capture-sources span { max-width:100%; white-space:normal; }
 .modal-head h2 { margin:0; flex:1; font-size:20px; }
+.pip-capture-picker { padding: 6px; }
+.pip-capture-picker .modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 12px);
+  padding: 0 8px 8px;
+}
+.pip-capture-picker .modal-head { gap: 6px; padding: 6px 0; }
+.pip-capture-picker .modal-head h2 { font-size: 14px; }
+.pip-capture-picker .modal-body { display: flex; flex-direction: column; min-height: 0; font-size: 12px; }
+.pip-capture-picker .modal-body p { margin: 2px 0; }
+.pip-capture-picker .capture-sources {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  margin: 4px 0;
+}
+.pip-capture-picker .capture-sources button {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  font-size: 12px;
+  padding: 4px;
+}
+.pip-capture-picker .capture-sources img { height: auto; aspect-ratio: 16 / 9; }
+.pip-capture-picker .capture-sources span { font-size: inherit; }
+.pip-capture-picker .field-row { flex-wrap: nowrap; justify-content: space-between; margin-top: 4px; }
+.pip-capture-picker .field-row button,
+.pip-capture-picker .modal-head button { font-size: 12px; padding: 3px 6px; }
 /* PIP 글자 크기: 글자가 있는 부분만 키운다 */
 .pip-issue,
 .pip-next,

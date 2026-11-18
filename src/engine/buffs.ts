@@ -3,17 +3,18 @@ import { endingText } from "../alerts/speech";
 import { autoBuffbarRegion, favoritesRegion, regionSignature } from "../capture/detectionRegions";
 import { screenCapture } from "../capture/screenCapture";
 import { regionValidFor } from "../capture/types";
-import { readDigits, segment } from "../cv/digits";
-import { cropPixels, toGray, type Pixels } from "../cv/image";
+import { readBuffDigits, type DigitRead } from "../cv/digits";
+import { compactBuffDigitTemplates } from "../cv/gameDigits";
+import { cropPixels, toGray } from "../cv/image";
 import { findTemplate, type PreparedTemplate, type StoredTemplate } from "../cv/match";
-import { gameIcon } from "../cv/gameIcons";
+import { gameIconTemplates } from "../cv/gameIcons";
 import { EstimateConsensus, applyExpiry, keepEndAfterVanish } from "../detect/consensus";
 import { CooldownSequenceRecorder, activeTemplates } from "../detect/digitLearner";
 import { PresenceTracker } from "../detect/presence";
 import type { SavedRegion } from "../capture/types";
 import { preciseIcon, profileStore, shortName, tts, type BuffEntry, type Profile } from "../state/profile";
 import { debugCrops, type BuffLive } from "./live";
-import { frameTime, observation, learnFrom, prepared, preparedScales, runner, runners } from "./shared";
+import { frameTime, observation, learnFrom, prepared, runner, runners } from "./shared";
 import { pauseLinkedTimers, startLinkedTimers } from "./timers";
 import { createBuffSearcher, type SearchMeta } from "./search/buffSearcher";
 import type { SearchItem, SearchRegion, TemplateDef } from "./search/buffSearch";
@@ -169,7 +170,7 @@ export function preciseSkillBuffs(p: Profile, frameW: number, frameH: number): B
 
 /** 비교할 아이콘: 프로그램에 넣어 둔 게임 아이콘(크기 몇 가지) 또는 사용자가 등록한 아이콘 */
 function templatesOf(b: BuffEntry): PreparedTemplate[] {
-  if (b.icon) return preparedScales(gameIcon(b.icon));
+  if (b.icon) return gameIconTemplates(b.icon);
   return b.template ? [prepared(b.template)] : [];
 }
 
@@ -278,8 +279,8 @@ export function trackBuffIcons(p: Profile, now: number, live: boolean) {
     rt.colorDist = m.colorDist;
     const icon = cropPixels(img, m.x, m.y, t.gray.width, t.gray.height);
     debugCrops.set(`buff:${b.id}`, new ImageData(new Uint8ClampedArray(icon.data), icon.width, icon.height));
-    const seg = segment(icon);
-    readBuffTime(b, rt, icon, now, seg);
+    const { seg, read } = readBuffDigits(icon, activeTemplates(), b.icon === "janus" ? compactBuffDigitTemplates() : undefined);
+    readBuffTime(b, rt, now, read);
     const res = rt.recorder.feed(seg, now);
     if (res) learnFrom(res, b.name, now);
   }
@@ -289,8 +290,7 @@ export function trackBuffIcons(p: Profile, now: number, live: boolean) {
  * 버프 아이콘 위의 남은 시간 숫자를 읽어 종료 시각을 맞춘다 (정밀 감지).
  * 3번 연달아 서로 2초 안으로 맞아야 믿고, 더 늦은 종료 시각이 확인되면(재사용·자석펫 연장) 새 주기로 본다.
  */
-function readBuffTime(b: BuffEntry, rt: BuffRuntime, icon: Pixels, now: number, seg = segment(icon)) {
-  const read = readDigits(seg, activeTemplates());
+function readBuffTime(b: BuffEntry, rt: BuffRuntime, now: number, read: DigitRead | null) {
   rt.readText = read?.text ?? null;
   if (!read || read.seconds < 1) {
     rt.readEsts.reset();

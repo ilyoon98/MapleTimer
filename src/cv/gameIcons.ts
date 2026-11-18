@@ -1,4 +1,5 @@
-import type { StoredTemplate } from "./match";
+import { prepareTemplate, scaleTemplate, type PreparedTemplate, type StoredTemplate } from "./match";
+import janusSmallRgba from "./janus-small.rgba.txt?raw";
 
 /**
  * 실제 게임에서 찍은 버프 아이콘 (사용자가 따로 등록하지 않도록 프로그램에 넣어 둔다).
@@ -205,4 +206,23 @@ export function gameIcon(id: GameIconId): StoredTemplate {
     fountain: decode(43, 43, FOUNTAIN),
   };
   return cache[id];
+}
+
+const iconScales = [0.92, 1, 1.08];
+// 작은 UI에서는 테두리의 픽셀 배치도 달라진다. 1366×768에서 캡처한 작은 아이콘을 기준으로 삼는다.
+const janusSmallScales = [0.9375, 1, 1.065, 1.155, 1.24];
+const preparedIcons = new Map<GameIconId, PreparedTemplate[]>();
+
+export function gameIconTemplates(id: GameIconId): PreparedTemplate[] {
+  let templates = preparedIcons.get(id);
+  if (!templates) {
+    const icon = gameIcon(id);
+    templates = iconScales.map((scale) => prepareTemplate(scale === 1 ? icon : scaleTemplate(icon, scale)));
+    if (id === "janus") {
+      const small = decode(32, 33, janusSmallRgba, icon.ignoreBox);
+      templates.push(...janusSmallScales.map((scale) => prepareTemplate(scale === 1 ? small : scaleTemplate(small, scale))));
+    }
+    preparedIcons.set(id, templates);
+  }
+  return templates;
 }

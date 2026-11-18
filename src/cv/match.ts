@@ -1,5 +1,5 @@
 import { isTextYellow } from "./digits";
-import { toGray, type Gray, type Pixels } from "./image";
+import { resizeRgba, toGray, type Gray, type Pixels } from "./image";
 
 /** 화면에서 직접 잘라 저장한 아이콘 템플릿 (localStorage 에 저장할 수 있게 숫자 배열) */
 export interface StoredTemplate {
@@ -124,27 +124,10 @@ export function trimToIconBorder(t: StoredTemplate): StoredTemplate {
 
 /** 템플릿 크기를 s 배로 바꾼다 (같은 아이콘이 버프칸·즐겨찾기 칸에서 조금 다른 크기로 보일 때) */
 export function scaleTemplate(t: StoredTemplate, s: number): StoredTemplate {
-  const w = Math.max(4, Math.round(t.width * s)),
-    h = Math.max(4, Math.round(t.height * s));
-  const rgba = new Array<number>(w * h * 4);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const fx = Math.min(t.width - 1, ((x + 0.5) * t.width) / w - 0.5),
-        fy = Math.min(t.height - 1, ((y + 0.5) * t.height) / h - 0.5);
-      const x0 = Math.max(0, Math.floor(fx)),
-        y0 = Math.max(0, Math.floor(fy));
-      const x1 = Math.min(t.width - 1, x0 + 1),
-        y1 = Math.min(t.height - 1, y0 + 1);
-      const ax = Math.max(0, fx - x0),
-        ay = Math.max(0, fy - y0);
-      for (let c = 0; c < 4; c++) {
-        const v = (xx: number, yy: number) => t.rgba[(yy * t.width + xx) * 4 + c];
-        rgba[(y * w + x) * 4 + c] = Math.round(
-          (v(x0, y0) * (1 - ax) + v(x1, y0) * ax) * (1 - ay) + (v(x0, y1) * (1 - ax) + v(x1, y1) * ax) * ay,
-        );
-      }
-    }
-  return { ...t, width: w, height: h, rgba };
+  const width = Math.max(4, Math.round(t.width * s));
+  const height = Math.max(4, Math.round(t.height * s));
+  const rgba = Array.from(resizeRgba(t.rgba, t.width, t.height, width, height));
+  return { ...t, width, height, rgba };
 }
 
 export function prepareTemplate(stored: StoredTemplate): PreparedTemplate {

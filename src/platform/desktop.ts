@@ -14,6 +14,7 @@ declare global {
       listSources(): Promise<CaptureSource[]>;
       selectSource(id: string): Promise<void>;
       appInfo?(): Promise<{version: string; packaged: boolean}>;
+      shouldRestorePip?(): Promise<boolean>;
       settings?: {
         read(key: string): {value: string | null; recovered?: boolean; error?: string};
         write(key: string,value: string): {ok: boolean; error?: string};

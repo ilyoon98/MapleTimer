@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createRoot } from "react-dom/client";
 import { screenCapture } from "../capture/screenCapture";
 import { appTicker } from "../core/ticker";
 import { SPECIAL_CORE_ENABLED } from "../state/features";
@@ -22,6 +22,8 @@ import {
   type PipText,
 } from "../state/profile";
 import { Toggle, fmtRemaining } from "./common";
+import { closeCapturePicker, connectMapleFromPip, connectStore, stopCapture } from "./connect";
+import { CapturePicker } from "./CapturePicker";
 import { useIssues } from "./issues";
 import { pauseTimer, startTimer } from "./panels/TimersPanel";
 
@@ -35,13 +37,23 @@ declare global {
 }
 
 export const pipStore = createStore<{ open: boolean }>({ open: false });
-let pipRoot: Root | null = null;
 let overlay: Window | null = null;
+let restoreRequested = false;
 
 export const pipSupported = () => !!desktop || !!window.documentPictureInPicture;
 
 /** 이보다 작게 저장하지 않는다 (잘못 줄어든 채로 다시 열리지 않게) */
 const MIN_PIP = { width: 200, height: 160 };
+
+export async function restorePip() {
+  if (!desktop?.shouldRestorePip || restoreRequested) return;
+  restoreRequested = true;
+  try {
+    if ((await desktop.shouldRestorePip()) && !pipStore.get().open) await openPip();
+  } catch (e) {
+    console.warn("PIP 상태를 복원하지 못했어요.", e);
+  }
+}
 
 /** 게임 위에 항상 떠 있는 작은 타이머 창 (Chrome Document Picture-in-Picture) */
 export async function openPip() {
@@ -74,8 +86,8 @@ export async function openPip() {
   pip.document.body.className = "pip-body";
   const mount = pip.document.createElement("div");
   pip.document.body.appendChild(mount);
-  pipRoot = createRoot(mount);
-  pipRoot.render(<PipRoot />);
+  const root = createRoot(mount);
+  root.render(<PipRoot />);
   overlay = pip;
   pipStore.set({ open: true });
   // 보이는 PIP 창의 타이머도 감지를 깨운다. 원래 탭의 워커 신호가 늦어져도 계속 확인한다.
@@ -91,11 +103,14 @@ export async function openPip() {
   });
   pip.addEventListener("pagehide", () => {
     pip.clearInterval(heartbeat);
-    pipRoot?.unmount();
-    pipRoot = null;
-    overlay = null;
-    pipStore.set({ open: false });
-  });
+    pip.clearTimeout(sizeTimer);
+    root.unmount();
+    if (overlay === pip) {
+      overlay = null;
+      closeCapturePicker("pip");
+      pipStore.set({ open: false });
+    }
+  }, { once: true });
 }
 
 export function closePip() {
@@ -285,7 +300,7 @@ function PipMissed() {
     return () => clearTimeout(t);
   }, [done]);
   const options = missedOptions(p);
-  if (screenCapture.state !== "live" || !options.length) return null;
+  if (!options.length) return null;
   const pick = (o: { key: string; label: string }) => {
     setOpen(false);
     setDone(captureMissedAlert(o.key, `놓침: ${o.label}`) ? `'${o.label}' 남겼어요` : "지금은 못 남겨요");
@@ -304,6 +319,29 @@ function PipMissed() {
           <button className="pip-missed-cancel" onClick={() => setOpen(false)}>닫기</button>
         </div>
       )}
+    </>
+  );
+}
+
+const subscribeToCapture = (listener: () => void) => screenCapture.onChange(listener);
+const captureState = () => screenCapture.state;
+
+function PipCaptureControls({ showMissed = false }: { showMissed?: boolean }) {
+  const state = useSyncExternalStore(subscribeToCapture, captureState);
+  const connecting = connectStore.use((s) => s.connecting) || state === "starting";
+  const error = connectStore.use((s) => s.error);
+  const sharing = state === "live";
+  return (
+    <>
+      {!sharing && !desktop && error && <div className="pip-issue" role="alert">{error}</div>}
+      <div className="pip-capture-actions">
+        {sharing ? <button className="pip-btn" onClick={stopCapture} disabled={connecting}>공유 중지</button> : (
+          <button className="pip-btn primary" onClick={connectMapleFromPip} disabled={connecting}>
+            {connecting ? "연결 중…" : "메이플 연결"}
+          </button>
+        )}
+        {sharing && showMissed && <PipMissed />}
+      </div>
     </>
   );
 }
@@ -336,6 +374,7 @@ function CorePipView() {
       <div className="pip-core-name">{core?.name ?? "특수 코어 항목 없음"}</div>
       <div className={`pip-core-time mono ${soon ? "urgent" : ""}`}>{ready ? "사용 가능" : fmtRemaining(rem)}</div>
       <div className="pip-core-state muted">{!core ? "특수 코어 알림에서 '+ 추가'를 눌러 주세요" : ready ? "" : soon ? "곧 사용 가능" : "쿨타임"}</div>
+      <PipCaptureControls />
       <ModeSwitch />
     </div>
   );
@@ -352,7 +391,13 @@ function ModeSwitch() {
 
 function PipRoot() {
   const mode = profileStore.use((s) => s.pipMode);
-  return SPECIAL_CORE_ENABLED && mode === "core" ? <CorePipView /> : <PipView />;
+  const picking = connectStore.use((s) => s.picking === "pip");
+  return (
+    <>
+      {SPECIAL_CORE_ENABLED && mode === "core" ? <CorePipView /> : <PipView />}
+      {picking && <CapturePicker surface="pip" ownerWindow={overlay ?? window} />}
+    </>
+  );
 }
 
 function PipView() {
@@ -473,6 +518,7 @@ function PipView() {
         )}
         {items.length === 0 && !p.rune.enabled && !p.stall.enabled && <div className="muted">표시할 항목이 없어요</div>}
       </div>
+      <PipCaptureControls showMissed />
       <div className="pip-foot">
         <span>볼륨</span>
         <input
@@ -488,7 +534,6 @@ function PipView() {
           {p.muted ? "🔇" : "🔊"}
         </button>
         {SPECIAL_CORE_ENABLED && p.buffs.some((b) => b.kind === "cooldown") && <ModeSwitch />}
-        <PipMissed />
       </div>
       {live.ringing.length > 0 && (
         <button className="ringing-btn" onClick={stopRingingAlerts}>

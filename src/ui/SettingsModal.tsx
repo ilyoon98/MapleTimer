@@ -13,12 +13,12 @@ import { deletePreset, loadPreset, presetStore, savePreset } from "../state/pres
 import { refreshCustomSounds } from "./AlertSettings";
 import { Toggle } from "./common";
 
-export function useEscape(onClose: () => void) {
+export function useEscape(onClose: () => void, ownerWindow: Window = window) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    ownerWindow.addEventListener("keydown", onKey);
+    return () => ownerWindow.removeEventListener("keydown", onKey);
+  }, [onClose, ownerWindow]);
 }
 
 export function SettingsModal({ onClose }: { onClose: () => void }) {

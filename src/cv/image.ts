@@ -12,6 +12,25 @@ export interface Gray {
   height: number;
 }
 
+/** 픽셀 중심을 기준으로 RGBA 영상을 쌍선형 보간한다. */
+export function resizeRgba(data: ArrayLike<number>, width: number, height: number, w: number, h: number): Uint8ClampedArray {
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const fy = Math.max(0, Math.min(height - 1, ((y + 0.5) * height) / h - 0.5));
+    const y0 = Math.floor(fy), y1 = Math.min(height - 1, y0 + 1), ay = fy - y0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.max(0, Math.min(width - 1, ((x + 0.5) * width) / w - 0.5));
+      const x0 = Math.floor(fx), x1 = Math.min(width - 1, x0 + 1), ax = fx - x0;
+      for (let c = 0; c < 4; c++) {
+        const top = data[(y0 * width + x0) * 4 + c] * (1 - ax) + data[(y0 * width + x1) * 4 + c] * ax;
+        const bottom = data[(y1 * width + x0) * 4 + c] * (1 - ax) + data[(y1 * width + x1) * 4 + c] * ax;
+        rgba[(y * w + x) * 4 + c] = Math.round(top * (1 - ay) + bottom * ay);
+      }
+    }
+  }
+  return rgba;
+}
+
 export function toGray(img: Pixels): Gray {
   const n = img.width * img.height;
   const out = new Float32Array(n);

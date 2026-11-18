@@ -11,19 +11,33 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.setName('메이플 타이머 개인용');
 // 설치 위치·파일명·버전이 바뀌어도 같은 설정을 사용한다. 테스트의 별도 프로필은 존중한다.
 if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), '메이플 타이머 개인용'));
-const { SettingsRepository } = require('./settings.cjs');
+const { SettingsRepository, PIP_STATE_KEY } = require('./settings.cjs');
 const settings = new SettingsRepository(path.join(app.getPath('userData'), 'settings'));
 const { createUpdateController } = require('./updates.cjs');
 let updates = createUpdateController({version:app.getVersion()});
 let main;
 let selected = null;
 const children = new Set();
+let closingApp = false;
+app.on('before-quit', () => { closingApp = true; });
 if(!app.requestSingleInstanceLock())app.quit();
 app.on('second-instance',()=>{if(main){if(main.isMinimized())main.restore();main.show();main.focus();}});
 const trusted = (event) => event.sender === main?.webContents && event.senderFrame === main.webContents.mainFrame
   && event.senderFrame.url === `${ORIGIN}/`;
 const sources = () => desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 240, height: 135 } });
 const ownIds = () => new Set(BrowserWindow.getAllWindows().map(w => w.getMediaSourceId().split(':').slice(0, 2).join(':')));
+
+function rememberPip(open) {
+  try { settings.write(PIP_STATE_KEY, JSON.stringify({ open })); }
+  catch (e) { console.warn('PIP 상태를 저장하지 못했어요.', e); }
+}
+
+function closePipWindows() {
+  for (const child of children) {
+    children.delete(child);
+    child.destroy();
+  }
+}
 
 function setupUpdates() {
   let updater=null;
@@ -56,6 +70,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('app:info',event=>{
     if(!trusted(event))throw new Error('허용되지 않은 요청');
     return {version:app.getVersion(),packaged:app.isPackaged};
+  });
+  ipcMain.handle('pip:restore', (event) => {
+    if (!trusted(event)) throw new Error('허용되지 않은 요청');
+    const { value, error } = settings.read(PIP_STATE_KEY);
+    if (error) throw new Error(error);
+    return JSON.parse(value)?.open === true;
   });
   ipcMain.handle('update:check',event=>{
     if(!trusted(event))throw new Error('허용되지 않은 요청');return updates.check();
@@ -101,18 +121,26 @@ app.whenReady().then(async () => {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false } });
   main.setMenuBarVisibility(false);
   main.webContents.on('will-navigate', (event, url) => { if (url !== `${ORIGIN}/`) event.preventDefault(); });
+  main.webContents.on('did-start-navigation', ({ url, isMainFrame, isSameDocument }) => {
+    if (url === `${ORIGIN}/` && isMainFrame && !isSameDocument) closePipWindows();
+  });
   main.webContents.setWindowOpenHandler(({ url, frameName }) => url === 'about:blank' && frameName === 'maple-overlay'
-    ? { action: 'allow', overrideBrowserWindowOptions: { title: '메이플 타이머', alwaysOnTop: true, autoHideMenuBar: true, minWidth: 220, minHeight: 180,
+    ? { action: 'allow', outlivesOpener: true, overrideBrowserWindowOptions: { title: '메이플 타이머', alwaysOnTop: true, autoHideMenuBar: true, minWidth: 220, minHeight: 180,
       webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false } } }
     : { action: 'deny' });
   main.webContents.on('did-create-window', child => {
     children.add(child);
+    rememberPip(true);
     child.setAlwaysOnTop(true, 'floating');
     child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     child.webContents.on('will-navigate', event => event.preventDefault());
-    child.on('closed', () => children.delete(child));
+    child.on('closed', () => {
+      if (children.delete(child) && !closingApp && children.size === 0) rememberPip(false);
+    });
   });
-  main.on('closed', () => { for (const child of children) child.destroy(); main = null; });
+  // 앱 종료로 닫히는 PIP는 다음 실행에서 다시 연다.
+  main.on('close', () => { closingApp = true; });
+  main.on('closed', () => { main = null; closePipWindows(); });
   await main.loadURL(`${ORIGIN}/`);
   setupUpdates();
 });

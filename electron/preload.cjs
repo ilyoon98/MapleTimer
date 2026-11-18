@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld('mapleDesktop', Object.freeze({
   listSources: () => ipcRenderer.invoke('capture:list'),
   selectSource: (id) => ipcRenderer.invoke('capture:select', id),
   appInfo: () => ipcRenderer.invoke('app:info'),
+  shouldRestorePip: () => ipcRenderer.invoke('pip:restore'),
   settings: Object.freeze({
     read: key => ipcRenderer.sendSync('settings:read', key),
     write: (key,value) => ipcRenderer.sendSync('settings:write', key,value),

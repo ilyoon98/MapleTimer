@@ -2,12 +2,11 @@
  * 알림 캡처 자동 분석 (개발용). 브라우저·DOM 없이 돈다:
  * scripts/evidence-check.mjs 가 진단 파일을 읽어 여기로 넘기고, 회귀 테스트(evidence.test.ts)도 같은 판정을 쓴다.
  */
-import { readDigits, segment, type DigitTemplates } from "../cv/digits";
-import { gameDigitTemplates } from "../cv/gameDigits";
-import { gameIcon, type GameIconId } from "../cv/gameIcons";
+import { readBuffDigits, type DigitTemplates } from "../cv/digits";
+import { compactBuffDigitTemplates, gameDigitTemplates } from "../cv/gameDigits";
+import { gameIconTemplates, type GameIconId } from "../cv/gameIcons";
 import { cropPixels, toGray, type Pixels } from "../cv/image";
-import { findTemplate, prepareTemplate, scaleTemplate, type StoredTemplate } from "../cv/match";
-import { ICON_SCALES } from "../engine/search/buffSearch";
+import { findTemplate, prepareTemplate, type StoredTemplate } from "../cv/match";
 import { preciseIcon, type BuffEntry, type SkillEntry } from "../state/profile";
 import { readSevenSegment } from "../cv/sevenSegment";
 import { DEFAULT_RUNE_COLOR, detectRuneByColor, detectRuneByTemplate, type RuneColorRange } from "../detect/rune";
@@ -65,9 +64,7 @@ function digitTemplates(learned?: LearnedDigitsData): DigitTemplates {
 
 /** 버프칸(또는 정한 자리)에서 아이콘을 찾고, 찾으면 그 위의 남은 시간 숫자를 읽는다 */
 export function recheckIcon(crop: Pixels, setup: IconSetup, learned?: LearnedDigitsData) {
-  const stored = setup.icon ? gameIcon(setup.icon) : setup.template ?? null;
-  if (!stored) return { found: false, score: 0, text: null as string | null };
-  const templates = setup.icon ? ICON_SCALES.map((k) => prepareTemplate(k === 1 ? stored : scaleTemplate(stored, k))) : [prepareTemplate(stored)];
+  const templates = setup.icon ? gameIconTemplates(setup.icon) : setup.template ? [prepareTemplate(setup.template)] : [];
   const gray = toGray(crop);
   let best: { x: number; y: number; score: number; colorDist: number; w: number; h: number } | null = null;
   for (const t of templates) {
@@ -78,7 +75,9 @@ export function recheckIcon(crop: Pixels, setup: IconSetup, learned?: LearnedDig
   const found = !!best && best.score >= setup.minScore && best.colorDist <= 60;
   let text: string | null = null;
   if (found && best && setup.readTime) {
-    text = readDigits(segment(cropPixels(crop, best.x, best.y, best.w, best.h)), digitTemplates(learned))?.text ?? null;
+    const icon = cropPixels(crop, best.x, best.y, best.w, best.h);
+    const compact = setup.icon === "janus" ? compactBuffDigitTemplates() : undefined;
+    text = readBuffDigits(icon, digitTemplates(learned), compact).read?.text ?? null;
   }
   return { found, score: best?.score ?? 0, text };
 }
